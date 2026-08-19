@@ -68,6 +68,6 @@ alembic upgrade head              # run migrations (uses DATABASE_URL_DIRECT)
 | `DATABASE_URL` | App runtime DB connection — POOLED (transaction mode) |
 | `DATABASE_URL_DIRECT` | Alembic migrations only — DIRECT connection |
 | `OPENAI_API_KEY` | LLM calls for risk assessment |
-| `OPENAI_MODEL` | Pinned model string, not an alias |
+| `OPENAI_MODEL` | Pinned model string, not an alias. Live-verified 2026-08-19 (T-03): `gpt-5.6-luna` — confirmed via `GET /v1/models/{model}` (200) and a minimal `/v1/chat/completions` call (200, `finish_reason: stop`) |
 | `ENV` | Deployment environment (dev/staging/prod) |
 | `LOG_LEVEL` | Logging verbosity |
