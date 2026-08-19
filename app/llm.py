@@ -99,7 +99,11 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
             return self._cache[key]
 
         result = await self._call(action_type, resource, params)
-        self._cache[key] = result
+        if not result.degraded:
+            # Only genuine successes are cached - a failed/degraded call
+            # must never "stick" and be replayed after the underlying
+            # issue has recovered.
+            self._cache[key] = result
         return result
 
     async def _call(

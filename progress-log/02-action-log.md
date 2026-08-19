@@ -505,3 +505,22 @@ curl across all terminal paths, hash chain valid across 15 real records.
 Evidence: reports/evidence/G2-state-machine-curl.txt,
 reports/gates/G2-report.md, reports/blocks/block-2-report.md.
 BLOCK 2 COMPLETE. Not starting Block 3.
+
+### [2026-08-20 01:15 IST] [Issue 2 fix] [delivery engineer]
+Action: Pre-T-14 production-readiness fix, plan-mode approved with 4
+open design decisions resolved by the product owner (real Neon dev DB
+for new DB tests, atomic multi-table writes, populate both LLM metadata
+columns, don't-cache-failures over TTL-based expiry).
+Fixed the documented G2 finding: `OpenAIConfidenceProvider`'s cache
+(`app/llm.py`) cached failed/degraded results identically to successes,
+with no TTL, in a process-lifetime singleton — a transient failure could
+"stick" forever. Wrote `test_degraded_result_is_not_cached` first
+(confirmed red: second call replayed the cached failure instead of
+retrying), then changed `get_confidence` to only write to `self._cache`
+when `result.degraded is False` (two-line change, `app/llm.py`).
+Result: 6/6 tests in test_llm.py pass. Full suite 106/106. T-08's four
+criterion tests re-verified unchanged (`tests/test_routing.py` zero
+diff). No frozen weights/thresholds/floors touched - this file isn't
+imported by any risk-engine module.
+Evidence: reports/evidence/issue2-llm-cache-fix-pytest.txt,
+reports/evidence/issue2-full-suite.txt (`106 passed`).

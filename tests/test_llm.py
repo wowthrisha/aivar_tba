@@ -100,3 +100,22 @@ async def test_caches_by_action_type_resource_and_canonical_params():
     await provider.get_confidence("delete", "users/42", {"id": 42})
 
     parse.assert_awaited_once()  # second call served from cache
+
+
+async def test_degraded_result_is_not_cached():
+    """A failed/degraded call must never be replayed on a later identical
+    call - only genuine successes are cached."""
+    err = APITimeoutError(request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"))
+    success = _fake_completion(
+        parsed=ConfidenceSchema(self_reported_confidence=0.7, reasoning="recovered")
+    )
+    parse = AsyncMock(side_effect=[err, success])
+    provider = OpenAIConfidenceProvider(_fake_client(parse), model="gpt-5.6-luna")
+
+    first = await provider.get_confidence("delete", "users/42", {"id": 42})
+    assert first.degraded is True
+
+    second = await provider.get_confidence("delete", "users/42", {"id": 42})
+    assert second.degraded is False
+    assert second.confidence == 0.7
+    assert parse.await_count == 2  # the second call genuinely retried, not served from cache
