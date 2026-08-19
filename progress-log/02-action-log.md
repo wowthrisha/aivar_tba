@@ -201,3 +201,24 @@ Result: 5/5 new tests pass (happy path, refusal terminal+not retried,
 timeout fails closed, out-of-range rejected, cache hit). Full suite
 56/56, no regressions.
 Evidence: reports/evidence/T-09-pytest.txt (`56 passed in 0.32s`).
+
+### [2026-08-19 23:30 IST] [T-09a] [delivery engineer]
+Action: Design decision, documented rather than silently done: did NOT
+modify T-09's `OpenAIConfidenceProvider.get_confidence` to apply the
+two-signal minimum internally, since its existing committed tests
+(test_llm.py) use `params={"id": 42}` fixtures that would fail a real
+action-catalogue structural check, breaking already-green tests. Instead
+built a separate, additive pure module `app/risk/confidence.py`:
+`ACTION_CATALOGUE` (minimal action_type -> required-params registry, to
+be extended in later tasks), `structural_completeness(action_type,
+params)` (1.0 only if action_type known AND all required params present
+— this doubles as the "did the schema validate first-pass" check per the
+DoD, since no per-field type schema was specified to validate against),
+and `two_signal_confidence(self_reported, structural) = min(...)`. Wrote
+tests/test_confidence.py first (confirmed red: `ModuleNotFoundError: No
+module named 'app.risk.confidence'`), then implemented.
+Result: 6/6 new tests pass, including the required "high self-report + low
+completeness -> low confidence" case (0.95 self-reported, missing
+required param -> structural=0.0 -> combined=0.0). Full suite 62/62, no
+regressions.
+Evidence: reports/evidence/T-09a-pytest.txt (`62 passed in 0.29s`).
