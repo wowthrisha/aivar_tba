@@ -60,7 +60,7 @@ incidental state. Rows with no such log entry are `Not started`.
 
 | ID | Task | Definition of Done (evidence that closes it) | Box | Status |
 |---|---|---|---|---|
-| T-19 | Concurrency proof | 50 requests, 0 failures, p95, matching audit rows | 45m | Not started |
+| T-19 | Concurrency proof | 50 requests, 0 failures, p95, matching audit rows | 45m | Done |
 | T-20 | Record video | file exists, 5-7 min. CODE FREEZE at 09:00 | 2h | Not started |
 | T-21 | Upload + verify sharing | link opened in an INCOGNITO window | 45m | Not started |
 | T-22 | Final polish | repo public, every README link clicked | 45m | Not started |

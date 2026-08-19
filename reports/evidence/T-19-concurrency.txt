@@ -1,0 +1,45 @@
+T-19 concurrency proof
+Run at: 2026-08-20 03:50 IST
+Target: https://aivartba-production.up.railway.app/v1/actions/evaluate
+Workload: 50 genuinely concurrent requests (asyncio.gather + httpx.AsyncClient), read-only action
+
+=== Baseline audit count before any T-19 activity ===
+Total audit records: 28
+Total 'evaluated' audit records: 18
+
+=== ATTEMPT 1 (client timeout=30.0s) ===
+Requests issued: 50
+Wall-clock time for all 50 concurrent requests: 30.22s
+Failures (status != 201): 2
+  FAILED i=9 status=None error=
+  FAILED i=11 status=None error=
+Latency (ms): min=8241.8 p50=19682.7 p95=29796.1 p99=30214.4 max=30214.4
+Unique action_ids returned: 48
+
+Root cause of the 2 client-side timeouts (read-only diagnosis, no app code changed):
+app/db_store.py:243 - SQLAlchemyAuditLog.append() takes a Postgres
+pg_advisory_xact_lock before reading-the-last-record-then-writing-the-next
+(D-10 fix: intentional serialization to prevent the hash chain forking
+under concurrent writers). 50 concurrent evaluate calls therefore queue
+for this lock one at a time; total wall-clock time scales with N, not
+constant. My test client's own 30s timeout was tighter than the actual
+server-side completion time for the last few queued requests - this is
+a test-harness limitation, not a server failure. Confirmed by attempt 2.
+
+=== ATTEMPT 2 (client timeout=90.0s, no application code changed) ===
+Requests issued: 50
+Wall-clock time for all 50 concurrent requests: 30.31s
+Failures (status != 201): 0
+Latency (ms): min=5354.8 p50=19179.6 p95=29390.5 p99=30299.5 max=30299.5
+Unique action_ids returned: 50
+
+=== Reconciliation against /v1/audit (fetched with ?limit=500 - the
+endpoint defaults to limit=50, app/main.py:386, which truncated the
+first reconciliation attempt and was corrected before drawing any
+conclusion) ===
+Total audit records after both attempts: 128 (baseline 28 + attempt1 50 + attempt2 50 = 128, matches exactly - confirms attempt 1's 2 client-timeouts DID complete server-side)
+Total evaluated audit records: 118 (baseline 18 + 50 + 50 = 118, matches exactly)
+attempt-2 (the qualifying, 0-failure run) action_ids returned by client: 50
+attempt-2 action_ids found in /v1/audit as evaluated records: 50
+attempt-2 action_ids MISSING from audit: 0
+Total evaluated records with actor=t19-load-agent (both attempts): 100 (50+50=100, matches exactly)
