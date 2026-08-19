@@ -1,0 +1,12 @@
+# Placeholder deps for scaffold. Versions intentionally unpinned —
+# pinning now would be guessing (E-3/E-5); finalize when feature code lands.
+fastapi
+uvicorn
+pydantic
+asyncpg
+sqlalchemy
+alembic
+openai
+python-dotenv
+pytest
+pytest-asyncio
