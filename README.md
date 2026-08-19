@@ -294,3 +294,80 @@ Project) — several `ASI` categories map to specific controls here:
   code edit + redeploy, not a config change. Production approach: move
   to env vars (`CONFIRM_TTL_MINUTES`, `FULL_REVIEW_TTL_HOURS`) with the
   same defaults, read once at startup.
+
+## 10. DMAIC
+
+No detailed spec for this section exists in the prompt pack — only the
+task-board's one-line entry names it (T-18a). This maps
+Define-Measure-Analyze-Improve-Control onto how this project's risk
+model and reliability were actually built, using real project
+artifacts — it isn't a new process being introduced.
+
+- **Define** — the frozen risk model: four weighted dimensions
+  (reversibility 0.40, data scope 0.30, regulatory 0.20, confidence
+  0.10), two frozen thresholds (0.30, 0.65), and T-08's four criterion
+  tests as the literal acceptance definition of "done."
+- **Measure** — `tests/test_scoring.py` (dimension bands),
+  `tests/test_tiers.py` (boundary-band sweep, T-07a),
+  `tests/test_floors.py` (escalate-only invariant, T-07), and live curl
+  verification against the deployed URL (`reports/evidence/`) — a green
+  build log alone is never treated as proof.
+- **Analyze** — a fresh-session adversarial review (T-13,
+  `reports/evidence/T-13-adversarial-review.txt`) found and classified
+  real findings, including boundary brittleness (Finding 3) and
+  prompt-injection surface (Finding 4a). The defect register
+  (`progress-log/03-errors-and-fixes.md`, D-01–D-12) records every other
+  defect's root cause the same way.
+- **Improve** — fixes approved only where they didn't touch the frozen
+  list: broadening the `regulated_mutation` floor to cover `PII_GDPR`
+  (T-13 Finding 2), adding `unrecoverable_mutation_requires_confirm`
+  (T-13 Finding 1), fixing the LLM-cache-on-failure bug (Issue 2 fix),
+  and D-11/D-12.
+- **Control** — the FROZEN list (`CLAUDE.md`) locks weights, thresholds,
+  which floors exist, and the fail-closed direction against silent
+  change; T-08's four criterion tests are READ-ONLY; every fix in this
+  project re-verified T-08 stays at zero diff before being accepted.
+
+## 11. Versioning
+
+- **Risk model versioning** — every risk assessment records
+  `weights_version` (`app/risk/scorer.py:56`, currently `"v1"`)
+  alongside the four dimension scores and composite, so a historical
+  audit stays reproducible even after the weights themselves change in
+  a future version — the explanation attached to a past decision won't
+  silently drift.
+- **API versioning** — every endpoint is under a `/v1/` prefix
+  (`/v1/actions/evaluate`, `/v1/audit`, `/v1/review-queue`, etc.); a
+  breaking request/response-shape change would ship under `/v2/`, not
+  mutate `/v1/` in place.
+- **Change history** — standard git history, plus the append-only
+  `progress-log/02-action-log.md` and
+  `progress-log/03-errors-and-fixes.md` as a human-readable record of
+  *why* each change happened, not just *what* changed.
+
+## 12. Fuzzy rejection
+
+No detailed spec for this section exists in the prompt pack either —
+same situation as DMAIC above. This documents the system's current,
+deliberate state; no code changed to write it.
+
+This system currently does **not** implement fuzzy or graduated
+rejection. Every routing decision is a hard classification into exactly
+one of AUTONOMOUS / CONFIRM / FULL_REVIEW, using two frozen, hard-edged
+thresholds (0.30, 0.65) — there is no partial-confidence middle state
+and no "ask again" outcome.
+
+This is a documented, deliberate limitation, not an oversight: a
+fresh-session adversarial review (T-13 Finding 3) found the composite
+score is brittle right at both threshold boundaries — a 0.006 change in
+`llm_confidence` can flip CONFIRM↔FULL_REVIEW, and a 0.01 change can
+flip CONFIRM↔AUTONOMOUS
+(`reports/evidence/T-13-adversarial-review.txt`). A fuzzy-rejection
+scheme — e.g. treating scores within some margin of a threshold as
+their own "needs a second opinion" state, or blending tiers by
+confidence — would reduce that brittleness, but was deliberately not
+built: the two thresholds are frozen, and the product owner chose not
+to add calibration/smoothing logic under deadline pressure (see §9
+above). Any future fuzzy-rejection design would need explicit sign-off
+before touching the frozen thresholds it would necessarily interact
+with.

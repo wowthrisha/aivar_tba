@@ -1,0 +1,13 @@
+T-18a verification — README.md DMAIC/versioning/fuzzy-rejection sections
+Run at: 2026-08-20 03:43 IST
+
+=== section headers present ===
+298:## 10. DMAIC
+331:## 11. Versioning
+348:## 12. Fuzzy rejection
+
+=== no blockquote-hazard lines (want exit 1 = no match) ===
+exit: 1
+
+=== secret-shaped pattern scan (0 expected) ===
+0
