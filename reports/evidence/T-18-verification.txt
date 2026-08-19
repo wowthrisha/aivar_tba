@@ -26,3 +26,88 @@ exit: 0
 14:## What this is
 23:## 1. Live URLs
 31:## 2. Quickstart
+
+=== GitHub rendering proof (gh api repos/wowthrisha/aivar_tba/readme, Accept: application/vnd.github.html) ===
+Pushed commit: fe9fd2f
+<markdown-accessiblity-table><table>
+<thead>
+<tr>
+<th>Success criterion</th>
+<th>Proven by</th>
+<th>Endpoint</th>
+<th>Video</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bulk delete → full review</td>
+<td><code>test_bulk_delete_routes_to_review</code></td>
+<td><code>POST /v1/actions/evaluate</code></td>
+<td>0:00</td>
+</tr>
+<tr>
+<td>Single update → confirmation</td>
+<td><code>test_single_update_routes_to_confirm</code></td>
+<td><code>POST /v1/actions/evaluate</code></td>
+<td>0:00</td>
+</tr>
+<tr>
+<td>Read-only → autonomous</td>
+<td><code>test_read_only_routes_autonomous</code></td>
+<td><code>POST /v1/actions/evaluate</code></td>
+<td>0:00</td>
+</tr>
+<tr>
+<td>Breakdown accurate &amp; readable</td>
+<td><code>test_audit_breakdown_is_human_readable</code></td>
+<td><code>GET /v1/audit</code></td>
+<td>0:00</td>
+</tr>
+</tbody>
+--
+<markdown-accessiblity-table><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Weight</th>
+<th>Bands</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reversibility</td>
+<td>0.40</td>
+<td>read 0.0 · update-with-snapshot 0.4 · update-without-snapshot 0.7 · delete/send/pay 1.0</td>
+</tr>
+<tr>
+<td>Data scope</td>
+<td>0.30</td>
+<td>0→0.0 · 1→0.2 · 10→0.4 · 100→0.6 · 1k→0.8 · 10k+→1.0 (log-scaled on affected records)</td>
+</tr>
+<tr>
+<td>Regulatory</td>
+<td>0.20</td>
+<td>none 0.0 · internal 0.3 · PII/GDPR 0.7 · PHI/SOX 1.0</td>
+</tr>
+<tr>
+<td>Confidence</td>
+<td>0.10</td>
+<td><code>1.0 − llm_confidence</code> — low confidence RAISES risk</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<p dir="auto"><strong>Rationale for the ordering</strong> (reversibility &gt; data scope &gt; regulatory</p>
+<blockquote>
+<p dir="auto">confidence): reversibility gets the largest weight because it bounds
+
+=== D-12 fix verification: blockquote bug (commit fe9fd2f) fixed in commit 2cf3e86 ===
+grep -c '<blockquote>' on rendered HTML (want 0):
+0
+
+Rationale sentence now renders as plain <p> prose:
+<p dir="auto"><strong>Rationale for the ordering</strong> (reversibility outranks data scope,
+which outranks regulatory, which outranks confidence): reversibility
+gets the largest weight because it bounds
+
+grep -n '^>' README.md (want no matches / exit 1):
+exit: 1

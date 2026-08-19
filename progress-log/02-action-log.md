@@ -757,3 +757,78 @@ DoD verification (raw evidence in `reports/evidence/T-16-raw-demo.txt`):
 Evidence: reports/evidence/T-16-pytest.txt (3/3 + full suite 109
 passed/6 skipped), reports/evidence/T-16-raw-demo.txt (literal JSON log
 lines and forced-error response, before/after the D-11 fix).
+
+### [2026-08-20 03:37 IST] [T-18] [delivery engineer]
+
+Wrote `README.md`. Unlike T-16, T-18 has a full detailed section in
+`PS-9-1-Prompt-Pack-v1.0.md:634-665` (the referenced "(2)" file still
+doesn't exist) - used that as the exact spec: traceability table at the
+very top, then live URLs, quickstart, architecture, risk model,
+override-floors worked example, security controls, compliance mapping,
+project-management links, known limitations. T-18a (DMAIC/versioning/
+fuzzy-rejection) is explicitly separate and out of scope.
+
+Content sourcing, cross-checked against the prompt pack and existing
+docs before writing (full point-by-point audit given to the product
+owner, who reviewed and approved before this was committed):
+  - Traceability table (4 rows), risk model weights/bands, and security
+    control descriptions: directly required, sourced from the prompt
+    pack / CLAUDE.md's frozen list.
+  - Architecture Mermaid diagram: built directly from
+    `app/state_machine.py`'s real `VALID_TRANSITIONS`, not invented.
+  - Override-floors worked example: used REAL evidence (composite 0.58,
+    `reports/evidence/T-14-curl.txt`) instead of the prompt's
+    illustrative "0.69" - no live call was forced to hit that exact
+    number, and the "would have been CONFIRM" reasoning is written
+    prose, not a literal system-generated string (a known gap already
+    logged in the LEFT OUT section before this task).
+  - Weight-ordering rationale: original writing - no existing rationale
+    exists anywhere in the project's prior docs.
+  - Compliance mapping: researched via a documentation-reading subagent
+    (L-7) rather than drafted from memory. This corrected two
+    imprecise phrases in the prompt pack itself - "Article 14's three
+    oversight obligations" (Article 14(4) actually has five lettered
+    sub-obligations, (a)-(e)) and "OWASP ASI risks" (the actual project
+    name is "OWASP Top 10 for Agentic Applications (2026)"; ASI is the
+    category-ID prefix inside it, not the project's name). Sourced from
+    secondary mirrors (artificialintelligenceact.eu, genai.owasp.org,
+    cross-checked against independent summaries) - the subagent could
+    not get a clean fetch of the primary eur-lex.europa.eu text or the
+    primary OWASP PDF, so this is flagged as researched-but-not-
+    primary-source-verified, not treated as beyond question.
+  - S-3's security-control line deliberately omits "both configurable"
+    (present in the prompt pack's own S-3 text) because
+    `CONFIRM_TTL`/`FULL_REVIEW_TTL` are hardcoded Python constants, not
+    actually runtime-configurable - already documented in this file's
+    own LEFT OUT section, which is quoted verbatim later in the same
+    README. Including "configurable" would have contradicted the
+    project's own recorded limitation within one document.
+
+**D-12** (see `progress-log/03-errors-and-fixes.md`): found while
+fetching GitHub's own rendered HTML as the required render-proof step
+(`gh api repos/.../readme -H "Accept: application/vnd.github.html"`),
+not from reading the raw markdown - a wrapped line in the weight-
+rationale sentence started with `>` (from "reversibility > data scope >
+regulatory\n> confidence"), which GitHub's renderer read as a
+blockquote, splitting one sentence into a paragraph plus an unintended
+quote block. Fixed by rewording to avoid any line starting with `>`;
+re-verified via the same render API (0 `<blockquote>` tags) and grepped
+the whole file for any other `^>` line (none found). Fixed on the first
+attempt.
+
+Verification (all raw output in `reports/evidence/T-18-verification.txt`):
+  - All 4 traceability-table test names confirmed present in
+    `tests/test_routing.py` (T-08, frozen - re-verified zero-diff
+    against commit `a573663`).
+  - Both traceability-table endpoints confirmed present in
+    `app/main.py`.
+  - Traceability table confirmed positioned before the project
+    description (first content block after the H1 title).
+  - No placeholder video timestamps presented as final evidence - all
+    `0:00` with the prompt's own "(timestamps filled after T-20)" note.
+  - Secret-shaped pattern scan: 0 matches.
+  - GitHub rendering fetched directly via the API (not just previewed
+    locally) both before and after the D-12 fix - the actual proof this
+    task's DoD ("table rendering on GitHub") requires.
+
+Evidence: reports/evidence/T-18-verification.txt.
