@@ -11,3 +11,12 @@ exit: 1
 
 === secret-shaped pattern scan (0 expected) ===
 0
+
+=== GitHub rendering proof (pushed commit 32d0680) ===
+blockquote count (want 0):
+0
+
+section headers as rendered:
+<h2 class="heading-element" dir="auto">10. DMAIC</h2>
+<h2 class="heading-element" dir="auto">11. Versioning</h2>
+<h2 class="heading-element" dir="auto">12. Fuzzy rejection</h2>
