@@ -24,7 +24,7 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-06a | Counterfactual explanation | test asserting "would have been X if Y" | 15m | Done |
 | T-07 | floors.py | test asserting escalate-only: no input lowers a tier | 45m | Done |
 | T-07a | Boundary escalation band | test at threshold +/- 0.04 escalating | 10m | Done |
-| T-08 | FOUR CRITERION TESTS | pytest tests/test_routing.py: 4 passed | 45m | Not started |
+| T-08 | FOUR CRITERION TESTS | pytest tests/test_routing.py: 4 passed | 45m | Done |
 | T-09 | llm.py adapter | test with mocked refusal proving terminal, not retried | 45m | Not started |
 | T-09a | Two-signal confidence | test: high self-report + low completeness = low | 20m | Not started |
 

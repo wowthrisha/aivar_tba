@@ -1,0 +1,67 @@
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0 -- /Users/thrisha/miniconda3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+testpaths: tests
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collecting ... collected 51 items
+
+tests/test_floors.py::test_irreversible_bulk_floor_fires_at_100_records PASSED [  1%]
+tests/test_floors.py::test_irreversible_bulk_floor_does_not_fire_below_100_records PASSED [  3%]
+tests/test_floors.py::test_regulated_mutation_floor_fires PASSED         [  5%]
+tests/test_floors.py::test_regulated_mutation_floor_does_not_fire_on_read PASSED [  7%]
+tests/test_floors.py::test_low_confidence_floor_fires_below_0_5 PASSED   [  9%]
+tests/test_floors.py::test_low_confidence_floor_does_not_fire_at_exactly_0_5 PASSED [ 11%]
+tests/test_floors.py::test_no_floor_fires_when_nothing_matches PASSED    [ 13%]
+tests/test_floors.py::test_final_tier_equals_weighted_tier_when_no_floor_fires_but_weighted_is_high PASSED [ 15%]
+tests/test_floors.py::test_escalate_only_sweep PASSED                    [ 17%]
+tests/test_routing.py::test_bulk_delete_routes_to_review PASSED          [ 19%]
+tests/test_routing.py::test_single_update_routes_to_confirm PASSED       [ 21%]
+tests/test_routing.py::test_read_only_routes_autonomous PASSED           [ 23%]
+tests/test_routing.py::test_audit_breakdown_is_human_readable PASSED     [ 25%]
+tests/test_scoring.py::test_reversibility_band[read-0.0] PASSED          [ 27%]
+tests/test_scoring.py::test_reversibility_band[update_with_snapshot-0.4] PASSED [ 29%]
+tests/test_scoring.py::test_reversibility_band[update_without_snapshot-0.7] PASSED [ 31%]
+tests/test_scoring.py::test_reversibility_band[irreversible-1.0] PASSED  [ 33%]
+tests/test_scoring.py::test_data_scope_band[0-0.0] PASSED                [ 35%]
+tests/test_scoring.py::test_data_scope_band[1-0.2] PASSED                [ 37%]
+tests/test_scoring.py::test_data_scope_band[9-0.2] PASSED                [ 39%]
+tests/test_scoring.py::test_data_scope_band[10-0.4] PASSED               [ 41%]
+tests/test_scoring.py::test_data_scope_band[99-0.4] PASSED               [ 43%]
+tests/test_scoring.py::test_data_scope_band[100-0.6] PASSED              [ 45%]
+tests/test_scoring.py::test_data_scope_band[999-0.6] PASSED              [ 47%]
+tests/test_scoring.py::test_data_scope_band[1000-0.8] PASSED             [ 49%]
+tests/test_scoring.py::test_data_scope_band[9999-0.8] PASSED             [ 50%]
+tests/test_scoring.py::test_data_scope_band[10000-1.0] PASSED            [ 52%]
+tests/test_scoring.py::test_data_scope_band[999999-1.0] PASSED           [ 54%]
+tests/test_scoring.py::test_regulatory_band[none-0.0] PASSED             [ 56%]
+tests/test_scoring.py::test_regulatory_band[internal-0.3] PASSED         [ 58%]
+tests/test_scoring.py::test_regulatory_band[pii_gdpr-0.7] PASSED         [ 60%]
+tests/test_scoring.py::test_regulatory_band[phi_sox-1.0] PASSED          [ 62%]
+tests/test_scoring.py::test_confidence_band[1.0-0.0] PASSED              [ 64%]
+tests/test_scoring.py::test_confidence_band[0.0-1.0] PASSED              [ 66%]
+tests/test_scoring.py::test_confidence_band[0.75-0.25] PASSED            [ 68%]
+tests/test_scoring.py::test_weights_are_frozen PASSED                    [ 70%]
+tests/test_scoring.py::test_composite_is_weighted_sum PASSED             [ 72%]
+tests/test_scoring.py::test_counterfactual_names_a_real_dimension_when_tier_would_change PASSED [ 74%]
+tests/test_scoring.py::test_counterfactual_states_none_explicitly_when_no_lever_changes_tier PASSED [ 76%]
+tests/test_tiers.py::test_boundary_band_tier[0.26-0] PASSED              [ 78%]
+tests/test_tiers.py::test_boundary_band_tier[0.27999999999999997-0] PASSED [ 80%]
+tests/test_tiers.py::test_boundary_band_tier[0.3-1] PASSED               [ 82%]
+tests/test_tiers.py::test_boundary_band_tier[0.32-1] PASSED              [ 84%]
+tests/test_tiers.py::test_boundary_band_tier[0.33999999999999997-1] PASSED [ 86%]
+tests/test_tiers.py::test_boundary_band_tier[0.61-1] PASSED              [ 88%]
+tests/test_tiers.py::test_boundary_band_tier[0.63-1] PASSED              [ 90%]
+tests/test_tiers.py::test_boundary_band_tier[0.65-2] PASSED              [ 92%]
+tests/test_tiers.py::test_boundary_band_tier[0.67-2] PASSED              [ 94%]
+tests/test_tiers.py::test_boundary_band_tier[0.6900000000000001-2] PASSED [ 96%]
+tests/test_tiers.py::test_tier_never_regresses_across_the_band[0.3] PASSED [ 98%]
+tests/test_tiers.py::test_tier_never_regresses_across_the_band[0.65] PASSED [100%]
+
+============================== 51 passed in 0.04s ==============================

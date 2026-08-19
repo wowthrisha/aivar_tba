@@ -141,3 +141,32 @@ tiers.py already matched the approved semantics from T-06a; this task
 formalizes the dedicated boundary-precision coverage the DoD asks for.
 Result: 12/12 new tests pass. Full suite 47/47, no regressions.
 Evidence: reports/evidence/T-07a-pytest.txt (`47 passed in 0.04s`).
+
+### [2026-08-19 23:00 IST] [T-08] [delivery engineer]
+Action: THE FOUR CRITERION TESTS — tests/test_routing.py, now READ-ONLY.
+As with T-06a's tiers.py, no task ID owns the scorer+floors integration
+these tests need — built `app/risk/router.py` (`route_action`: runs
+score_action + evaluate_floors + final_tier, and if a floor fired, uses
+the floor's own reason as the explanation's triggering reason instead of
+the weighted-only counterfactual). Wrote the test file first (confirmed
+red: `ModuleNotFoundError: No module named 'app.risk.router'`), then
+implemented router.py, then the four tests passed without further changes
+on first run (hand-verified the arithmetic before writing: bulk delete
+composite 0.585 weighted-CONFIRM but floor escalates to FULL_REVIEW;
+single update composite 0.35 CONFIRM via weighted score alone, no floor;
+read-only composite 0.125 AUTONOMOUS).
+LEFT OUT: the router's explanation, when a floor fires, states the floor's
+reason but does not compute a floor-specific "would have been X if Y"
+counterfactual (e.g. "if affected_records < 100") — T-08's literal
+assertions (composite + tier + triggering reason present) don't require
+it, and building genuine per-floor counterfactual logic was out of this
+task's scope. Logged to 03-errors-and-fixes.md.
+Result: THE FOUR CRITERION TESTS pass. GATE G1 met: `pytest
+tests/test_routing.py -vv` → 4/4 passed, NO FastAPI, NO database imported
+anywhere in app/risk/. Full suite 51/51, no regressions.
+Evidence: reports/evidence/T-08-pytest.txt (full suite, `51 passed in
+0.04s`). Named results:
+  tests/test_routing.py::test_bulk_delete_routes_to_review PASSED
+  tests/test_routing.py::test_single_update_routes_to_confirm PASSED
+  tests/test_routing.py::test_read_only_routes_autonomous PASSED
+  tests/test_routing.py::test_audit_breakdown_is_human_readable PASSED
