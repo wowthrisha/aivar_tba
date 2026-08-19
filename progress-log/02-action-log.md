@@ -222,3 +222,29 @@ completeness -> low confidence" case (0.95 self-reported, missing
 required param -> structural=0.0 -> combined=0.0). Full suite 62/62, no
 regressions.
 Evidence: reports/evidence/T-09a-pytest.txt (`62 passed in 0.29s`).
+
+### [2026-08-20 00:20 IST] [T-09 fix, discovered during T-10] [delivery engineer]
+Action: T-10's live curl verification (POST /v1/actions/evaluate against
+the real API) showed `llm_degraded: true` on every call. Stopped Block 2
+execution and reported per CLAUDE.md's "a dependency behaves differently
+from its documentation" trigger, rather than silently patching. Product
+owner approved a minimal fix.
+Root cause (confirmed via direct provider call, not guessed): `app/llm.py`
+passed `temperature=0` to `client.chat.completions.parse()` per T-09's
+literal spec ("temperature 0"). The live pinned model `gpt-5.6-luna`
+rejects it: `Error code: 400 - "Unsupported value: 'temperature' does not
+support 0 with this model. Only the default (1) value is supported."`
+This has been present since T-09's original commit (f612c9f) — T-09's
+mocked tests never exercised the real `temperature` argument, so it was
+never caught until real API calls happened in T-10.
+Fix: removed the `temperature=0` line entirely (app/llm.py:122) so the
+SDK uses the model's required default. Nothing else changed — frozen
+weights/thresholds/floors, fail-closed direction, T-08 tests, refusal
+handling, timeout behavior, structured-output validation, and two-signal
+confidence logic all untouched.
+Result: tests/test_llm.py 5/5 pass (unchanged — mocks never asserted on
+`temperature`). Full suite 80/80. Direct live call:
+`confidence: 0.82, degraded: False, reason: None`. Audit record for a
+real evaluate call now shows `"llm_degraded": false`.
+Evidence: reports/evidence/T-09-fix-live-verification.txt; D-02 logged in
+03-errors-and-fixes.md.

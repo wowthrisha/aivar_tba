@@ -58,9 +58,15 @@ class ConfidenceProvider(ABC):
         self, action_type: str, resource: str, params: dict[str, Any]
     ) -> ConfidenceResult: ...
 
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Cheap reachability probe for /readyz. Never raises."""
+        ...
+
 
 class _ParseCapableClient(Protocol):
     chat: Any  # structurally: client.chat.completions.parse(...) is awaitable
+    models: Any  # structurally: client.models.retrieve(model) is awaitable
 
 
 def _cache_key(action_type: str, resource: str, params: dict[str, Any]) -> str:
@@ -77,6 +83,13 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
         self._client = client
         self._model = model  # PINNED: caller passes the exact OPENAI_MODEL string
         self._cache: dict[str, ConfidenceResult] = {}
+
+    async def health_check(self) -> bool:
+        try:
+            await self._client.models.retrieve(self._model)
+            return True
+        except Exception:
+            return False
 
     async def get_confidence(
         self, action_type: str, resource: str, params: dict[str, Any]
@@ -106,7 +119,6 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
                     }
                 ],
                 response_format=ConfidenceSchema,
-                temperature=0,
                 timeout=TIMEOUT_SECONDS,
             )
         except APITimeoutError:

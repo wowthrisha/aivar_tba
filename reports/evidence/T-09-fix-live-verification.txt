@@ -1,0 +1,29 @@
+=== POST /v1/actions/evaluate (post-fix, real LLM call) ===
+REQUEST: {"agent_id":"agent-1","action_type":"read","resource":"reports/quarterly","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"6941e58a-b7c1-402f-8679-1349ed29d72b","agent_id":"agent-1","action_type":"read","resource":"reports/quarterly","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.134,"tier":"AUTONOMOUS","explanation":"0.13 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T17:11:04.930683Z"}
+HTTP_STATUS:201
+
+=== GET /v1/audit?action_id=6941e58a-b7c1-402f-8679-1349ed29d72b (confirm llm_degraded=false) ===
+[
+    {
+        "id": "f018e977-66a8-4e9a-ba46-9bc691a089be",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "entry_hash": "179d184e480f9e56b95f7b5b58422d0fea8899db444adde85bddce5b11cdc922",
+        "event_type": "evaluated",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "6941e58a-b7c1-402f-8679-1349ed29d72b",
+            "tier": "AUTONOMOUS",
+            "composite": 0.134,
+            "floor_name": null,
+            "explanation": "0.13 -> AUTONOMOUS. No single dimension change would alter the tier.",
+            "llm_degraded": false
+        },
+        "created_at": "2026-08-19T17:11:08.098584Z"
+    }
+]
+
+=== Direct provider call: raw confidence + degraded flag ===
+confidence: 0.82
+degraded: False
+reason: None
