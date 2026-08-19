@@ -13,6 +13,13 @@ pydantic
 # the live Neon DB, before writing any code.
 asyncpg==0.30.0
 sqlalchemy==2.0.36
+# greenlet is an OPTIONAL SQLAlchemy dependency (needed for its async
+# engine, e.g. Alembic's async env.py) - `pip show sqlalchemy` confirms
+# it's not a hard requirement. It was present locally as some other
+# package's transitive dependency, masking this gap until Railway's
+# clean container build failed with "the greenlet library is required
+# ... No module named 'greenlet'" during the T-14 preDeployCommand.
+greenlet==3.3.2
 alembic==1.14.0
 # Pinned (T-09): the structured-outputs behavior app/llm.py relies on
 # (message.refusal, message.parsed, strict/additionalProperties auto-set

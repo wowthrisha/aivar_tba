@@ -1,5 +1,6 @@
 {
   "deploy": {
-    "healthcheckPath": "/livez"
+    "healthcheckPath": "/livez",
+    "preDeployCommand": "alembic upgrade head"
   }
 }
