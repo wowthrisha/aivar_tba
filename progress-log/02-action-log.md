@@ -899,3 +899,22 @@ No code changed. `tests/test_routing.py` (T-08) untouched. No frozen
 weights/thresholds/floors/fail-closed direction modified.
 
 Evidence: reports/evidence/T-18a-verification.txt.
+
+### [2026-08-20 03:46 IST] [G3] [autonomous overnight batch - delivery engineer]
+
+Report-only gate check, no code/config changes. Gate condition (task
+board/prompt pack): "Live URL + green suite + README". Noted a naming
+collision: `reports/00-project-charter.md`'s own Gate-schedule table
+also has a row labeled "G3" with a different, already-satisfied
+condition ("API + audit log wired end-to-end") - evaluated the task-
+board/prompt-pack G3 per this batch's explicit instruction, not the
+charter's.
+
+All three conditions freshly re-verified (not just cited from earlier
+evidence): live `/livez` check (200), latest GitHub Actions run
+confirmed at the exact current HEAD commit (`430fab6`, 115/115 passed),
+README's 12 sections + 4-row traceability table confirmed present.
+
+**G3: PASS.** Full report: `reports/gates/G3-report.md`. T-15 (AWS)
+remains Not started - out of scope for this batch, not required by
+G3's own condition. Continuing to T-19 per the batch's instruction.
