@@ -28,7 +28,8 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-09 | llm.py adapter | test with mocked refusal proving terminal, not retried | 45m | Done |
 | T-09a | Two-signal confidence | test: high self-report + low completeness = low | 20m | Done |
 
->>> **GATE G1**: four criterion tests green, NO framework, NO database
+>>> **GATE G1**: four criterion tests green, NO framework, NO database —
+    **PASS** (see reports/gates/G1-report.md, reports/blocks/block-1-report.md)
 
 ## BLOCK 2 — Service
 
