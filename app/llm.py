@@ -27,11 +27,7 @@ from typing import Any, Protocol
 from openai import APITimeoutError, OpenAIError
 from pydantic import BaseModel, ValidationError, field_validator
 
-TIMEOUT_SECONDS = 10.0  # T-14: 3.0s left ~no margin for gpt-5.6-luna's
-# observed ~2.3-2.9s local latency plus Railway's added network hop to
-# OpenAI - every live evaluate call was hitting APITimeoutError and
-# fail-closing to at least CONFIRM/low_confidence (confirmed via
-# /v1/audit's llm_degraded:true on all three live T-14 curl checks).
+TIMEOUT_SECONDS = 3.0
 
 
 class ConfidenceSchema(BaseModel):
