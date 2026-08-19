@@ -1,0 +1,11 @@
+Evaluating action against https://aivartba-production.up.railway.app ...
+
+  Risk assessment
+  ---------------
+  action_type:   update
+  resource:      t17-cli-demo
+  composite:     0.38
+  tier:          CONFIRM
+  explanation:   0.38 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).
+
+This action requires confirmation. Confirm? [y/N] Confirmed. New state: approved

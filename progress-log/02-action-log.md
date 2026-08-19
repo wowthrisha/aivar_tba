@@ -832,3 +832,34 @@ Verification (all raw output in `reports/evidence/T-18-verification.txt`):
     task's DoD ("table rendering on GitHub") requires.
 
 Evidence: reports/evidence/T-18-verification.txt.
+
+### [2026-08-20 03:41 IST] [T-17] [autonomous overnight batch - delivery engineer]
+
+Wrote `cli.py`. Used the task-board's one-line entry as the complete
+spec (product owner explicit instruction): "CLI | pasted session
+showing risk table + confirm prompt" - no additional CLI features
+invented.
+
+stdlib-only (argparse/json/urllib), no new dependency. Talks to the
+real deployed API over HTTP rather than reimplementing risk-engine
+logic, so a session against it exercises the actual live system.
+`POST /v1/actions/{id}/confirm` is literally named "confirm" in
+`app/main.py:240` - mapped the DoD's "confirm prompt" directly onto
+that real endpoint rather than inventing a broader decision UI. When a
+FULL_REVIEW-tier action is evaluated, the CLI explains that a *separate*
+reviewer_id is required (S-6) and does not attempt that step itself,
+since this is a single-user session.
+
+Verification: ran a real session against the live Railway URL
+(`https://aivartba-production.up.railway.app`) using the canonical T-08
+single-update scenario (`update_without_snapshot`, 1 record,
+`regulatory=none`) - risk table printed (composite 0.38, tier CONFIRM,
+floor `unrecoverable_mutation_requires_confirm`), confirm prompt
+answered "y", action moved to `approved`. Full raw terminal output
+saved, grepped for secret-shaped patterns first (0 matches).
+
+No frozen weights/thresholds/floors/fail-closed direction touched -
+`cli.py` is a pure HTTP client, imports nothing from `app.risk.*`.
+`tests/test_routing.py` (T-08) not touched.
+
+Evidence: reports/evidence/T-17-cli-session.txt.
