@@ -20,7 +20,7 @@ incidental state. Rows with no such log entry are `Not started`.
 
 | ID | Task | Definition of Done (evidence that closes it) | Box | Status |
 |---|---|---|---|---|
-| T-06 | scorer.py, four dimensions | pytest tests/test_scoring.py green | 2h | Not started |
+| T-06 | scorer.py, four dimensions | pytest tests/test_scoring.py green | 2h | Done |
 | T-06a | Counterfactual explanation | test asserting "would have been X if Y" | 15m | Not started |
 | T-07 | floors.py | test asserting escalate-only: no input lowers a tier | 45m | Not started |
 | T-07a | Boundary escalation band | test at threshold +/- 0.04 escalating | 10m | Not started |

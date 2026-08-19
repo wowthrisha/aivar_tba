@@ -77,3 +77,15 @@ Evidence:
   image descriptor annotated `"architecture":"amd64","os":"linux"`;
   "Deploy complete".
 - No secrets in response body or deploy log.
+
+### [2026-08-19 22:05 IST] [T-06] [delivery engineer]
+Action: Wrote `tests/test_scoring.py` first (confirmed red: `ModuleNotFoundError:
+No module named 'app.risk.scorer'`), then implemented `app/risk/scorer.py`
+— pure Python (Enum + Pydantic v2 only, no FastAPI/DB import), four
+dimensions banded per spec, WEIGHTS dict + WEIGHTS_VERSION="v1" constant,
+`RiskAssessmentResult` Pydantic model (composite, four sub-scores, weights,
+version). `data_scope` implemented as step bands (lower-bound thresholds)
+since the spec gave anchor points, not a continuous formula — documented as
+a comment in scorer.py. Commit SHA: (see next commit).
+Result: 24/24 tests pass, weights verified frozen (0.40/0.30/0.20/0.10).
+Evidence: reports/evidence/T-06-pytest.txt (`24 passed in 0.02s`).
