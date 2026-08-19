@@ -2,7 +2,7 @@
 
 | ID | Symptom | Root cause | Fix | Status |
 |---|---|---|---|---|
-| — | none yet | — | — | — |
+| D-01 | `tests/test_llm.py::test_out_of_range_value_is_rejected` failed with `UnboundLocalError` | Python deletes an `except ... as name` binding when the except block exits, so `real_validation_error` was referenced after being auto-deleted | Captured the exception into a variable declared before the try/except instead | Fixed |
 
 ## LEFT OUT
 

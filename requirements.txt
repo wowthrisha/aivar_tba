@@ -6,7 +6,13 @@ pydantic
 asyncpg
 sqlalchemy
 alembic
-openai
+# Pinned (T-09): the structured-outputs behavior app/llm.py relies on
+# (message.refusal, message.parsed, strict/additionalProperties auto-set
+# from a Pydantic response_format, APITimeoutError hierarchy) was verified
+# by introspecting this exact installed version's source before writing
+# any code. Deploying a different version without re-verifying would
+# reintroduce guessed behavior.
+openai==2.49.0
 python-dotenv
 pytest
 pytest-asyncio

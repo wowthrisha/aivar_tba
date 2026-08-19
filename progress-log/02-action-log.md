@@ -170,3 +170,34 @@ Evidence: reports/evidence/T-08-pytest.txt (full suite, `51 passed in
   tests/test_routing.py::test_single_update_routes_to_confirm PASSED
   tests/test_routing.py::test_read_only_routes_autonomous PASSED
   tests/test_routing.py::test_audit_breakdown_is_human_readable PASSED
+
+### [2026-08-19 23:20 IST] [T-09] [delivery engineer]
+Action: Before writing any code, introspected the ACTUAL installed
+`openai` SDK (local: 2.49.0) rather than trusting docs/memory (E-3) —
+confirmed via source inspection: `client.chat.completions.parse()` with a
+Pydantic `response_format` auto-sets `strict=True` and
+`additionalProperties=False` (openai/lib/_pydantic.py,
+lib/_parsing/_completions.py:286); `message.refusal: str|None` and
+`message.parsed` are real fields on `ParsedChatCompletionMessage`;
+refusal short-circuits parsing (parsed stays None); a field_validator on
+the response_format model fires during the SDK's own parse and raises
+`pydantic.ValidationError` out of `.parse()` itself; `APITimeoutError`
+and finish-reason errors are all `openai.OpenAIError` subclasses.
+Flagged and fixed a real risk: local openai==2.49.0 but Railway's T-05
+deploy resolved openai==3.3.0 (requirements.txt was unpinned) — pinned to
+`openai==2.49.0` in requirements.txt with a comment explaining why, so
+the verified behavior is what actually ships.
+Wrote tests/test_llm.py first (confirmed red:
+`ModuleNotFoundError: No module named 'app.llm'`), implemented
+`app/llm.py` (OpenAIConfidenceProvider, ConfidenceSchema with a
+range-check field_validator, cache keyed on sha256 of canonical JSON of
+(action_type, resource, params), fail-closed on timeout/refusal/API
+error/out-of-range with degraded=True).
+One test-authoring bug (not implementation): `UnboundLocalError` in
+test_out_of_range_value_is_rejected — Python deletes an `except ... as
+name` binding on block exit; fixed by capturing into a pre-declared
+variable. Logged as D-01 in 03-errors-and-fixes.md.
+Result: 5/5 new tests pass (happy path, refusal terminal+not retried,
+timeout fails closed, out-of-range rejected, cache hit). Full suite
+56/56, no regressions.
+Evidence: reports/evidence/T-09-pytest.txt (`56 passed in 0.32s`).
