@@ -40,7 +40,8 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-12 | Security S-1,2,3,5,6 | one test per control, five named in output | 1h | Done |
 | T-13 | Adversarial review (fresh session) | findings pasted with my decision on each | 30m | Done |
 
->>> **GATE G2**: full suite green locally, state machine proven by curl
+>>> **GATE G2**: full suite green locally, state machine proven by curl —
+    **PASS** (see reports/gates/G2-report.md, reports/blocks/block-2-report.md)
 
 ## BLOCK 3 — Deploy and polish
 

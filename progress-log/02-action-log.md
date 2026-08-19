@@ -480,3 +480,28 @@ tests), reports/evidence/T-13-fixes-full-suite.txt (`105 passed`),
 reports/evidence/T-13-adversarial-cases-rerun.txt (before/after on the
 exact original cases).
 T-13 CLOSED — all approved fixes implemented and verified.
+
+### [2026-08-20 00:15 IST] [G2] [delivery engineer]
+Action: Gate G2 check. Verified evidence files present/non-empty (all
+11), re-ran full suite clean, then ran a fresh live end-to-end state
+machine walkthrough via a local uvicorn instance running the current
+code (post all T-13 fixes) — all four terminal paths (AUTONOMOUS-direct,
+CONFIRM->APPROVED, FULL_REVIEW->APPROVED incl. S-6 self-review block,
+FULL_REVIEW->REJECTED->blocked-execute) plus a final `/v1/audit/verify`
+across the whole session.
+Investigated and resolved (as an explanation, not a fix) an apparent
+regression during the walkthrough: the first live evaluate call showed
+`llm_degraded: true` again. Traced it: NOT a repeat of D-02 (temperature
+issue is fixed, confirmed via a direct provider call returning
+confidence=0.86) - it was the provider's own cache (per T-09's original
+spec: cache by (action_type, resource, params)) storing a transient
+first-call failure and replaying it on identical retries. Confirmed
+non-regression with a fresh resource identifier, which got a genuine
+successful call immediately. Flagged as a design observation (should
+failed results be cached?) for a future task, not fixed now - outside
+G2's scope.
+Result: Gate G2 PASS. Full suite 105/105. State machine proven live by
+curl across all terminal paths, hash chain valid across 15 real records.
+Evidence: reports/evidence/G2-state-machine-curl.txt,
+reports/gates/G2-report.md, reports/blocks/block-2-report.md.
+BLOCK 2 COMPLETE. Not starting Block 3.

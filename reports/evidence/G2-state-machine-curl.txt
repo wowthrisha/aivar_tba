@@ -1,0 +1,80 @@
+=== GET /livez ===
+{"status":"ok"}
+HTTP_STATUS:200
+
+=== GET /readyz ===
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP_STATUS:200
+
+=== PROPOSED->EVALUATED->AUTONOMOUS->EXECUTED (read) ===
+REQUEST: {"agent_id":"agent-1","action_type":"read","resource":"reports/q3","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"41194f78-d42c-4ba0-940c-d046f118f828","agent_id":"agent-1","action_type":"read","resource":"reports/q3","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"confirm","composite":0.22,"tier":"CONFIRM","explanation":"0.22 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).","created_at":"2026-08-19T18:30:12.290111Z"}
+HTTP_STATUS:201
+
+
+NOTE: the first evaluate call above (resource=reports/q3) hit a
+transient LLM failure on this server's very first live call (cold
+start), which the provider's cache (per T-09's spec: "Cache by hash of
+(action_type, resource, canonical params)") correctly stored and kept
+replaying on identical retries - the fail-closed design worked exactly
+as intended, but it also means a transient failure can be "sticky" for
+that exact cache key until process restart, since there's no cache
+entry TTL. Confirmed non-regression: a fresh resource identifier
+(reports/q4-fresh-check) got a genuine successful call immediately
+(composite 0.122 -> AUTONOMOUS). Flagging this as a design observation
+for a future task, not fixing now - out of scope for G2 verification.
+The rest of this walkthrough uses fresh resource identifiers throughout.
+
+=== AUTONOMOUS path: evaluate -> execute (no approval step) ===
+REQUEST: {"agent_id":"agent-1","action_type":"read","resource":"g2-autonomous-1","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"f77da536-0de3-405c-ac89-bd841b4e56cf","agent_id":"agent-1","action_type":"read","resource":"g2-autonomous-1","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.138,"tier":"AUTONOMOUS","explanation":"0.14 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T18:31:53.425846Z"}
+HTTP_STATUS:201
+
+--- execute (AUTONOMOUS, no approval needed) ---
+{"id":"f77da536-0de3-405c-ac89-bd841b4e56cf","agent_id":"agent-1","action_type":"read","resource":"g2-autonomous-1","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"executed","composite":0.138,"tier":"AUTONOMOUS","explanation":"0.14 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T18:31:53.425846Z"}
+HTTP_STATUS:200
+
+=== CONFIRM path: evaluate -> confirm -> execute ===
+REQUEST: {"agent_id":"agent-1","action_type":"update","resource":"g2-confirm-1","params":{"resource_id":1,"fields":{"x":1}},"reversibility":"update_with_snapshot","affected_records":1,"regulatory":"none"}
+{"id":"8bfe7c28-1f58-4da0-baa7-15a7039e7eae","agent_id":"agent-1","action_type":"update","resource":"g2-confirm-1","params":{"resource_id":1,"fields":{"x":1}},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"confirm","composite":0.28800000000000003,"tier":"CONFIRM","explanation":"0.29 -> CONFIRM (floor: LLM confidence 0.32 below 0.5).","created_at":"2026-08-19T18:32:06.701209Z"}
+HTTP_STATUS:201
+
+--- confirm ---
+{"id":"8bfe7c28-1f58-4da0-baa7-15a7039e7eae","agent_id":"agent-1","action_type":"update","resource":"g2-confirm-1","params":{"resource_id":1,"fields":{"x":1}},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"approved","composite":0.28800000000000003,"tier":"CONFIRM","explanation":"0.29 -> CONFIRM (floor: LLM confidence 0.32 below 0.5).","created_at":"2026-08-19T18:32:06.701209Z"}
+HTTP_STATUS:200
+
+--- execute ---
+{"id":"8bfe7c28-1f58-4da0-baa7-15a7039e7eae","agent_id":"agent-1","action_type":"update","resource":"g2-confirm-1","params":{"resource_id":1,"fields":{"x":1}},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"executed","composite":0.28800000000000003,"tier":"CONFIRM","explanation":"0.29 -> CONFIRM (floor: LLM confidence 0.32 below 0.5).","created_at":"2026-08-19T18:32:06.701209Z"}
+HTTP_STATUS:200
+
+=== FULL_REVIEW path: evaluate -> decision(approve) -> execute ===
+REQUEST: {"agent_id":"agent-1","action_type":"delete","resource":"g2-fullreview-1","params":{"resource_id":1},"reversibility":"irreversible","affected_records":500,"regulatory":"none"}
+{"id":"f2a6bec0-7b0b-4f2c-a0b9-50187cb94905","agent_id":"agent-1","action_type":"delete","resource":"g2-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"full_review","composite":0.5810000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T18:32:21.415803Z"}
+HTTP_STATUS:201
+
+--- decision: self-review blocked (S-6) ---
+{"detail":"reviewer_id must differ from the proposing agent_id"}
+HTTP_STATUS:403
+
+--- decision: approve (different reviewer) ---
+{"id":"f2a6bec0-7b0b-4f2c-a0b9-50187cb94905","agent_id":"agent-1","action_type":"delete","resource":"g2-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"approved","composite":0.5810000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T18:32:21.415803Z"}
+HTTP_STATUS:200
+
+--- execute ---
+{"id":"f2a6bec0-7b0b-4f2c-a0b9-50187cb94905","agent_id":"agent-1","action_type":"delete","resource":"g2-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"executed","composite":0.5810000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T18:32:21.415803Z"}
+HTTP_STATUS:200
+
+=== REJECT path ===
+{"id":"8233d7fe-17f5-4280-a3a6-8533d864f3d6","agent_id":"agent-1","action_type":"delete","resource":"g2-reject-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"full_review","composite":0.5820000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 300 records (>= 100)).","created_at":"2026-08-19T18:32:37.356269Z"}
+
+--- decision: reject ---
+{"id":"8233d7fe-17f5-4280-a3a6-8533d864f3d6","agent_id":"agent-1","action_type":"delete","resource":"g2-reject-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"rejected","composite":0.5820000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 300 records (>= 100)).","created_at":"2026-08-19T18:32:37.356269Z"}
+HTTP_STATUS:200
+
+--- execute on REJECTED (blocked) ---
+{"detail":"action is in state rejected, not executable"}
+HTTP_STATUS:409
+
+=== GET /v1/audit/verify (hash chain, whole session) ===
+{"valid":true,"records_checked":15,"first_invalid_id":null}
+HTTP_STATUS:200
