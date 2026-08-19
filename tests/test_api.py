@@ -1,7 +1,11 @@
-"""T-10 — API and state machine. In-memory store (T-11 adds real persistence).
+"""T-10 — API and state machine. The 9 business endpoints still use the
+in-memory store (T-11 added the Postgres schema/migration and wired the
+POOLED engine into /readyz only — see progress-log/03-errors-and-fixes.md
+for that scope decision).
 
-The real OpenAI-backed confidence provider is overridden with a fake one
-via FastAPI's dependency_overrides, so these tests never call the live API.
+The real OpenAI-backed confidence provider and the real DB engine are
+both overridden with fakes via FastAPI's dependency_overrides, so these
+tests never call the live API or touch Postgres.
 """
 
 from types import SimpleNamespace
@@ -11,7 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.llm import ConfidenceResult
-from app.main import app, get_confidence_provider
+from app.main import app, get_app_engine, get_confidence_provider
 
 
 class _FakeProvider:
@@ -25,9 +29,28 @@ class _FakeProvider:
         return True
 
 
+class _FakeConnection:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def exec_driver_sql(self, sql):
+        return None
+
+
+class _FakeEngine:
+    """Stands in for the real AsyncEngine so tests never touch Postgres."""
+
+    def connect(self):
+        return _FakeConnection()
+
+
 @pytest.fixture
 def client():
     app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider(0.95)
+    app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -54,12 +77,12 @@ def test_livez_still_zero_io_and_200():
     assert resp.json() == {"status": "ok"}
 
 
-def test_readyz_reports_llm_and_db_placeholder(client):
+def test_readyz_reports_llm_and_db_checks(client):
     resp = client.get("/readyz")
-    assert resp.status_code in (200, 503)
+    assert resp.status_code == 200
     body = resp.json()
-    assert "llm" in body["checks"]
-    assert body["checks"]["db"] == "not_configured (T-11 pending)"
+    assert body["checks"]["llm"] == "ok"
+    assert body["checks"]["db"] == "ok"
 
 
 def test_evaluate_bulk_delete_routes_to_full_review_via_floor(client):

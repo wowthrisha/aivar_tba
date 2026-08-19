@@ -4,8 +4,10 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from openai import AsyncOpenAI
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.audit import AuditLog
+from app.db import make_app_engine
 from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.router import route_action
@@ -31,6 +33,7 @@ CONFIRM_TTL = timedelta(minutes=30)
 FULL_REVIEW_TTL = timedelta(hours=4)
 
 _real_provider: ConfidenceProvider | None = None
+_app_engine: AsyncEngine | None = None
 
 
 def get_confidence_provider() -> ConfidenceProvider:
@@ -41,20 +44,41 @@ def get_confidence_provider() -> ConfidenceProvider:
     return _real_provider
 
 
+def get_app_engine() -> AsyncEngine:
+    global _app_engine
+    if _app_engine is None:
+        _app_engine = make_app_engine()
+    return _app_engine
+
+
+async def _check_db(engine: AsyncEngine) -> bool:
+    try:
+        async with engine.connect() as conn:
+            await conn.exec_driver_sql("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
 @app.get("/livez")
 def livez():
     return {"status": "ok"}
 
 
 @app.get("/readyz")
-async def readyz(response: Response, provider: ConfidenceProvider = Depends(get_confidence_provider)):
+async def readyz(
+    response: Response,
+    provider: ConfidenceProvider = Depends(get_confidence_provider),
+    engine: AsyncEngine = Depends(get_app_engine),
+):
     llm_ok = await provider.health_check()
+    db_ok = await _check_db(engine)
     checks = {
         "llm": "ok" if llm_ok else "unreachable",
-        "db": "not_configured (T-11 pending)",
+        "db": "ok" if db_ok else "unreachable",
     }
-    response.status_code = 200 if llm_ok else 503
-    return {"status": "ok" if llm_ok else "degraded", "checks": checks}
+    response.status_code = 200 if (llm_ok and db_ok) else 503
+    return {"status": "ok" if (llm_ok and db_ok) else "degraded", "checks": checks}
 
 
 def _to_action_response(record) -> ActionResponse:

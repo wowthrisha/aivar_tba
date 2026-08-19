@@ -41,3 +41,16 @@ what was not done, never substitute silently.
   limit/offset) — no cursor-based pagination or filtering by date range.
   Sufficient for T-10's DoD ("filterable, paginated"); can be extended if
   a later task needs more.
+- T-11: the 9 T-10 business endpoints (evaluate, confirm, decision,
+  execute, audit list/verify, review-queue) still read/write
+  `InMemoryStore`/`AuditLog`, not the new Postgres tables. T-11's DoD
+  ("alembic current on DIRECT; app on POOLED; \dt shows 4 tables") is
+  infrastructure proof and does not literally require the swap; a full
+  store rewrite would mean re-touching and re-verifying all 9 already-
+  proven T-10 endpoints, which is a materially larger task than the 1h
+  box. Only `/readyz`'s db check uses the real POOLED engine. Production
+  approach: implement a `SQLAlchemyStore` behind the same interface as
+  `InMemoryStore` (the interface was already kept swap-ready for this)
+  and switch `app/main.py`'s `_store`/`_audit` module globals over to it
+  — flagged for explicit confirmation before doing it, since it's a
+  meaningfully larger change than T-11's literal DoD asks for.

@@ -1,0 +1,23 @@
+=== alembic current ===
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+473900d668ec (head)
+
+=== alembic history ===
+<base> -> 473900d668ec (head), create actions, risk_assessments, approvals, audit_records
+
+=== \dt equivalent: tables in public schema (via DATABASE_URL_DIRECT) ===
+actions
+alembic_version
+approvals
+audit_records
+risk_assessments
+
+=== Indexes ===
+ix_actions_agent_id_created_at on actions
+ix_approvals_action_id on approvals
+ix_audit_records_created_at on audit_records
+
+=== GET /readyz (real app, POOLED engine, live) ===
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP_STATUS:200

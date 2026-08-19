@@ -1,11 +1,19 @@
-# Placeholder deps for scaffold. Versions intentionally unpinned —
-# pinning now would be guessing (E-3/E-5); finalize when feature code lands.
+# Unpinned: no version-specific behavior has been relied on for these yet
+# (E-3/E-5 — pinning without a reason would be guessing). Pinned entries
+# below carry the reason inline.
 fastapi
 uvicorn
 pydantic
-asyncpg
-sqlalchemy
-alembic
+# Pinned (T-11): app/db.py and migrations/env.py rely on SQLAlchemy's
+# asyncpg dialect handling `prepared_statement_cache_size` as a DBAPI
+# query-string argument (not the raw asyncpg `statement_cache_size`
+# kwarg) and on asyncpg.connect() accepting `ssl` (not the libpq
+# `sslmode`/`channel_binding` params in the .env URLs) - verified by
+# reading these exact installed versions' source, then confirmed against
+# the live Neon DB, before writing any code.
+asyncpg==0.30.0
+sqlalchemy==2.0.36
+alembic==1.14.0
 # Pinned (T-09): the structured-outputs behavior app/llm.py relies on
 # (message.refusal, message.parsed, strict/additionalProperties auto-set
 # from a Pydantic response_format, APITimeoutError hierarchy) was verified
