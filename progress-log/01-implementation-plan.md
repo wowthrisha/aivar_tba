@@ -52,7 +52,7 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-16 | Observability | JSON log line with request_id; forced error returns clean JSON | 45m | Done |
 | T-17 | CLI | pasted session showing risk table + confirm prompt | 45m | Done |
 | T-18 | README + traceability table | table rendering on GitHub, 4 rows populated | 45m | Done |
-| T-18a | DMAIC + versioning + fuzzy-rejection sections | present in README | 15m | Not started |
+| T-18a | DMAIC + versioning + fuzzy-rejection sections | present in README | 15m | Done |
 
 >>> **GATE G3** (Wed 21:00): SCOPE FREEZE. Live URL + green suite + README
 

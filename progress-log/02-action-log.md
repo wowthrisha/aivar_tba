@@ -863,3 +863,39 @@ No frozen weights/thresholds/floors/fail-closed direction touched -
 `tests/test_routing.py` (T-08) not touched.
 
 Evidence: reports/evidence/T-17-cli-session.txt.
+
+### [2026-08-20 03:44 IST] [T-18a] [autonomous overnight batch - delivery engineer]
+
+Added three README sections (`## 10. DMAIC`, `## 11. Versioning`,
+`## 12. Fuzzy rejection`). Used the task-board's one-line entry as the
+complete spec (product owner explicit instruction): "DMAIC + versioning
++ fuzzy-rejection sections | present in README" - confirmed via grep
+that, same as T-16 and T-18a's own DoD, none of the three has a
+detailed section anywhere else in the prompt pack.
+
+Content grounded in real, already-established project artifacts, not
+invented process or features:
+  - DMAIC maps Define-Measure-Analyze-Improve-Control onto this
+    project's actual history (T-08 criterion tests as Define, the test
+    suites + live curl evidence as Measure, T-13's adversarial review +
+    the D-01-D-12 defect register as Analyze, the approved T-13/Issue-2/
+    D-11/D-12 fixes as Improve, the FROZEN list + T-08's read-only
+    status as Control).
+  - Versioning covers `weights_version` (`app/risk/scorer.py:56`), the
+    `/v1/` API prefix, and the action-log/defect-register as change
+    history - no new versioning mechanism added.
+  - Fuzzy rejection documents that this system deliberately does NOT
+    implement graduated/fuzzy rejection - citing T-13 Finding 3's
+    already-accepted boundary-brittleness limitation - rather than
+    introducing new logic. No frozen thresholds touched.
+
+Learned from D-12 (T-18): checked for the same `^>` line-start
+blockquote hazard before pushing this time, and verified via GitHub's
+actual render API (not just local preview) after pushing - both times
+clean (0 `<blockquote>` tags, all three headers render as real `<h2>`
+elements).
+
+No code changed. `tests/test_routing.py` (T-08) untouched. No frozen
+weights/thresholds/floors/fail-closed direction modified.
+
+Evidence: reports/evidence/T-18a-verification.txt.
