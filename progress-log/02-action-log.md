@@ -126,3 +126,18 @@ combinations of (reversibility, affected_records, regulatory,
 llm_confidence) asserting final_tier never falls below weighted_tier. Full
 suite 35/35, no regressions.
 Evidence: reports/evidence/T-07-pytest.txt (`35 passed in 0.03s`).
+
+### [2026-08-19 22:45 IST] [T-07a] [delivery engineer]
+Action: No task-specific prompt exists for T-07a in the Prompt Pack
+(flagged and confirmed earlier this session) — used only the approved
+interpretation and the task-board DoD. Wrote tests/test_tiers.py testing
+`app/risk/tiers.tier_for_composite` (built during T-06a) against the
+approved boundary semantics: composite<0.30->AUTONOMOUS,
+0.30<=composite<0.65->CONFIRM, composite>=0.65->FULL_REVIEW. Parametrized
+test at each threshold +/- 0.04 (5 points per threshold) plus a
+monotonicity sweep (80 steps across each 0.08-wide band) asserting tier
+never regresses as composite rises. No implementation change was needed —
+tiers.py already matched the approved semantics from T-06a; this task
+formalizes the dedicated boundary-precision coverage the DoD asks for.
+Result: 12/12 new tests pass. Full suite 47/47, no regressions.
+Evidence: reports/evidence/T-07a-pytest.txt (`47 passed in 0.04s`).
