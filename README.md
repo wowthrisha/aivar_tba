@@ -98,8 +98,9 @@ Four dimensions, each normalized to 0.0–1.0, combined as a weighted sum
 | Regulatory | 0.20 | none 0.0 · internal 0.3 · PII/GDPR 0.7 · PHI/SOX 1.0 |
 | Confidence | 0.10 | `1.0 − llm_confidence` — low confidence RAISES risk |
 
-**Rationale for the ordering** (reversibility > data scope > regulatory
-> confidence): reversibility gets the largest weight because it bounds
+**Rationale for the ordering** (reversibility outranks data scope,
+which outranks regulatory, which outranks confidence): reversibility
+gets the largest weight because it bounds
 the *worst case* directly — an irreversible action has no undo path
 regardless of how many records it touched or how confident the model
 was. Data scope is second because blast radius compounds any other
