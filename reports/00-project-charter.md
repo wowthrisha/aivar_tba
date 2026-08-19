@@ -29,8 +29,19 @@ Deadline: 20 Aug 2026, 17:00 IST. Target submission: 13:00 IST.
 | G1 | Criterion tests written (read-only after) | TBD |
 | G2 | Risk scorer implemented, tests green | TBD |
 | G3 | API + audit log wired end-to-end | TBD |
-| G4 | Deployed, curl-verified against public URL | TBD |
+| G4 | Deployed, curl-verified against public URL | 2026-08-20 |
 | G5 | Final submission | 2026-08-20 13:00 IST |
 
 Gate dates beyond G0 depend on the task list to be provided next
 (`progress-log/01-implementation-plan.md`).
+
+## Live deployment (G4, T-14)
+
+- **URL**: https://aivartba-production.up.railway.app
+- **Platform**: Railway (ECS Express Mode successor product; App Runner
+  is closed to new customers, per the known constraints)
+- Curl-verified against all three routing tiers plus `/livez` and
+  `/v1/audit` — see `progress-log/02-action-log.md` (T-14 entry) and
+  `reports/evidence/T-14-curl.txt` for full raw evidence.
+- CI: GitHub Actions runs the full test suite on every push —
+  https://github.com/wowthrisha/aivar_tba/actions/runs/32303917004

@@ -1,0 +1,87 @@
+T-14 live curl verification (FINAL)
+URL: https://aivartba-production.up.railway.app
+Run at: 2026-08-19T21:33:45Z
+Deployment: b6fd821c-6ba9-40cb-a91e-1143032a13ba (commit 2f2794a)
+
+Single-update example uses the canonical T-08 scenario:
+  reversibility=update_without_snapshot, affected_records=1, regulatory=none
+  (matches tests/test_routing.py::test_single_update_routes_to_confirm exactly)
+
+=== 1. GET /livez -> expect 200 ===
+{"status":"ok"}
+HTTP_STATUS:200
+
+=== 2. POST /v1/actions/evaluate - bulk delete -> expect FULL_REVIEW ===
+REQUEST: {"agent_id":"t14-agent","action_type":"delete","resource":"t14-live-bulk-delete-final","params":{"resource_id":1},"reversibility":"irreversible","affected_records":500,"regulatory":"none"}
+upstream error
+HTTP_STATUS:502
+NOTE: first attempt at this check returned a transient 502 upstream error;
+immediate retry of GET /livez confirmed the service was still Online/200,
+and the retry below succeeded normally. Logged for transparency (E-7).
+
+RETRY REQUEST: {"agent_id":"t14-agent","action_type":"delete","resource":"t14-live-bulk-delete-final","params":{"resource_id":1},"reversibility":"irreversible","affected_records":500,"regulatory":"none"}
+{"id":"1becd014-9010-4964-9ede-0d396a3d924d","agent_id":"t14-agent","action_type":"delete","resource":"t14-live-bulk-delete-final","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"full_review","composite":0.5810000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T21:34:14.573580Z"}
+HTTP_STATUS:201
+
+=== 3. POST /v1/actions/evaluate - single update (update_without_snapshot, canonical T-08 scenario) -> expect CONFIRM ===
+REQUEST: {"agent_id":"t14-agent","action_type":"update","resource":"t14-live-single-update-final","params":{"resource_id":1,"fields":{"x":1}},"reversibility":"update_without_snapshot","affected_records":1,"regulatory":"none"}
+{"id":"1244af38-afc7-442b-89d9-bf32574e930f","agent_id":"t14-agent","action_type":"update","resource":"t14-live-single-update-final","params":{"fields":{"x":1},"resource_id":1},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"confirm","composite":0.34299999999999997,"tier":"CONFIRM","explanation":"0.34 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).","created_at":"2026-08-19T21:35:14.180924Z"}
+HTTP_STATUS:201
+
+=== 4. POST /v1/actions/evaluate - read-only -> expect AUTONOMOUS ===
+REQUEST: {"agent_id":"t14-agent","action_type":"read","resource":"t14-live-readonly-final","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"b5ca9045-da05-434c-a5c8-4117a47abd9a","agent_id":"t14-agent","action_type":"read","resource":"t14-live-readonly-final","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.132,"tier":"AUTONOMOUS","explanation":"0.13 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T21:35:24.921783Z"}
+HTTP_STATUS:201
+
+=== 5. GET /v1/audit - readable audit records ===
+The three T-14 verification records (extracted from /v1/audit), all llm_degraded=false:
+{
+  "id": "66ea1684-0867-4319-b6ba-6f50fe4066c2",
+  "prev_hash": "059e8a3696b43d241eae00b229db7e713e933d23efc089e5cc3f74b99403be54",
+  "entry_hash": "56af7e1fb496f7067787f5c862e3f8d7c70715d304a497b6faf1d030aca7e15a",
+  "event_type": "evaluated",
+  "actor": "t14-agent",
+  "payload": {
+    "tier": "FULL_REVIEW",
+    "action_id": "1becd014-9010-4964-9ede-0d396a3d924d",
+    "composite": 0.5810000000000001,
+    "floor_name": "irreversible_bulk",
+    "explanation": "0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).",
+    "llm_degraded": false
+  },
+  "created_at": "2026-08-19T21:34:16.753038Z"
+}
+{
+  "id": "9d0f429f-3610-4c04-a872-f5f50d84afc8",
+  "prev_hash": "56af7e1fb496f7067787f5c862e3f8d7c70715d304a497b6faf1d030aca7e15a",
+  "entry_hash": "a568e725617a05cdccd4d9453597463f5f71bdc9257e67dae6dfba806fed65cb",
+  "event_type": "evaluated",
+  "actor": "t14-agent",
+  "payload": {
+    "tier": "CONFIRM",
+    "action_id": "1244af38-afc7-442b-89d9-bf32574e930f",
+    "composite": 0.34299999999999997,
+    "floor_name": "unrecoverable_mutation_requires_confirm",
+    "explanation": "0.34 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).",
+    "llm_degraded": false
+  },
+  "created_at": "2026-08-19T21:35:18.450267Z"
+}
+{
+  "id": "1f6205ea-cd6a-41ee-b8b2-1be7960e8e2c",
+  "prev_hash": "a568e725617a05cdccd4d9453597463f5f71bdc9257e67dae6dfba806fed65cb",
+  "entry_hash": "610e6cf5536e0c5d1684501446cd0f244914db302eda4d3a0fe534421573f8b2",
+  "event_type": "evaluated",
+  "actor": "t14-agent",
+  "payload": {
+    "tier": "AUTONOMOUS",
+    "action_id": "b5ca9045-da05-434c-a5c8-4117a47abd9a",
+    "composite": 0.132,
+    "floor_name": null,
+    "explanation": "0.13 -> AUTONOMOUS. No single dimension change would alter the tier.",
+    "llm_degraded": false
+  },
+  "created_at": "2026-08-19T21:35:29.778751Z"
+}
+Total audit records returned: 26
+HTTP_STATUS: 200
