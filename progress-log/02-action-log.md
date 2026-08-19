@@ -109,3 +109,20 @@ Result: 26/26 tests pass (24 from T-06 unchanged + 2 new). No regressions.
 Evidence: reports/evidence/T-06a-pytest.txt (`26 passed in 0.02s`). Sample
 real output: `0.72 -> FULL_REVIEW. Would have been CONFIRM if
 reversibility were update_without_snapshot instead of irreversible.`
+
+### [2026-08-19 22:35 IST] [T-07] [delivery engineer]
+Action: Wrote tests/test_floors.py first (confirmed red:
+`ModuleNotFoundError: No module named 'app.risk.floors'`), then
+implemented app/risk/floors.py. Three FROZEN floors: irreversible+100
+records -> FULL_REVIEW, PHI_SOX+mutation -> FULL_REVIEW,
+llm_confidence<0.5 -> CONFIRM (`is_mutation` derived as
+`reversibility != READ`, documented in-code). `final_tier =
+max(weighted_tier, floor.tier)` — escalate-only is structurally guaranteed
+by max() (floor.tier defaults to the lowest tier, AUTONOMOUS, when no
+floor fires) plus an explicit `assert result >= weighted_tier` for
+self-documentation, not just a comment.
+Result: 9/9 floors tests pass, including a sweep test over all 4x9x4x9=1296
+combinations of (reversibility, affected_records, regulatory,
+llm_confidence) asserting final_tier never falls below weighted_tier. Full
+suite 35/35, no regressions.
+Evidence: reports/evidence/T-07-pytest.txt (`35 passed in 0.03s`).
