@@ -7,6 +7,11 @@
 | D-03 | T-12's race test (`test_race_concurrent_decisions_resolve_via_conditional_update`) passed 5/5 runs against T-10's original `decision` handler, which read `record.state`, checked it, then mutated it as two separate steps — a genuine read-then-write, not a conditional update | Python's GIL plus the specific fast, non-yielding code path in that handler made the race window narrow enough that this synthetic two-thread test never happened to land in it. A passing test is not proof of a correct implementation when the spec mandates a specific mechanism (conditional UPDATE), not just an observed outcome. | Added `InMemoryStore.conditional_transition` (lock-guarded atomic check-and-set) and switched confirm/decision/execute to use it instead of read-then-write, regardless of the test already passing. | Fixed |
 | D-04 | `test_s5_tampered_middle_record_is_detected` passed in isolation but failed when the full suite ran together (`valid=True` when `False` was expected) | The test indexed into the app's shared `_audit` module-level singleton, which accumulates audit records across the entire pytest session (every test that calls evaluate/confirm/decision/execute appends to it). `records[1]` picked up an unrelated record from a different, earlier test whose `tier` value already equaled what the test was "tampering" it to — a no-op mutation that happened to leave the hash chain intact. | Rewrote the test to construct and tamper a fresh, isolated `AuditLog()` instance directly, rather than reaching into the shared app singleton. | Fixed |
 | D-05 | `test_finding1_update_without_snapshot_no_longer_autonomous` (T-13 fix regression test) failed: `assert 0.38 == 0.28 ± 2.8e-07` | Test called `score_action(..., llm_confidence=0.0)` but the comment and expected value (`composite=0.28`) were computed for the review's actual case, `llm_confidence=1.0` — a copy/transcription mismatch between the two calls in the same test (the second call, to `evaluate_floors`, correctly used `1.0`). | Corrected the `score_action` call to use `llm_confidence=1.0`, matching the review's original input. | Fixed |
+| D-06 | Every real `/v1/actions/evaluate` call showed `llm_degraded: true` again during the G2 walkthrough, even though D-02 (the temperature bug) was already fixed | `OpenAIConfidenceProvider`'s cache stored the failed/degraded result from the process's very first (cold-start) live call and replayed it on every subsequent identical-key call, indefinitely — the exact issue later fixed as "Issue 2" in this same session. | Traced via a direct provider call (bypassing the cache) confirming the SDK itself worked (`confidence: 0.86`); confirmed non-regression with a fresh cache key. Formally fixed later the same session — see the Issue 2 fix entry below. | Fixed |
+| D-07 | Pre-T-14 Issue 1 fix: after swapping to dependency-injected `get_store`, three test files' evaluate-then-follow-up tests (e.g. evaluate then `GET /v1/actions/{id}`) failed with spurious 404s | Fixture used `app.dependency_overrides[get_store] = lambda: InMemoryStore()` — FastAPI calls the override on every request, so each lambda invocation built a BRAND NEW empty store; the action written by `evaluate()` never existed in the store the follow-up request received. | Fixed by constructing the store/audit_log ONCE per test and capturing it in the lambda's closure (`store = InMemoryStore(); ... lambda: store`), matching the pattern `_FakeProvider`/`_FakeEngine` already used correctly. | Fixed |
+| D-08 | New `tests/test_db_store.py` hung (2-minute timeout) with module-scoped async engine fixtures, then failed with `RuntimeError: ... attached to a different loop` / `Event loop is closed` | This pytest-asyncio version's default event-loop handling creates a new event loop per test function; a module-scoped async fixture (the engine) gets created in one loop and later tests try to use its connection pool from a different loop. | Reverted to function-scoped fixtures — real per-test connection-setup cost against live Neon (~20s/test) accepted rather than fighting the framework's default loop scoping under time pressure. | Fixed (worked around) |
+| D-09 | Latent (never shipped): `_check_expiry`'s original design mutated `record.state = ActionState.EXPIRED` directly on the local Python object | Correct for `InMemoryStore` (whose `get_action()` returns a live reference into its internal dict) but silently wrong for `SQLAlchemyStore` (whose `get_action()` reconstructs a fresh `ActionRecord` from a DB query every call) — the mutation would vanish with the object, never reaching Postgres. Found during design review before writing `db_store.py`'s callers, not from a failing test. | Routed expiry through `conditional_transition` (the same real DB update every other transition already uses) instead of local mutation. | Fixed |
+| D-10 | Latent (never shipped): `SQLAlchemyAuditLog.append()`'s "read the last record by created_at, then write the next" is a genuine TOCTOU race under concurrent writers | `audit_records` has no auto-incrementing sequence column (only `created_at`, an unordered timestamp) to serialize on, unlike `actions.state`. Two concurrent appends could both read the same "last" row and both compute the same `prev_hash`, forking the hash chain. Found during design review, not from a failing test — no concurrent-audit-write test was run before this was caught. | Serialized all `append()` calls with a Postgres advisory transaction lock (`pg_advisory_xact_lock`), released automatically at transaction end. | Fixed |
 
 ## LEFT OUT
 
@@ -44,19 +49,29 @@ what was not done, never substitute silently.
   limit/offset) — no cursor-based pagination or filtering by date range.
   Sufficient for T-10's DoD ("filterable, paginated"); can be extended if
   a later task needs more.
-- T-11: the 9 T-10 business endpoints (evaluate, confirm, decision,
-  execute, audit list/verify, review-queue) still read/write
-  `InMemoryStore`/`AuditLog`, not the new Postgres tables. T-11's DoD
-  ("alembic current on DIRECT; app on POOLED; \dt shows 4 tables") is
-  infrastructure proof and does not literally require the swap; a full
-  store rewrite would mean re-touching and re-verifying all 9 already-
-  proven T-10 endpoints, which is a materially larger task than the 1h
-  box. Only `/readyz`'s db check uses the real POOLED engine. Production
-  approach: implement a `SQLAlchemyStore` behind the same interface as
-  `InMemoryStore` (the interface was already kept swap-ready for this)
-  and switch `app/main.py`'s `_store`/`_audit` module globals over to it
-  — flagged for explicit confirmation before doing it, since it's a
-  meaningfully larger change than T-11's literal DoD asks for.
+- ~~T-11: the 9 business endpoints read/write InMemoryStore, not
+  Postgres~~ — RESOLVED by the pre-T-14 Issue 1 fix. All 9 endpoints now
+  use `SQLAlchemyStore`/`SQLAlchemyAuditLog` at runtime, verified by a
+  direct Postgres query showing real persisted rows and a live
+  multi-connection concurrency proof. See the "Issue 1 fix" action-log
+  entry.
+- ~~G2: transient LLM failures cached indefinitely~~ — RESOLVED by the
+  pre-T-14 Issue 2 fix. `OpenAIConfidenceProvider` now only caches
+  `degraded=False` results. See the "Issue 2 fix" action-log entry.
+- Pre-T-14 Issue 1 fix: `audit_records` has no DB-level enforcement of
+  "APPEND-ONLY, never UPDATE, never DELETE" — that's currently true only
+  because application code never issues those statements. A Postgres
+  trigger or `REVOKE UPDATE, DELETE` grant would enforce it at the DB
+  level. Explicitly deferred as a separate, out-of-scope hardening step
+  per the approved plan (not part of "swap the store").
+- Pre-T-14 Issue 1 fix: `test_db_store.py`'s real-DB tests run
+  function-scoped (fresh engine/connection pool per test, ~20s each,
+  ~2 minutes for the file) due to a pytest-asyncio event-loop-scoping
+  incompatibility with module-scoped async fixtures (D-08). Production
+  approach if this becomes a CI time problem: pin an explicit
+  `asyncio_default_fixture_loop_scope` (module or session) in
+  `pytest.ini` and re-test module-scoped fixtures against that config,
+  or accept the per-test cost as this project already has.
 - T-13 Finding 3 (boundary brittleness), ACCEPTED as a documented
   limitation per product owner decision — not fixed, frozen thresholds
   unchanged, no calibration logic added. A fresh-session adversarial

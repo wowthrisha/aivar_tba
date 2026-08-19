@@ -1,6 +1,8 @@
-"""In-memory store for actions and approvals. T-11 built the real Postgres
-schema (see app/db_models.py) but the business endpoints still read/write
-here - see progress-log/03-errors-and-fixes.md for that scope decision.
+"""In-memory store for actions and approvals - the test double for
+SQLAlchemyStore (app/db_store.py), which backs the real Postgres tables
+at runtime. Methods are `async def` with no real awaiting inside, purely
+so app/main.py's handlers can call the same interface uniformly
+regardless of which backend is dependency-injected.
 
 T-12: all mutation goes through a single lock so evaluate-idempotency and
 decision transitions are genuine conditional updates, not read-then-write.
@@ -43,6 +45,7 @@ class ApprovalRecord:
     action_id: str
     decision: str  # "approve" | "reject"
     reviewer_id: str | None
+    approved_params_hash: str
     decided_at: datetime
     expires_at: datetime | None
 
@@ -55,7 +58,7 @@ class InMemoryStore:
         self._executed_idempotency: set[tuple[str, str]] = set()  # (action_id, key)
         self._lock = threading.Lock()
 
-    def get_or_create_action(
+    async def get_or_create_action(
         self,
         id: str,
         agent_id: str,
@@ -88,20 +91,20 @@ class InMemoryStore:
                 self._evaluate_idempotency[idempotency_key] = id
             return record, True
 
-    def get_action(self, action_id: str) -> ActionRecord | None:
+    async def get_action(self, action_id: str) -> ActionRecord | None:
         return self._actions.get(action_id)
 
-    def list_review_queue(self) -> list[ActionRecord]:
+    async def list_review_queue(self) -> list[ActionRecord]:
         pending = [a for a in self._actions.values() if a.state == ActionState.FULL_REVIEW]
         return sorted(pending, key=lambda a: a.created_at)
 
-    def set_approval(self, approval: ApprovalRecord) -> None:
+    async def set_approval(self, approval: ApprovalRecord) -> None:
         self._approvals[approval.action_id] = approval
 
-    def get_approval(self, action_id: str) -> ApprovalRecord | None:
+    async def get_approval(self, action_id: str) -> ApprovalRecord | None:
         return self._approvals.get(action_id)
 
-    def conditional_transition(
+    async def conditional_transition(
         self, action_id: str, expected_state: ActionState, new_state: ActionState
     ) -> bool:
         """S-race: atomic check-and-set. Returns False (no mutation) if the
@@ -114,10 +117,43 @@ class InMemoryStore:
             record.state = new_state
             return True
 
-    def was_executed_with_key(self, action_id: str, idempotency_key: str) -> bool:
+    async def was_executed_with_key(self, action_id: str, idempotency_key: str) -> bool:
         with self._lock:
             return (action_id, idempotency_key) in self._executed_idempotency
 
-    def remember_executed_key(self, action_id: str, idempotency_key: str) -> None:
+    async def remember_executed_key(self, action_id: str, idempotency_key: str) -> None:
         with self._lock:
             self._executed_idempotency.add((action_id, idempotency_key))
+
+    async def save_risk_assessment(
+        self,
+        action_id: str,
+        reversibility_score: float,
+        data_scope_score: float,
+        regulatory_score: float,
+        confidence_score: float,
+        weights_version: str,
+        composite: float,
+        floor_fired: str | None,
+        tier: str,
+        llm_model: str | None,
+        llm_latency_ms: int | None,
+        degraded: bool,
+        rendered_explanation: str,
+        new_state: ActionState,
+    ) -> ActionRecord:
+        """Atomically records the risk assessment and transitions the
+        action's state (mirrors SQLAlchemyStore, which does both writes in
+        one DB transaction). The per-dimension scores / llm_model /
+        llm_latency_ms / degraded are accepted for interface parity with
+        the DB-backed store's risk_assessments table but have no field on
+        ActionRecord/ActionResponse to hold them in-memory - they're
+        simply not persisted here, only in Postgres."""
+        with self._lock:
+            record = self._actions[action_id]
+            record.state = new_state
+            record.composite = composite
+            record.tier = tier
+            record.explanation = rendered_explanation
+            record.floor_name = floor_fired
+            return record

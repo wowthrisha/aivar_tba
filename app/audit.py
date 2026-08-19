@@ -1,5 +1,9 @@
-"""Append-only, hash-chained audit log. In-memory (T-11 adds real
-persistence to the `audit_records` table with the same shape).
+"""Append-only, hash-chained audit log - the test double for
+SQLAlchemyAuditLog (app/db_store.py), which persists to the real
+`audit_records` table at runtime and reuses `_entry_hash`/`GENESIS_HASH`
+from this module so the chain algorithm is provably identical regardless
+of storage backend. Methods are `async def` with no real awaiting inside,
+purely for interface uniformity with the DB-backed version.
 """
 
 import hashlib
@@ -40,7 +44,7 @@ class AuditLog:
     def __init__(self) -> None:
         self._records: list[AuditRecord] = []
 
-    def append(self, event_type: str, actor: str, payload: dict[str, Any]) -> AuditRecord:
+    async def append(self, event_type: str, actor: str, payload: dict[str, Any]) -> AuditRecord:
         prev_hash = self._records[-1].entry_hash if self._records else GENESIS_HASH
         created_at = datetime.now(timezone.utc)
         entry_hash = _entry_hash(prev_hash, event_type, actor, payload, created_at)
@@ -56,7 +60,7 @@ class AuditLog:
         self._records.append(record)
         return record
 
-    def list_records(
+    async def list_records(
         self,
         action_id: str | None = None,
         event_type: str | None = None,
@@ -70,7 +74,7 @@ class AuditLog:
             records = [r for r in records if r.event_type == event_type]
         return records[offset : offset + limit]
 
-    def verify(self) -> AuditVerifyResult:
+    async def verify(self) -> AuditVerifyResult:
         prev_hash = GENESIS_HASH
         for i, record in enumerate(self._records):
             if record.prev_hash != prev_hash:

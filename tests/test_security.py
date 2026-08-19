@@ -3,7 +3,10 @@
 S-3 and S-5 manipulate internal store/audit state directly to simulate
 elapsed time / tampering, since there is no injectable clock and no
 external tamperer available in-process. Documented here rather than
-silently done.
+silently done. `store`/`audit_log` fixtures are dependency-injected into
+the app (pre-T-14 persistence fix swapped the runtime default to
+SQLAlchemyStore/SQLAlchemyAuditLog; these tests override back to the
+in-memory versions to stay hermetic and fast).
 """
 
 import threading
@@ -11,9 +14,10 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
+from app.audit import AuditLog
 from app.llm import ConfidenceResult
-from app.main import _store, app, get_app_engine, get_confidence_provider
-from app.store import canonical_params_hash
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_store
+from app.store import InMemoryStore, canonical_params_hash
 
 
 class _FakeProvider:
@@ -41,9 +45,21 @@ class _FakeEngine:
 
 
 @pytest.fixture
-def client():
+def store():
+    return InMemoryStore()
+
+
+@pytest.fixture
+def audit_log():
+    return AuditLog()
+
+
+@pytest.fixture
+def client(store, audit_log):
     app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider()
     app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -145,7 +161,7 @@ def test_s2_execute_replay_returns_original_result_without_reexecuting(client):
 # ---------------------------------------------------------------------------
 
 
-def test_s3_expired_approval_cannot_execute(client):
+async def test_s3_expired_approval_cannot_execute(client, store):
     from datetime import datetime, timedelta, timezone
 
     created = _evaluate(client).json()  # FULL_REVIEW
@@ -155,7 +171,7 @@ def test_s3_expired_approval_cannot_execute(client):
     )
     # simulate elapsed time: no injectable clock exists, so force the
     # stored approval's expires_at into the past directly.
-    approval = _store.get_approval(created["id"])
+    approval = await store.get_approval(created["id"])
     approval.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
 
     resp = client.post(
@@ -169,28 +185,22 @@ def test_s3_expired_approval_cannot_execute(client):
 # ---------------------------------------------------------------------------
 
 
-def test_s5_tampered_middle_record_is_detected():
-    # Uses a fresh, isolated AuditLog rather than the app's shared _audit
-    # singleton: _audit accumulates records across the whole pytest
-    # session (every test that calls evaluate/confirm/decision/execute
-    # appends to it), so indexing into it here would be unpredictable and
-    # could tamper a record whose value happens to already match, making
-    # the "tamper" a no-op. A fresh instance gives full control.
-    from app.audit import AuditLog
-
+async def test_s5_tampered_middle_record_is_detected():
+    # Uses a fresh, isolated AuditLog rather than the shared per-test
+    # fixture instance, for full control over exactly what's in it.
     log = AuditLog()
-    log.append("evaluated", "agent-1", {"action_id": "a1", "tier": "CONFIRM"})
-    middle = log.append("evaluated", "agent-1", {"action_id": "a2", "tier": "FULL_REVIEW"})
-    log.append("evaluated", "agent-1", {"action_id": "a3", "tier": "AUTONOMOUS"})
+    await log.append("evaluated", "agent-1", {"action_id": "a1", "tier": "CONFIRM"})
+    middle = await log.append("evaluated", "agent-1", {"action_id": "a2", "tier": "FULL_REVIEW"})
+    await log.append("evaluated", "agent-1", {"action_id": "a3", "tier": "AUTONOMOUS"})
 
-    assert log.verify().valid is True
+    assert (await log.verify()).valid is True
 
     # tamper with the middle record's payload directly (an external
     # attacker editing the row would look the same: entry_hash no longer
     # matches the recomputed hash of the mutated payload).
     object.__setattr__(middle, "payload", {**middle.payload, "tier": "AUTONOMOUS"})
 
-    result = log.verify()
+    result = await log.verify()
     assert result.valid is False
     assert result.first_invalid_id == middle.id
 

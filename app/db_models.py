@@ -29,6 +29,9 @@ class ActionORM(Base):
     params_hash: Mapped[str] = mapped_column(String, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Not in T-11's original column list - gap found during the pre-T-14
+    # persistence review (no state machine state was ever persisted).
+    state: Mapped[str] = mapped_column(String, nullable=False)
 
     __table_args__ = (Index("ix_actions_agent_id_created_at", "agent_id", "created_at"),)
 

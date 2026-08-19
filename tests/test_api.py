@@ -1,7 +1,8 @@
-"""T-10 — API and state machine. The 9 business endpoints still use the
-in-memory store (T-11 added the Postgres schema/migration and wired the
-POOLED engine into /readyz only — see progress-log/03-errors-and-fixes.md
-for that scope decision).
+"""T-10 — API and state machine. The 9 business endpoints are now backed
+by SQLAlchemyStore/SQLAlchemyAuditLog at runtime (pre-T-14 persistence
+fix) - these tests override get_store/get_audit_log with fresh
+InMemoryStore()/AuditLog() instances per test, exactly like the
+confidence provider and DB engine, so the suite stays hermetic and fast.
 
 The real OpenAI-backed confidence provider and the real DB engine are
 both overridden with fakes via FastAPI's dependency_overrides, so these
@@ -14,8 +15,10 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.audit import AuditLog
 from app.llm import ConfidenceResult
-from app.main import app, get_app_engine, get_confidence_provider
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_store
+from app.store import InMemoryStore
 
 
 class _FakeProvider:
@@ -49,8 +52,15 @@ class _FakeEngine:
 
 @pytest.fixture
 def client():
+    # store/audit_log must be created ONCE per test and reused across
+    # every request in that test (a fresh instance per request would
+    # mean evaluate() and a follow-up call never see the same data).
+    store = InMemoryStore()
+    audit_log = AuditLog()
     app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider(0.95)
     app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

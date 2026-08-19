@@ -1,0 +1,60 @@
+=== GET /readyz ===
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP_STATUS:200
+
+=== AUTONOMOUS path: evaluate -> execute ===
+REQUEST: {"agent_id":"agent-1","action_type":"read","resource":"issue1-autonomous-1","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"890dfa8a-6333-47c2-b947-2012f628622c","agent_id":"agent-1","action_type":"read","resource":"issue1-autonomous-1","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.13,"tier":"AUTONOMOUS","explanation":"0.13 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T19:59:33.979678Z"}
+HTTP_STATUS:201
+
+{"id":"890dfa8a-6333-47c2-b947-2012f628622c","agent_id":"agent-1","action_type":"read","resource":"issue1-autonomous-1","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"executed","composite":0.13,"tier":"AUTONOMOUS","explanation":"0.13 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T19:59:33.979678Z"}
+HTTP_STATUS:200
+
+=== Direct DB query proving persistence (via DATABASE_URL_DIRECT) ===
+{'id': '890dfa8a-6333-47c2-b947-2012f628622c', 'state': 'executed', 'action_type': 'read', 'resource': 'issue1-autonomous-1'}
+{'action_id': '890dfa8a-6333-47c2-b947-2012f628622c', 'tier': 'AUTONOMOUS', 'composite': 0.13, 'llm_model': 'gpt-5.6-luna', 'llm_latency_ms': 6418, 'degraded': False}
+
+=== CONFIRM path: evaluate -> confirm -> execute ===
+REQUEST: {"agent_id":"agent-1","action_type":"update","resource":"issue1-confirm-1","params":{"resource_id":1,"fields":{"x":1}},"reversibility":"update_with_snapshot","affected_records":1,"regulatory":"none"}
+{"id":"cd030e21-d51a-4a4d-92d9-3a9024299976","agent_id":"agent-1","action_type":"update","resource":"issue1-confirm-1","params":{"fields":{"x":1},"resource_id":1},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"confirm","composite":0.30200000000000005,"tier":"CONFIRM","explanation":"0.30 -> CONFIRM (floor: LLM confidence 0.18 below 0.5).","created_at":"2026-08-19T20:00:26.879327Z"}
+HTTP_STATUS:201
+
+{"id":"cd030e21-d51a-4a4d-92d9-3a9024299976","agent_id":"agent-1","action_type":"update","resource":"issue1-confirm-1","params":{"fields":{"x":1},"resource_id":1},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"approved","composite":0.30200000000000005,"tier":"CONFIRM","explanation":"0.30 -> CONFIRM (floor: LLM confidence 0.18 below 0.5).","created_at":"2026-08-19T20:00:26.879327Z"}
+HTTP_STATUS:200
+
+{"id":"cd030e21-d51a-4a4d-92d9-3a9024299976","agent_id":"agent-1","action_type":"update","resource":"issue1-confirm-1","params":{"fields":{"x":1},"resource_id":1},"params_hash":"1358b5ef58b5701633df2ea7591178a2c655d7bcd269ab1d3f537b8696fe27e0","state":"executed","composite":0.30200000000000005,"tier":"CONFIRM","explanation":"0.30 -> CONFIRM (floor: LLM confidence 0.18 below 0.5).","created_at":"2026-08-19T20:00:26.879327Z"}
+HTTP_STATUS:200
+
+=== FULL_REVIEW path: evaluate -> decision(approve, diff reviewer) -> execute ===
+REQUEST: {"agent_id":"agent-1","action_type":"delete","resource":"issue1-fullreview-1","params":{"resource_id":1},"reversibility":"irreversible","affected_records":500,"regulatory":"none"}
+{"id":"1bf25092-7e65-48a3-bf71-8369a9bd9b06","agent_id":"agent-1","action_type":"delete","resource":"issue1-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"full_review","composite":0.5830000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T20:01:12.794965Z"}
+HTTP_STATUS:201
+
+--- self-review blocked (S-6) ---
+{"detail":"reviewer_id must differ from the proposing agent_id"}
+HTTP_STATUS:403
+
+--- approve, different reviewer ---
+{"id":"1bf25092-7e65-48a3-bf71-8369a9bd9b06","agent_id":"agent-1","action_type":"delete","resource":"issue1-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"approved","composite":0.5830000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T20:01:12.794965Z"}
+HTTP_STATUS:200
+
+--- execute ---
+{"id":"1bf25092-7e65-48a3-bf71-8369a9bd9b06","agent_id":"agent-1","action_type":"delete","resource":"issue1-fullreview-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"executed","composite":0.5830000000000001,"tier":"FULL_REVIEW","explanation":"0.58 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T20:01:12.794965Z"}
+HTTP_STATUS:200
+
+=== GET /v1/audit/verify (real DB-backed hash chain) ===
+{"valid":true,"records_checked":10,"first_invalid_id":null}
+HTTP_STATUS:200
+
+=== Live concurrency proof: two REAL concurrent HTTP decision calls ===
+action_id: 3c684ced-9966-450e-a9df-94a00ca7d8eb
+--- Result A (approve) ---
+{"detail":"action is in state full_review, not full_review"}
+HTTP_STATUS:409
+
+--- Result B (reject) ---
+{"id":"3c684ced-9966-450e-a9df-94a00ca7d8eb","agent_id":"agent-1","action_type":"delete","resource":"issue1-race-1","params":{"resource_id":1},"params_hash":"bf70fa67cfa40eb940ed5f55f5b9dec558fe9f4562a2b0443b68c0fb2eb8c4f6","state":"rejected","composite":0.668,"tier":"FULL_REVIEW","explanation":"0.67 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T20:02:17.751544Z"}
+HTTP_STATUS:200
+=== Repeat run 2 ===
+A status: 409
+B status: 200

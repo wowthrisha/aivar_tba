@@ -524,3 +524,99 @@ diff). No frozen weights/thresholds/floors touched - this file isn't
 imported by any risk-engine module.
 Evidence: reports/evidence/issue2-llm-cache-fix-pytest.txt,
 reports/evidence/issue2-full-suite.txt (`106 passed`).
+
+### [2026-08-20 02:00 IST] [Issue 1 fix] [delivery engineer]
+Action: Pre-T-14 persistence fix, plan-mode approved with 4 open design
+decisions resolved by the product owner (real Neon dev DB for new tests,
+atomic actions+risk_assessments writes, populate both llm_model and
+llm_latency_ms, defer audit_records DB-level append-only enforcement as
+a separate follow-on).
+Built `app/db_store.py` (`SQLAlchemyStore`, `SQLAlchemyAuditLog`) behind
+the exact method surface `InMemoryStore`/`AuditLog` already exposed (now
+`async def` throughout, for interface uniformity with the DB-backed
+versions). Wired `app/main.py`'s 9 business endpoints via new
+`get_store()`/`get_audit_log()` FastAPI dependencies (mirroring the
+existing `get_confidence_provider`/`get_app_engine` pattern) - the
+module-level `_store`/`_audit` globals are gone.
+
+Schema gap found and fixed (flagged in the approved plan): T-11's
+original `actions` table had no `state` column at all. New migration
+`c5326268c7fa` (`add state to actions`) applied against the real DIRECT
+connection - table was confirmed empty (0 rows) before applying a NOT
+NULL column with no default.
+
+Two additional correctness issues found and fixed DURING this work, not
+in the original plan - flagging both explicitly:
+  1. `_check_expiry`'s original logic mutated `record.state` directly,
+     which only works when `get_action()` returns a live reference to
+     the same object still held in memory (true for InMemoryStore, NOT
+     true for SQLAlchemyStore, which reconstructs a fresh ActionRecord
+     from the DB on every call). Fixed by routing expiry through
+     `conditional_transition` (the same real DB update every other
+     transition uses) instead of a local mutation that would have
+     silently failed to persist.
+  2. `SQLAlchemyAuditLog.append()`'s "read the last record, write the
+     next" is a genuine TOCTOU race under concurrent writers - unlike
+     `actions.state`, `audit_records` has no auto-incrementing sequence
+     to serialize on (only `created_at`, an unordered timestamp), so two
+     concurrent appends could both read the same prev_hash and fork the
+     chain. Fixed with a Postgres advisory transaction lock
+     (`pg_advisory_xact_lock`) serializing all appends - same "genuine
+     atomic operation, not read-then-write" standard T-12 already
+     established for `conditional_transition`, applied here since it's
+     equally a correctness requirement, not an optional hardening step.
+
+Design choices per the approved decisions: `evaluate()` now calls
+`score_action()` separately (in addition to `route_action()`, which
+already calls it internally) to get the four sub-scores for
+`risk_assessments` - a deliberate small duplicate computation rather
+than modifying `app/risk/router.py`/`RoutingResult`, keeping every
+risk-engine file completely untouched by this fix as promised.
+Evaluate-idempotency reuses the existing `actions.idempotency_key`
+column; execute-idempotency has no dedicated column - `was_executed_with_key`
+queries `audit_records.payload` (JSONB) for a matching `executed` event,
+so `execute()` now includes `idempotency_key` in that event's payload
+when present. `ApprovalRecord` gained a required `approved_params_hash`
+field (was missing, but `approvals.approved_params_hash` is NOT NULL in
+T-11's schema) - both call sites in `main.py` updated.
+
+Testing: wrote `tests/test_db_store.py` (6 tests) against the REAL Neon
+dev DB (approved strategy - unique per-test action_id, explicit teardown
+deletes). Hit and fixed a real pytest-asyncio incompatibility: module-
+scoped async fixtures failed with "attached to a different loop" /
+"Event loop is closed" against this pytest-asyncio version's default
+per-function event loop - reverted to function-scoped fixtures (real
+per-test connection-setup cost against live Neon, ~20s/test, accepted).
+Added `pytestmark = pytest.mark.skipif("DATABASE_URL" not in os.environ,
+...)` so the normal full-suite run skips these cleanly rather than
+erroring when no live DB credentials are present.
+Updated `tests/test_api.py`, `tests/test_security.py`,
+`tests/test_adversarial_fixes.py` fixtures to override
+`get_store`/`get_audit_log` with fresh `InMemoryStore()`/`AuditLog()`
+instances CAPTURED ONCE PER TEST (not constructed fresh per request -
+first attempt used `lambda: InMemoryStore()`, which silently gave every
+request within a test a different empty store, breaking every
+multi-request test with spurious 404s; fixed by capturing one instance
+per test, exactly like `_FakeProvider`/`_FakeEngine` already do).
+`tests/test_security.py`'s S-3/S-5 tests updated to `async def` +
+`await`, since `AuditLog`'s methods are now async too.
+
+Result: 6/6 new DB-backed tests pass against real Postgres. 106/106
+existing tests pass unchanged (in-memory-backed, hermetic), 6 skipped
+cleanly without DATABASE_URL. T-08's four criterion tests re-verified
+unchanged (zero diff on tests/test_routing.py). Live curl walkthrough
+against the DB-backed server proved all three tiers end-to-end
+(AUTONOMOUS/CONFIRM/FULL_REVIEW incl. S-6 block), confirmed via a DIRECT
+Postgres query that rows genuinely persisted (state, tier, composite,
+llm_model, llm_latency_ms=6418 from a real LLM call). Hash chain valid
+across 10 real audit records. Live concurrency proof: two genuinely
+concurrent HTTP requests (not Python threading within one process) to
+the same decision endpoint, run twice, both times exactly one 200 / one
+409 - the real `UPDATE ... WHERE state = :expected` holds under actual
+multi-connection concurrency, which the in-memory lock could never prove.
+No frozen weights/thresholds/floors touched; app/risk/*.py never
+imported by anything this fix changed.
+Evidence: reports/evidence/issue1-db-store-pytest.txt (6/6 real-DB
+tests), reports/evidence/issue1-full-suite.txt (`106 passed, 6
+skipped`), reports/evidence/issue1-db-backed-curl.txt (full walkthrough,
+direct-DB-query proof, and the concurrency proof, both runs).

@@ -19,6 +19,7 @@ source before writing this (not guessed, per E-3):
 
 import hashlib
 import json
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -50,6 +51,7 @@ class ConfidenceResult:
     confidence: float
     degraded: bool
     reason: str | None
+    latency_ms: int | None = None
 
 
 class ConfidenceProvider(ABC):
@@ -109,6 +111,11 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
     async def _call(
         self, action_type: str, resource: str, params: dict[str, Any]
     ) -> ConfidenceResult:
+        start = time.monotonic()
+
+        def elapsed_ms() -> int:
+            return int((time.monotonic() - start) * 1000)
+
         try:
             completion = await self._client.chat.completions.parse(
                 model=self._model,
@@ -143,27 +150,36 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
                 timeout=TIMEOUT_SECONDS,
             )
         except APITimeoutError:
-            return ConfidenceResult(confidence=0.0, degraded=True, reason="timeout")
+            return ConfidenceResult(confidence=0.0, degraded=True, reason="timeout", latency_ms=elapsed_ms())
         except ValidationError as exc:
             # structural parse succeeded but a value was out of range
-            return ConfidenceResult(confidence=0.0, degraded=True, reason=f"out_of_range_validation: {exc}")
+            return ConfidenceResult(
+                confidence=0.0, degraded=True, reason=f"out_of_range_validation: {exc}", latency_ms=elapsed_ms()
+            )
         except OpenAIError as exc:
             # FAIL CLOSED: any other API error, including refusal-adjacent
             # finish reasons (length, content_filter) - never fail open.
-            return ConfidenceResult(confidence=0.0, degraded=True, reason=f"api_error: {exc}")
+            return ConfidenceResult(
+                confidence=0.0, degraded=True, reason=f"api_error: {exc}", latency_ms=elapsed_ms()
+            )
 
         message = completion.choices[0].message
 
         if message.refusal is not None:
             # TERMINAL. Never retried - a retry loop that ignores refusals
             # loops forever.
-            return ConfidenceResult(confidence=0.0, degraded=True, reason=f"refusal: {message.refusal}")
+            return ConfidenceResult(
+                confidence=0.0, degraded=True, reason=f"refusal: {message.refusal}", latency_ms=elapsed_ms()
+            )
 
         if message.parsed is None:
-            return ConfidenceResult(confidence=0.0, degraded=True, reason="unparsed_response")
+            return ConfidenceResult(
+                confidence=0.0, degraded=True, reason="unparsed_response", latency_ms=elapsed_ms()
+            )
 
         return ConfidenceResult(
             confidence=message.parsed.self_reported_confidence,
             degraded=False,
             reason=None,
+            latency_ms=elapsed_ms(),
         )

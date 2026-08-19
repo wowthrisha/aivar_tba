@@ -14,11 +14,13 @@ import itertools
 import pytest
 from fastapi.testclient import TestClient
 
+from app.audit import AuditLog
 from app.llm import ConfidenceResult
-from app.main import app, get_app_engine, get_confidence_provider
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_store
 from app.risk.floors import evaluate_floors, final_tier
 from app.risk.scorer import Regulatory, Reversibility, score_action
 from app.risk.tiers import Tier
+from app.store import InMemoryStore
 
 
 class _FakeProvider:
@@ -53,6 +55,10 @@ class _FakeEngine:
 def client():
     app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider(0.95)
     app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    store = InMemoryStore()
+    audit_log = AuditLog()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
