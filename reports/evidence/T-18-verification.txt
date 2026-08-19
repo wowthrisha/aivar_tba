@@ -1,0 +1,28 @@
+T-18 verification — README.md
+Run at: 2026-08-20 03:35 IST
+
+=== traceability table test names exist in tests/test_routing.py ===
+12:def test_bulk_delete_routes_to_review():
+18:def test_single_update_routes_to_confirm():
+26:def test_read_only_routes_autonomous():
+32:def test_audit_breakdown_is_human_readable():
+
+=== traceability table endpoints exist in app/main.py ===
+148:@app.post("/v1/actions/evaluate", response_model=ActionResponse, status_code=201)
+382:@app.get("/v1/audit", response_model=list[AuditRecordResponse])
+
+=== README.md table line count (2 tables x 6 lines = 12 expected) ===
+12
+
+=== T-08 criterion tests unchanged (zero diff expected) ===
+exit: 0
+
+=== secret-shaped pattern scan (0 expected) ===
+0
+
+=== traceability table position: first content block after H1, before project description ===
+1:# PS-9.1 — Graduated Autonomy Engine
+3:## Traceability
+14:## What this is
+23:## 1. Live URLs
+31:## 2. Quickstart
