@@ -1,0 +1,23 @@
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0 -- /Users/thrisha/miniconda3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collecting ... collected 8 items
+
+tests/test_security.py::test_s1_hash_is_computed_over_canonicalised_json_key_order_independent PASSED [ 12%]
+tests/test_security.py::test_s1_confirm_and_execute_both_reject_hash_drift PASSED [ 25%]
+tests/test_security.py::test_s2_evaluate_replay_returns_the_original_action_not_a_new_one PASSED [ 37%]
+tests/test_security.py::test_s2_execute_replay_returns_original_result_without_reexecuting PASSED [ 50%]
+tests/test_security.py::test_s3_expired_approval_cannot_execute PASSED   [ 62%]
+tests/test_security.py::test_s5_tampered_middle_record_is_detected PASSED [ 75%]
+tests/test_security.py::test_s6_agent_cannot_approve_its_own_action PASSED [ 87%]
+tests/test_security.py::test_race_concurrent_decisions_resolve_via_conditional_update PASSED [100%]
+
+============================== 8 passed in 0.53s ===============================

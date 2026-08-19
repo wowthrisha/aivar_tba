@@ -357,3 +357,44 @@ suite 80/80, no regressions.
 Evidence: reports/evidence/T-11-verification.txt (alembic current,
 alembic history, table list, index list, live /readyz curl),
 reports/evidence/T-11-pytest.txt (`80 passed`).
+
+### [2026-08-20 01:40 IST] [T-12] [delivery engineer]
+Action: Five named security controls plus the race test. Assessed what
+T-10 already covered before building: S-1 (hash pinning) and S-6
+(separation of duties) had working groundwork from T-10 but no dedicated
+named test; S-2 (idempotency), S-5's tamper-detection proof, and the
+race-safe conditional update were genuinely new.
+Wrote tests/test_security.py first; confirmed red for S-2 specifically
+(`AssertionError: assert 'be7e...' == '3fa1...'` on replay — different
+action IDs, proving idempotency wasn't yet enforced) while S-1/S-3/S-5/
+S-6/race passed immediately against existing T-10 behavior.
+IMPORTANT CAUGHT ISSUE: the race test passed 5/5 runs against the OLD
+read-then-write `decision` handler before any fix — that is NOT proof of
+correctness, only that this run didn't hit the window. The spec
+explicitly requires a conditional UPDATE, not merely a passing test, so
+I implemented the real fix regardless of the test already passing by
+luck: added `InMemoryStore.conditional_transition` (lock-guarded
+check-and-set) and switched confirm/decision/execute to use it instead
+of read-then-write.
+Implemented S-2: `InMemoryStore.get_or_create_action` makes the
+idempotency check-then-create atomic (one lock acquisition) so a replayed
+evaluate call returns the original action, not a second one; execute
+checks `was_executed_with_key` before doing anything else and returns the
+original terminal result without re-running the transition or appending
+a second audit record.
+Found and fixed a real bug in my OWN test (not the implementation):
+`test_s5_tampered_middle_record_is_detected` originally indexed into the
+app's shared `_audit` singleton, which accumulates records across the
+WHOLE pytest session (every other test's evaluate/confirm/decision/
+execute calls append to it too) — `records[1]` picked up an unrelated
+record from an earlier test whose `tier` already equaled the value I was
+"tampering" it to, making the tamper a silent no-op and the test falsely
+green in isolation, then failing once the full suite ran together and
+polluted `_audit` further. Fixed by testing a fresh, isolated `AuditLog()`
+instance directly instead of the shared app singleton.
+Result: 8/8 new tests pass (S-1, S-1, S-2, S-2, S-3, S-5, S-6, race).
+Full suite 88/88, stable across 3 repeat runs (checked given the race
+test's inherent flakiness risk). No frozen-list changes; T-08's
+tests/test_routing.py untouched.
+Evidence: reports/evidence/T-12-pytest.txt (dedicated security tests),
+reports/evidence/T-12-full-suite.txt (`88 passed`).

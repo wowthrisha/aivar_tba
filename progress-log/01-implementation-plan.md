@@ -37,7 +37,7 @@ incidental state. Rows with no such log entry are `Not started`.
 |---|---|---|---|---|
 | T-10 | API + state machine | curl each endpoint, responses pasted | 1h | Done |
 | T-11 | Persistence | alembic current on DIRECT; app on POOLED; \dt shows 4 tables | 1h | Done |
-| T-12 | Security S-1,2,3,5,6 | one test per control, five named in output | 1h | Not started |
+| T-12 | Security S-1,2,3,5,6 | one test per control, five named in output | 1h | Done |
 | T-13 | Adversarial review (fresh session) | findings pasted with my decision on each | 30m | Not started |
 
 >>> **GATE G2**: full suite green locally, state machine proven by curl

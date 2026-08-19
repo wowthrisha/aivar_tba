@@ -4,6 +4,8 @@
 |---|---|---|---|---|
 | D-01 | `tests/test_llm.py::test_out_of_range_value_is_rejected` failed with `UnboundLocalError` | Python deletes an `except ... as name` binding when the except block exits, so `real_validation_error` was referenced after being auto-deleted | Captured the exception into a variable declared before the try/except instead | Fixed |
 | D-02 | Every real `/v1/actions/evaluate` call showed `llm_degraded: true` in the audit log during T-10's live curl verification; confidence always fell back to 0.0, spuriously tripping the T-07 `low_confidence` floor on low-risk actions | `app/llm.py`'s `.parse()` call passed `temperature=0` per T-09's literal spec. The live pinned model (`gpt-5.6-luna`) rejects that value: `Error code: 400 - "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported."` T-09's mocked tests never caught this since they mock the client and never exercise the real `temperature` argument. Present since T-09's original commit — not introduced by T-10. | Removed the `temperature=0` argument (approved by product owner) so the SDK uses the model's required default. Root cause and fix confirmed via a real live call: `confidence: 0.82, degraded: False, reason: None`. | Fixed |
+| D-03 | T-12's race test (`test_race_concurrent_decisions_resolve_via_conditional_update`) passed 5/5 runs against T-10's original `decision` handler, which read `record.state`, checked it, then mutated it as two separate steps — a genuine read-then-write, not a conditional update | Python's GIL plus the specific fast, non-yielding code path in that handler made the race window narrow enough that this synthetic two-thread test never happened to land in it. A passing test is not proof of a correct implementation when the spec mandates a specific mechanism (conditional UPDATE), not just an observed outcome. | Added `InMemoryStore.conditional_transition` (lock-guarded atomic check-and-set) and switched confirm/decision/execute to use it instead of read-then-write, regardless of the test already passing. | Fixed |
+| D-04 | `test_s5_tampered_middle_record_is_detected` passed in isolation but failed when the full suite ran together (`valid=True` when `False` was expected) | The test indexed into the app's shared `_audit` module-level singleton, which accumulates audit records across the entire pytest session (every test that calls evaluate/confirm/decision/execute appends to it). `records[1]` picked up an unrelated record from a different, earlier test whose `tier` value already equaled what the test was "tampering" it to — a no-op mutation that happened to leave the hash chain intact. | Rewrote the test to construct and tamper a fresh, isolated `AuditLog()` instance directly, rather than reaching into the shared app singleton. | Fixed |
 
 ## LEFT OUT
 
@@ -54,3 +56,10 @@ what was not done, never substitute silently.
   and switch `app/main.py`'s `_store`/`_audit` module globals over to it
   — flagged for explicit confirmation before doing it, since it's a
   meaningfully larger change than T-11's literal DoD asks for.
+- T-12/S-3: `CONFIRM_TTL`/`FULL_REVIEW_TTL` are module-level Python
+  constants (`app/main.py`), not runtime-configurable (e.g. via env var).
+  T-12's spec says "both configurable" — the values themselves (30 min /
+  4 h) are correct and enforced, but changing them currently requires a
+  code edit + redeploy, not a config change. Production approach: move
+  to env vars (`CONFIRM_TTL_MINUTES`, `FULL_REVIEW_TTL_HOURS`) with the
+  same defaults, read once at startup.

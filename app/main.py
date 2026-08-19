@@ -102,7 +102,7 @@ async def evaluate(
     body: EvaluateRequest, provider: ConfidenceProvider = Depends(get_confidence_provider)
 ):
     action_id = str(uuid.uuid4())
-    record = _store.create_action(
+    record, created = _store.get_or_create_action(
         id=action_id,
         agent_id=body.agent_id,
         action_type=body.action_type,
@@ -110,6 +110,10 @@ async def evaluate(
         params=body.params,
         idempotency_key=body.idempotency_key,
     )
+    if not created:
+        # S-2: idempotency replay - return the original action, no new
+        # scoring, no new audit entry, no second action created.
+        return _to_action_response(record)
 
     llm_result = await provider.get_confidence(body.action_type, body.resource, body.params)
     structural = structural_completeness(body.action_type, body.params)
@@ -172,10 +176,12 @@ def confirm(action_id: str, body: ConfirmRequest):
     record = _store.get_action(action_id)
     if record is None:
         raise HTTPException(status_code=404, detail="action not found")
-    if record.state != ActionState.CONFIRM:
-        raise HTTPException(status_code=409, detail=f"action is in state {record.state.value}, not confirm")
     if body.params_hash != record.params_hash:
         raise HTTPException(status_code=409, detail="params_hash mismatch")
+
+    transition(ActionState.CONFIRM, ActionState.APPROVED)  # validates the edge exists
+    if not _store.conditional_transition(action_id, ActionState.CONFIRM, ActionState.APPROVED):
+        raise HTTPException(status_code=409, detail=f"action is in state {record.state.value}, not confirm")
 
     now = datetime.now(timezone.utc)
     _store.set_approval(
@@ -187,8 +193,6 @@ def confirm(action_id: str, body: ConfirmRequest):
             expires_at=now + CONFIRM_TTL,
         )
     )
-    transition(record.state, ActionState.APPROVED)
-    record.state = ActionState.APPROVED
 
     _audit.append(
         event_type="confirmed",
@@ -208,16 +212,24 @@ def decision(action_id: str, body: DecisionRequest):
     record = _store.get_action(action_id)
     if record is None:
         raise HTTPException(status_code=404, detail="action not found")
-    if record.state != ActionState.FULL_REVIEW:
-        raise HTTPException(
-            status_code=409, detail=f"action is in state {record.state.value}, not full_review"
-        )
     if body.reviewer_id == record.agent_id:
         # S-6 (separation of duties): an agent cannot approve its own action.
         raise HTTPException(status_code=403, detail="reviewer_id must differ from the proposing agent_id")
 
-    now = datetime.now(timezone.utc)
+    target = ActionState.APPROVED if body.decision == "approve" else ActionState.REJECTED
+    transition(ActionState.FULL_REVIEW, target)  # validates the edge exists
+
+    # Race (T-12): a CONDITIONAL UPDATE, not read-then-write. Two concurrent
+    # decisions on the same item: exactly one flips FULL_REVIEW -> target;
+    # the other's compare-and-set sees a state that no longer matches and
+    # gets zero rows affected -> 409, never a lost update.
+    if not _store.conditional_transition(action_id, ActionState.FULL_REVIEW, target):
+        raise HTTPException(
+            status_code=409, detail=f"action is in state {record.state.value}, not full_review"
+        )
+
     if body.decision == "approve":
+        now = datetime.now(timezone.utc)
         _store.set_approval(
             ApprovalRecord(
                 action_id=action_id,
@@ -227,11 +239,6 @@ def decision(action_id: str, body: DecisionRequest):
                 expires_at=now + FULL_REVIEW_TTL,
             )
         )
-        transition(record.state, ActionState.APPROVED)
-        record.state = ActionState.APPROVED
-    else:
-        transition(record.state, ActionState.REJECTED)
-        record.state = ActionState.REJECTED
 
     _audit.append(
         event_type="decision",
@@ -247,14 +254,20 @@ def execute(action_id: str, body: ExecuteRequest):
     if record is None:
         raise HTTPException(status_code=404, detail="action not found")
 
+    if body.idempotency_key is not None and _store.was_executed_with_key(action_id, body.idempotency_key):
+        # S-2: replay of an already-completed execute - return the
+        # original (terminal, unchanged) result. Not re-executed.
+        return _to_action_response(record)
+
     _check_expiry(action_id, record)
 
     if record.state == ActionState.AUTONOMOUS:
-        pass  # no approval needed
+        expected_state = ActionState.AUTONOMOUS
     elif record.state == ActionState.APPROVED:
         approval = _store.get_approval(action_id)
         if approval is None or approval.expires_at is None or approval.expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=409, detail="approval missing or expired")
+        expected_state = ActionState.APPROVED
     else:
         raise HTTPException(
             status_code=409, detail=f"action is in state {record.state.value}, not executable"
@@ -263,8 +276,14 @@ def execute(action_id: str, body: ExecuteRequest):
     if body.params_hash != record.params_hash:
         raise HTTPException(status_code=409, detail="params_hash mismatch")
 
-    transition(record.state, ActionState.EXECUTED)
-    record.state = ActionState.EXECUTED
+    transition(expected_state, ActionState.EXECUTED)  # validates the edge exists
+    if not _store.conditional_transition(action_id, expected_state, ActionState.EXECUTED):
+        raise HTTPException(
+            status_code=409, detail=f"action is in state {record.state.value}, not executable"
+        )
+
+    if body.idempotency_key is not None:
+        _store.remember_executed_key(action_id, body.idempotency_key)
 
     _audit.append(
         event_type="executed",
