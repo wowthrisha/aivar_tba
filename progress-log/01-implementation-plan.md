@@ -47,7 +47,7 @@ incidental state. Rows with no such log entry are `Not started`.
 
 | ID | Task | Definition of Done (evidence that closes it) | Box | Status |
 |---|---|---|---|---|
-| T-14 | Railway deploy + CI | curl live URL exercising all three tiers; green Actions | 1h | Not started |
+| T-14 | Railway deploy + CI | curl live URL exercising all three tiers; green Actions | 1h | Done |
 | T-15 | AWS deploy — HARD 2h BOX | curl an AWS HTTPS URL | 2h | Not started |
 | T-16 | Observability | JSON log line with request_id; forced error returns clean JSON | 45m | Not started |
 | T-17 | CLI | pasted session showing risk table + confirm prompt | 45m | Not started |
