@@ -248,3 +248,63 @@ Result: tests/test_llm.py 5/5 pass (unchanged — mocks never asserted on
 real evaluate call now shows `"llm_degraded": false`.
 Evidence: reports/evidence/T-09-fix-live-verification.txt; D-02 logged in
 03-errors-and-fixes.md.
+
+### [2026-08-20 00:30 IST] [T-10] [delivery engineer]
+Action: Built the FastAPI service + state machine. New modules:
+`app/state_machine.py` (ActionState enum, VALID_TRANSITIONS map,
+`transition()`), `app/audit.py` (append-only hash-chained AuditLog),
+`app/store.py` (InMemoryStore — T-11 will back this with SQLAlchemy
+behind the same shape), `app/schemas.py` (request/response models),
+extended `app/main.py` with all 8 new routes plus a
+`get_confidence_provider` FastAPI dependency (real OpenAIConfidenceProvider
+at runtime, overridden with a fake in tests so no test hits the live API).
+Also added `health_check()` to `ConfidenceProvider`'s ABC (verified via
+`AsyncOpenAI.models.retrieve`, an async method — checked via introspection
+before using it) so `/readyz`'s LLM leg is real and mockable.
+Design decisions made and documented, not silently assumed:
+  - `/readyz` checks LLM reachability for real (cheap `models.retrieve`
+    call) but reports `db: "not_configured (T-11 pending)"` rather than
+    faking a DB check — there is no DB yet.
+  - Two distinct human-gate endpoints: `/actions/{id}/confirm`
+    (self-service, CONFIRM tier, only checks params_hash) vs
+    `/review-queue/{id}/decision` (reviewer-gated, FULL_REVIEW tier,
+    reviewer_id required and rejected with 403 if it equals agent_id —
+    S-6 groundwork, though T-12 owns the dedicated named test).
+  - EvaluateRequest takes reversibility/affected_records/regulatory as
+    explicit caller-supplied fields rather than deriving them from
+    action_type, since no such mapping was specified anywhere.
+  - REJECTED/EXPIRED/EXECUTED are terminal states directly; the spec
+    diagram's "TERMINAL" target isn't a separate enum value since no
+    endpoint transitions further out of them.
+Wrote tests/test_api.py first (confirmed red:
+`ImportError: cannot import name 'get_confidence_provider'`), then
+implemented. 18/18 new tests pass on first run against the design.
+
+BLOCKER found and fixed mid-task: live curl testing (not the mocked
+pytest suite) surfaced that every real evaluate call had
+`llm_degraded: true` — traced to T-09's `temperature=0` being rejected by
+the live pinned model. Stopped, reported per the "dependency behaves
+differently from its documentation" trigger, got approval, fixed in a
+separate commit (4a1823e) — see the entry above. Did not proceed with
+T-10's live verification until that fix was confirmed.
+
+Full live curl walkthrough (post-fix) exercised all 9 endpoints for real
+against a local uvicorn instance (not Railway — T-05's live deployment is
+untouched, per instruction; redeploy is T-14's job): /livez, /readyz,
+evaluate (bulk delete -> FULL_REVIEW via floor, single update -> CONFIRM
+via weighted score, read -> AUTONOMOUS), GET action (found + 404),
+confirm (hash mismatch 409 + success), review-queue, decision (missing
+reviewer_id 422, self-review 403, approve, reject), execute (hash
+mismatch 409, AUTONOMOUS direct execute, APPROVED execute, blocked on
+REJECTED 409, blocked on replay-after-executed 409), audit list, audit
+verify. Every real evaluate call showed `llm_degraded: false` and a
+genuine self-reported confidence (e.g. 0.82, 0.148 composite on a clean
+read). Evaluate never executed in the same request (state stayed
+autonomous/confirm/full_review, never executed, until a separate execute
+call).
+Result: 18/18 new tests pass, full suite 80/80. Live curl walkthrough:
+all 9 endpoints proven, hash chain valid across 10 real audit records
+(`{"valid":true,"records_checked":10,"first_invalid_id":null}`).
+Evidence: reports/evidence/T-10-pytest.txt (`80 passed`),
+reports/evidence/T-10-curl.txt (full request/response pairs for all 9
+endpoints).

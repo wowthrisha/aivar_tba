@@ -1,0 +1,238 @@
+=== GET /livez ===
+{"status":"ok"}
+HTTP_STATUS:200
+
+=== GET /readyz ===
+{"status":"ok","checks":{"llm":"ok","db":"not_configured (T-11 pending)"}}
+HTTP_STATUS:200
+
+=== POST /v1/actions/evaluate (bulk delete -> FULL_REVIEW via floor) ===
+REQUEST: {"agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"reversibility":"irreversible","affected_records":500,"regulatory":"none"}
+{"id":"62f15608-ef82-48ef-b637-ee7b13baa748","agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc","state":"full_review","composite":0.678,"tier":"FULL_REVIEW","explanation":"0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T17:13:11.836404Z"}
+HTTP_STATUS:201
+
+=== GET /v1/actions/{id} ===
+{"id":"62f15608-ef82-48ef-b637-ee7b13baa748","agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc","state":"full_review","composite":0.678,"tier":"FULL_REVIEW","explanation":"0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T17:13:11.836404Z"}
+HTTP_STATUS:200
+
+=== GET /v1/actions/{id} - not found case ===
+{"detail":"action not found"}
+HTTP_STATUS:404
+
+=== GET /v1/review-queue ===
+[{"id":"62f15608-ef82-48ef-b637-ee7b13baa748","agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc","state":"full_review","composite":0.678,"tier":"FULL_REVIEW","explanation":"0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T17:13:11.836404Z"}]
+HTTP_STATUS:200
+
+=== POST /v1/review-queue/{id}/decision - missing reviewer_id -> 422 ===
+{"detail":[{"type":"missing","loc":["body","reviewer_id"],"msg":"Field required","input":{"decision":"approve"}}]}
+HTTP_STATUS:422
+
+=== POST /v1/review-queue/{id}/decision - reviewer == agent -> 403 (S-6) ===
+{"detail":"reviewer_id must differ from the proposing agent_id"}
+HTTP_STATUS:403
+
+=== POST /v1/review-queue/{id}/decision - approve, reviewer-9 ===
+REQUEST: {"decision":"approve","reviewer_id":"reviewer-9"}
+{"id":"62f15608-ef82-48ef-b637-ee7b13baa748","agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc","state":"approved","composite":0.678,"tier":"FULL_REVIEW","explanation":"0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T17:13:11.836404Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/{id}/execute - hash mismatch -> 409 ===
+{"detail":"params_hash mismatch"}
+HTTP_STATUS:409
+
+=== POST /v1/actions/{id}/execute - correct hash, approved -> executed ===
+REQUEST: {"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc"}
+{"id":"62f15608-ef82-48ef-b637-ee7b13baa748","agent_id":"agent-1","action_type":"delete","resource":"users/bulk","params":{"resource_id":"bulk-1"},"params_hash":"b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc","state":"executed","composite":0.678,"tier":"FULL_REVIEW","explanation":"0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).","created_at":"2026-08-19T17:13:11.836404Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/{id}/execute - already executed, replay -> 409 ===
+{"detail":"action is in state executed, not executable"}
+HTTP_STATUS:409
+
+=== POST /v1/actions/evaluate (single update -> CONFIRM) ===
+REQUEST: {"agent_id":"agent-1","action_type":"update","resource":"users/1","params":{"resource_id":1,"fields":{"email":"new@example.com"}},"reversibility":"update_without_snapshot","affected_records":1,"regulatory":"none"}
+{"id":"7a4ca579-8f70-4c36-98f5-7be45db99d92","agent_id":"agent-1","action_type":"update","resource":"users/1","params":{"resource_id":1,"fields":{"email":"new@example.com"}},"params_hash":"c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441","state":"confirm","composite":0.37499999999999994,"tier":"CONFIRM","explanation":"0.37 -> CONFIRM. Would have been AUTONOMOUS if reversibility were update_with_snapshot instead of update_without_snapshot.","created_at":"2026-08-19T17:13:52.187401Z"}
+HTTP_STATUS:201
+
+=== POST /v1/actions/{id}/confirm - wrong hash -> 409 ===
+{"detail":"params_hash mismatch"}
+HTTP_STATUS:409
+
+=== POST /v1/actions/{id}/confirm - correct hash ===
+REQUEST: {"params_hash":"c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441"}
+{"id":"7a4ca579-8f70-4c36-98f5-7be45db99d92","agent_id":"agent-1","action_type":"update","resource":"users/1","params":{"resource_id":1,"fields":{"email":"new@example.com"}},"params_hash":"c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441","state":"approved","composite":0.37499999999999994,"tier":"CONFIRM","explanation":"0.37 -> CONFIRM. Would have been AUTONOMOUS if reversibility were update_with_snapshot instead of update_without_snapshot.","created_at":"2026-08-19T17:13:52.187401Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/{id}/execute - approved via confirm ===
+REQUEST: {"params_hash":"c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441"}
+{"id":"7a4ca579-8f70-4c36-98f5-7be45db99d92","agent_id":"agent-1","action_type":"update","resource":"users/1","params":{"resource_id":1,"fields":{"email":"new@example.com"}},"params_hash":"c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441","state":"executed","composite":0.37499999999999994,"tier":"CONFIRM","explanation":"0.37 -> CONFIRM. Would have been AUTONOMOUS if reversibility were update_with_snapshot instead of update_without_snapshot.","created_at":"2026-08-19T17:13:52.187401Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/evaluate (read-only -> AUTONOMOUS) ===
+REQUEST: {"agent_id":"agent-1","action_type":"read","resource":"reports/quarterly","params":{},"reversibility":"read","affected_records":50,"regulatory":"none"}
+{"id":"0c960fad-0546-4fc4-abe8-c5631e07e40e","agent_id":"agent-1","action_type":"read","resource":"reports/quarterly","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.148,"tier":"AUTONOMOUS","explanation":"0.15 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T17:14:14.350554Z"}
+HTTP_STATUS:201
+
+=== POST /v1/actions/{id}/execute - AUTONOMOUS, no prior approval needed ===
+REQUEST: {"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"}
+{"id":"0c960fad-0546-4fc4-abe8-c5631e07e40e","agent_id":"agent-1","action_type":"read","resource":"reports/quarterly","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"executed","composite":0.148,"tier":"AUTONOMOUS","explanation":"0.15 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-19T17:14:14.350554Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/evaluate (another FULL_REVIEW, for reject demo) ===
+{"id":"10a3b63c-9f6e-44e8-b88a-2822474282ff","agent_id":"agent-2","action_type":"delete","resource":"users/bulk2","params":{"resource_id":"bulk-2"},"params_hash":"bc6bc1fee62dff2d84640ab5c35327272a89efe4e32c4a13fe33c5d35cbcb0f6","state":"full_review","composite":0.672,"tier":"FULL_REVIEW","explanation":"0.67 -> FULL_REVIEW (floor: irreversible action affecting 200 records (>= 100)).","created_at":"2026-08-19T17:14:31.622942Z"}
+HTTP_STATUS:201
+
+=== POST /v1/review-queue/{id}/decision - reject ===
+{"id":"10a3b63c-9f6e-44e8-b88a-2822474282ff","agent_id":"agent-2","action_type":"delete","resource":"users/bulk2","params":{"resource_id":"bulk-2"},"params_hash":"bc6bc1fee62dff2d84640ab5c35327272a89efe4e32c4a13fe33c5d35cbcb0f6","state":"rejected","composite":0.672,"tier":"FULL_REVIEW","explanation":"0.67 -> FULL_REVIEW (floor: irreversible action affecting 200 records (>= 100)).","created_at":"2026-08-19T17:14:31.622942Z"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/{id}/execute on REJECTED -> 409 ===
+{"detail":"action is in state rejected, not executable"}
+HTTP_STATUS:409
+
+=== GET /v1/audit ===
+
+=== GET /v1/audit/verify ===
+{"valid":true,"records_checked":10,"first_invalid_id":null}
+HTTP_STATUS:200
+
+=== GET /v1/audit (corrected capture) ===
+[
+    {
+        "id": "a87dca94-3e15-4fd2-b77d-9f4ebd8a7ded",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "entry_hash": "fc652f5f4feef692f335862fc2864135a9e05d0e73541fa206d873085b81e52d",
+        "event_type": "evaluated",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "62f15608-ef82-48ef-b637-ee7b13baa748",
+            "tier": "FULL_REVIEW",
+            "composite": 0.678,
+            "floor_name": "irreversible_bulk",
+            "explanation": "0.68 -> FULL_REVIEW (floor: irreversible action affecting 500 records (>= 100)).",
+            "llm_degraded": false
+        },
+        "created_at": "2026-08-19T17:13:17.765982Z"
+    },
+    {
+        "id": "b2f8726f-d9cf-4524-8317-3b31bb5fe414",
+        "prev_hash": "fc652f5f4feef692f335862fc2864135a9e05d0e73541fa206d873085b81e52d",
+        "entry_hash": "3b94172c4b52a078d0498793cec8eae9cc35bf9b56f5ce574107f534fedbd289",
+        "event_type": "decision",
+        "actor": "reviewer-9",
+        "payload": {
+            "action_id": "62f15608-ef82-48ef-b637-ee7b13baa748",
+            "decision": "approve"
+        },
+        "created_at": "2026-08-19T17:13:35.081307Z"
+    },
+    {
+        "id": "60dc281e-f345-4d1f-b101-5c1201a3bf51",
+        "prev_hash": "3b94172c4b52a078d0498793cec8eae9cc35bf9b56f5ce574107f534fedbd289",
+        "entry_hash": "00cf3fc2d50aab0fc1e8213779ae27cf3915a349318e524f9959c8724041e4a4",
+        "event_type": "executed",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "62f15608-ef82-48ef-b637-ee7b13baa748",
+            "params_hash": "b5b23a3c2311236ed49d4c9e1cb8700713784f5207aa39531064fad2e0bd19fc"
+        },
+        "created_at": "2026-08-19T17:13:44.197704Z"
+    },
+    {
+        "id": "f75d3be7-d39d-440a-8ea3-e33ebab0cd65",
+        "prev_hash": "00cf3fc2d50aab0fc1e8213779ae27cf3915a349318e524f9959c8724041e4a4",
+        "entry_hash": "177abbd484e736c765c0f52c826a3f8e38a3afb15146abefcfa27890773b270c",
+        "event_type": "evaluated",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "7a4ca579-8f70-4c36-98f5-7be45db99d92",
+            "tier": "CONFIRM",
+            "composite": 0.37499999999999994,
+            "floor_name": null,
+            "explanation": "0.37 -> CONFIRM. Would have been AUTONOMOUS if reversibility were update_with_snapshot instead of update_without_snapshot.",
+            "llm_degraded": false
+        },
+        "created_at": "2026-08-19T17:13:55.117355Z"
+    },
+    {
+        "id": "897147bb-cb90-4fba-84c8-3d9d43d4b7c0",
+        "prev_hash": "177abbd484e736c765c0f52c826a3f8e38a3afb15146abefcfa27890773b270c",
+        "entry_hash": "bd066e38b9b6ba51b2bee45944f9017c1b4c7086623a0ae8e5fc3fa801e75058",
+        "event_type": "confirmed",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "7a4ca579-8f70-4c36-98f5-7be45db99d92",
+            "params_hash": "c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441"
+        },
+        "created_at": "2026-08-19T17:14:04.732807Z"
+    },
+    {
+        "id": "2c0f0f2a-d608-4c39-81e8-f7b9a451fc35",
+        "prev_hash": "bd066e38b9b6ba51b2bee45944f9017c1b4c7086623a0ae8e5fc3fa801e75058",
+        "entry_hash": "de8fd2e072b5bcc1e1ebf47be310704757c79f693c07f79a2bce4c6f787409a9",
+        "event_type": "executed",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "7a4ca579-8f70-4c36-98f5-7be45db99d92",
+            "params_hash": "c4e7d76330614ca06c579672e08ba3fa95e0ab2dda5a5abc8474e4498a6fe441"
+        },
+        "created_at": "2026-08-19T17:14:04.742982Z"
+    },
+    {
+        "id": "a0dcf7ba-804a-467e-8937-7336d2400f24",
+        "prev_hash": "de8fd2e072b5bcc1e1ebf47be310704757c79f693c07f79a2bce4c6f787409a9",
+        "entry_hash": "5c1a1ee52cf27a6bdfed72d00925aaa706a1eecb5e8e6be8d781c3d88f833c7a",
+        "event_type": "evaluated",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "0c960fad-0546-4fc4-abe8-c5631e07e40e",
+            "tier": "AUTONOMOUS",
+            "composite": 0.148,
+            "floor_name": null,
+            "explanation": "0.15 -> AUTONOMOUS. No single dimension change would alter the tier.",
+            "llm_degraded": false
+        },
+        "created_at": "2026-08-19T17:14:20.591552Z"
+    },
+    {
+        "id": "5c569aec-4857-4766-a73a-b97466c74e49",
+        "prev_hash": "5c1a1ee52cf27a6bdfed72d00925aaa706a1eecb5e8e6be8d781c3d88f833c7a",
+        "entry_hash": "1e7de22c271e17b4dbbba0470a6c8bf8400ccfb8b379d80276e326ce119dc491",
+        "event_type": "executed",
+        "actor": "agent-1",
+        "payload": {
+            "action_id": "0c960fad-0546-4fc4-abe8-c5631e07e40e",
+            "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        "created_at": "2026-08-19T17:14:20.656919Z"
+    },
+    {
+        "id": "a8cb5a04-2d21-4747-977a-3ef982ae74b0",
+        "prev_hash": "1e7de22c271e17b4dbbba0470a6c8bf8400ccfb8b379d80276e326ce119dc491",
+        "entry_hash": "c7c699cf254220b66a251b4c822c86903ff9b7b1704ff30f9eddd67e76e376bb",
+        "event_type": "evaluated",
+        "actor": "agent-2",
+        "payload": {
+            "action_id": "10a3b63c-9f6e-44e8-b88a-2822474282ff",
+            "tier": "FULL_REVIEW",
+            "composite": 0.672,
+            "floor_name": "irreversible_bulk",
+            "explanation": "0.67 -> FULL_REVIEW (floor: irreversible action affecting 200 records (>= 100)).",
+            "llm_degraded": false
+        },
+        "created_at": "2026-08-19T17:14:34.263595Z"
+    },
+    {
+        "id": "1c8e741d-bfa7-42b6-bfe8-b61847cda24f",
+        "prev_hash": "c7c699cf254220b66a251b4c822c86903ff9b7b1704ff30f9eddd67e76e376bb",
+        "entry_hash": "06ae7ef9a222b03dca6e48830dd7465e0c14d6f98540c841386d5b318822b824",
+        "event_type": "decision",
+        "actor": "reviewer-9",
+        "payload": {
+            "action_id": "10a3b63c-9f6e-44e8-b88a-2822474282ff",
+            "decision": "reject"
+        },
+        "created_at": "2026-08-19T17:14:34.306471Z"
+    }
+]
+HTTP_STATUS:200

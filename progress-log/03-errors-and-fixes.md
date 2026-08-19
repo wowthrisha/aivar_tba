@@ -22,3 +22,22 @@ what was not done, never substitute silently.
   need for it appears (e.g. in T-18's README worked example) — not needed
   to satisfy T-08's literal assertions (composite + tier + triggering
   reason present in the string).
+- T-10: idempotency_key is accepted and stored on evaluate/execute
+  requests but not yet enforced (no replay-returns-original-result
+  behavior). S-2's dedicated enforcement + test is T-12's job.
+- T-10: approval expiry (S-3) is enforced lazily — checked at execute
+  time, not by a background sweep — since no scheduler exists. An
+  approval past its expires_at is only actually marked EXPIRED when
+  something reads/executes it. Acceptable for this system's shape (no
+  external party needs to observe "expired" before then), but worth
+  naming: `GET /v1/actions/{id}` does NOT currently trigger the same
+  lazy-expiry check that `execute` does, so a stale GET can show a
+  not-yet-expired APPROVED state past its TTL until execute is attempted.
+  Production approach: apply `_check_expiry` in the GET handler too, or
+  add a scheduled sweep — deferred since T-10's own DoD doesn't require
+  it and no endpoint's correctness depends on GET reflecting expiry
+  eagerly.
+- T-10: `/v1/audit` filtering/pagination is basic (action_id, event_type,
+  limit/offset) — no cursor-based pagination or filtering by date range.
+  Sufficient for T-10's DoD ("filterable, paginated"); can be extended if
+  a later task needs more.
