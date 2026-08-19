@@ -6,6 +6,7 @@
 | D-02 | Every real `/v1/actions/evaluate` call showed `llm_degraded: true` in the audit log during T-10's live curl verification; confidence always fell back to 0.0, spuriously tripping the T-07 `low_confidence` floor on low-risk actions | `app/llm.py`'s `.parse()` call passed `temperature=0` per T-09's literal spec. The live pinned model (`gpt-5.6-luna`) rejects that value: `Error code: 400 - "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported."` T-09's mocked tests never caught this since they mock the client and never exercise the real `temperature` argument. Present since T-09's original commit — not introduced by T-10. | Removed the `temperature=0` argument (approved by product owner) so the SDK uses the model's required default. Root cause and fix confirmed via a real live call: `confidence: 0.82, degraded: False, reason: None`. | Fixed |
 | D-03 | T-12's race test (`test_race_concurrent_decisions_resolve_via_conditional_update`) passed 5/5 runs against T-10's original `decision` handler, which read `record.state`, checked it, then mutated it as two separate steps — a genuine read-then-write, not a conditional update | Python's GIL plus the specific fast, non-yielding code path in that handler made the race window narrow enough that this synthetic two-thread test never happened to land in it. A passing test is not proof of a correct implementation when the spec mandates a specific mechanism (conditional UPDATE), not just an observed outcome. | Added `InMemoryStore.conditional_transition` (lock-guarded atomic check-and-set) and switched confirm/decision/execute to use it instead of read-then-write, regardless of the test already passing. | Fixed |
 | D-04 | `test_s5_tampered_middle_record_is_detected` passed in isolation but failed when the full suite ran together (`valid=True` when `False` was expected) | The test indexed into the app's shared `_audit` module-level singleton, which accumulates audit records across the entire pytest session (every test that calls evaluate/confirm/decision/execute appends to it). `records[1]` picked up an unrelated record from a different, earlier test whose `tier` value already equaled what the test was "tampering" it to — a no-op mutation that happened to leave the hash chain intact. | Rewrote the test to construct and tamper a fresh, isolated `AuditLog()` instance directly, rather than reaching into the shared app singleton. | Fixed |
+| D-05 | `test_finding1_update_without_snapshot_no_longer_autonomous` (T-13 fix regression test) failed: `assert 0.38 == 0.28 ± 2.8e-07` | Test called `score_action(..., llm_confidence=0.0)` but the comment and expected value (`composite=0.28`) were computed for the review's actual case, `llm_confidence=1.0` — a copy/transcription mismatch between the two calls in the same test (the second call, to `evaluate_floors`, correctly used `1.0`). | Corrected the `score_action` call to use `llm_confidence=1.0`, matching the review's original input. | Fixed |
 
 ## LEFT OUT
 
@@ -56,6 +57,21 @@ what was not done, never substitute silently.
   and switch `app/main.py`'s `_store`/`_audit` module globals over to it
   — flagged for explicit confirmation before doing it, since it's a
   meaningfully larger change than T-11's literal DoD asks for.
+- T-13 Finding 3 (boundary brittleness), ACCEPTED as a documented
+  limitation per product owner decision — not fixed, frozen thresholds
+  unchanged, no calibration logic added. A fresh-session adversarial
+  review found the composite score is brittle near both frozen
+  thresholds: a 0.006 change in `llm_confidence` (0.505→0.499) flips
+  CONFIRM↔FULL_REVIEW at 0.65; a 0.01 change flips CONFIRM↔AUTONOMOUS at
+  0.30 (see reports/evidence/T-13-adversarial-review.txt for the exact
+  inputs). Rationale: the two thresholds (0.30, 0.65) are FROZEN — the
+  product owner has to defend each on camera and chose not to add
+  calibration/smoothing logic under deadline pressure. This is a known,
+  accepted characteristic of any hard-threshold system, not a bug.
+  Existing boundary tests (tests/test_tiers.py, T-07a) are kept exactly
+  as-is; they already prove the boundary behaves per the frozen,
+  approved semantics — brittleness near the line is a property of having
+  a line at all, not of the semantics being wrong.
 - T-12/S-3: `CONFIRM_TTL`/`FULL_REVIEW_TTL` are module-level Python
   constants (`app/main.py`), not runtime-configurable (e.g. via env var).
   T-12's spec says "both configurable" — the values themselves (30 min /

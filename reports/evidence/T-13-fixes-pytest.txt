@@ -1,0 +1,32 @@
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0 -- /Users/thrisha/miniconda3/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collecting ... collected 17 items
+
+tests/test_adversarial_fixes.py::test_finding1_update_without_snapshot_no_longer_autonomous PASSED [  5%]
+tests/test_adversarial_fixes.py::test_finding1_sweep_unrecoverable_reversibility_never_autonomous PASSED [ 11%]
+tests/test_adversarial_fixes.py::test_finding1_read_and_snapshot_update_unaffected PASSED [ 17%]
+tests/test_adversarial_fixes.py::test_finding1_full_review_floor_still_takes_precedence PASSED [ 23%]
+tests/test_adversarial_fixes.py::test_finding2_pii_gdpr_mutation_now_escalates_to_full_review PASSED [ 29%]
+tests/test_adversarial_fixes.py::test_finding2_pii_gdpr_read_does_not_fire PASSED [ 35%]
+tests/test_adversarial_fixes.py::test_finding2_phi_sox_still_fires_unchanged PASSED [ 41%]
+tests/test_adversarial_fixes.py::test_finding4a_prompt_delimits_untrusted_content PASSED [ 47%]
+tests/test_adversarial_fixes.py::test_finding4b_read_action_requires_read_reversibility PASSED [ 52%]
+tests/test_adversarial_fixes.py::test_finding4b_read_action_with_correct_reversibility_succeeds PASSED [ 58%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_require_irreversible[delete] PASSED [ 64%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_require_irreversible[send] PASSED [ 70%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_require_irreversible[pay] PASSED [ 76%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_with_irreversible_succeeds[delete] PASSED [ 82%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_with_irreversible_succeeds[send] PASSED [ 88%]
+tests/test_adversarial_fixes.py::test_finding4b_delete_send_pay_with_irreversible_succeeds[pay] PASSED [ 94%]
+tests/test_adversarial_fixes.py::test_finding4b_update_action_type_has_no_added_constraint PASSED [100%]
+
+============================== 17 passed in 0.67s ==============================

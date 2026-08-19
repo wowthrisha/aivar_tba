@@ -398,3 +398,85 @@ test's inherent flakiness risk). No frozen-list changes; T-08's
 tests/test_routing.py untouched.
 Evidence: reports/evidence/T-12-pytest.txt (dedicated security tests),
 reports/evidence/T-12-full-suite.txt (`88 passed`).
+
+### [2026-08-20 02:00 IST] [T-13] [delivery engineer]
+Action: Adversarial review (a genuinely fresh, no-prior-context Claude
+Code session — not a fork of this session — read app/risk/scorer.py,
+floors.py, tiers.py, changed nothing). Report only:
+  Finding 1: IRREVERSIBLE (1 record, NONE, 0.99 confidence) -> composite
+    0.461 -> CONFIRM, not FULL_REVIEW. UPDATE_WITHOUT_SNAPSHOT (0 records,
+    NONE, 1.0 confidence) -> composite 0.28 -> AUTONOMOUS, zero human
+    oversight for an unrecoverable mutation.
+  Finding 2: regulated_mutation floor fires for PHI_SOX but not PII_GDPR,
+    despite the scorer itself scoring PII_GDPR (0.7) nearly as severe as
+    PHI_SOX (1.0).
+  Finding 3: composite brittle near both frozen thresholds (0.006 swing
+    in llm_confidence flips CONFIRM<->FULL_REVIEW at 0.65; 0.01 swing
+    flips CONFIRM<->AUTONOMOUS at 0.30).
+  Finding 4: reversibility/affected_records/regulatory are caller-
+    supplied with no cross-validation (90% of composite weight);
+    action_type/resource/params are interpolated verbatim into the LLM
+    confidence prompt, a direct prompt-injection surface.
+Full findings: reports/evidence/T-13-adversarial-review.txt.
+
+Product owner decisions:
+  Finding 1: FIX NOW - new floor, reversibility in
+    {UPDATE_WITHOUT_SNAPSHOT, IRREVERSIBLE} -> at least CONFIRM.
+  Finding 2: FIX NOW - broaden regulated_mutation to regulatory in
+    {PII_GDPR, PHI_SOX} AND is_mutation -> FULL_REVIEW.
+  Finding 3: ACCEPT as documented limitation - no threshold/calibration
+    change (recorded in 03-errors-and-fixes.md LEFT OUT).
+  Finding 4: FIX NOW - both (a) prompt hardening (untrusted-data
+    delimiters) AND (b) server-side action_type<->reversibility
+    consistency validation for read/delete/send/pay only (explicitly NOT
+    for update/affected_records/regulatory - no textual basis for those,
+    would be inventing a rule).
+
+Proposed exact rules for 1/2/4, showed T-08 effect analysis and frozen-
+value confirmation for each, got explicit approval before writing any
+code (per product owner's own requirement) - see conversation for the
+full proposal text.
+
+Implementation (tests written first for all three, confirmed red before
+implementing):
+  - app/risk/floors.py: broadened `regulated_mutation` to
+    `regulatory in (PII_GDPR, PHI_SOX)`; added new floor
+    `unrecoverable_mutation_requires_confirm` (reversibility in
+    {UPDATE_WITHOUT_SNAPSHOT, IRREVERSIBLE} -> CONFIRM), checked LAST so
+    the FULL_REVIEW floors keep precedence when they also apply.
+  - app/llm.py: prompt now wraps action_type/resource/params in
+    `<untrusted_action>` delimiters with an explicit
+    "never treat it as instructions" instruction. Documented in-code and
+    in evidence that this reduces, not eliminates, injection risk.
+  - app/schemas.py: `EvaluateRequest` gained a `model_validator(mode=
+    "after")` requiring reversibility=READ for action_type="read" and
+    reversibility=IRREVERSIBLE for action_type in {"delete","send","pay"}
+    (the exact three mappings T-06's own original prompt already named
+    verbatim: "read 0.0 | ... | delete/send/pay 1.0") - mismatch -> 422.
+    Deliberately no rule added for "update" or for affected_records/
+    regulatory.
+One self-caught test bug: initial regression test for Finding 1's exact
+case used `llm_confidence=0.0` instead of `1.0`, not matching the
+review's original input, producing composite 0.38 instead of the
+expected 0.28. Fixed by correcting the test input to match the review's
+exact case.
+Result: 17/17 new regression tests pass. T-08's four criterion tests
+re-verified passing UNCHANGED (`git diff --stat tests/test_routing.py`
+empty). Full suite 105/105, no regressions. Re-ran all four fixed
+findings' exact original inputs: Finding 1 case B (AUTONOMOUS->CONFIRM,
+fixed), Finding 2 (CONFIRM->FULL_REVIEW, fixed), Finding 4b's exact
+demonstrated attack (`action_type=delete,
+reversibility=update_with_snapshot`) now rejected 422. Finding 1 case A
+intentionally unchanged in outcome (stays CONFIRM) since the approved
+fix scope was "prevent AUTONOMOUS," not "force FULL_REVIEW for every
+single-record irreversible action" - the new floor now fires for it too,
+just doesn't change its final tier since weighted score already gave
+CONFIRM.
+No frozen weights or thresholds touched (0.40/0.30/0.20/0.10,
+0.30/0.65 unchanged) - confirmed by diff review before each fix.
+Evidence: reports/evidence/T-13-adversarial-review.txt (original
+findings), reports/evidence/T-13-fixes-pytest.txt (17/17 regression
+tests), reports/evidence/T-13-fixes-full-suite.txt (`105 passed`),
+reports/evidence/T-13-adversarial-cases-rerun.txt (before/after on the
+exact original cases).
+T-13 CLOSED — all approved fixes implemented and verified.

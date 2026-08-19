@@ -1,9 +1,21 @@
 """Override floors — evaluated AFTER the weighted score. Pure Python, no I/O.
 
 FROZEN — do not add, remove, or retune without explicit approval:
-  irreversible AND affected_records >= 100   -> FULL_REVIEW
-  regulatory == PHI_SOX AND is_mutation      -> FULL_REVIEW
-  llm_confidence < 0.5                       -> CONFIRM
+  irreversible AND affected_records >= 100          -> FULL_REVIEW
+  regulatory in {PII_GDPR, PHI_SOX} AND is_mutation  -> FULL_REVIEW
+  llm_confidence < 0.5                               -> CONFIRM
+  reversibility in {UPDATE_WITHOUT_SNAPSHOT,
+                     IRREVERSIBLE}                    -> at least CONFIRM
+
+T-13 adversarial review, approved fixes (2026-08-20):
+  - "regulated_mutation" broadened from PHI_SOX-only to PII_GDPR+PHI_SOX
+    (Finding 2): PII_GDPR already scores 0.7 on the regulatory dimension,
+    nearly as severe as PHI_SOX's 1.0, but was not guaranteed a floor.
+  - "unrecoverable_mutation_requires_confirm" added (Finding 1): an
+    unrecoverable mutation (no rollback path) must never execute fully
+    autonomously, regardless of what the weighted score alone produces.
+    Checked LAST so the FULL_REVIEW floors above still take precedence
+    when they also apply.
 """
 
 from dataclasses import dataclass
@@ -43,11 +55,11 @@ def evaluate_floors(
             ),
         )
 
-    if regulatory == Regulatory.PHI_SOX and is_mutation:
+    if regulatory in (Regulatory.PII_GDPR, Regulatory.PHI_SOX) and is_mutation:
         return FloorResult(
             tier=Tier.FULL_REVIEW,
             floor_name="regulated_mutation",
-            reason="floor: PHI/SOX-regulated data mutation",
+            reason=f"floor: {regulatory.value}-regulated data mutation",
         )
 
     if llm_confidence < FLOOR_CONFIDENCE_THRESHOLD:
@@ -57,6 +69,16 @@ def evaluate_floors(
             reason=(
                 f"floor: LLM confidence {llm_confidence:.2f} below "
                 f"{FLOOR_CONFIDENCE_THRESHOLD}"
+            ),
+        )
+
+    if reversibility in (Reversibility.UPDATE_WITHOUT_SNAPSHOT, Reversibility.IRREVERSIBLE):
+        return FloorResult(
+            tier=Tier.CONFIRM,
+            floor_name="unrecoverable_mutation_requires_confirm",
+            reason=(
+                f"floor: reversibility={reversibility.value} has no rollback path; "
+                "unrecoverable mutations may not execute autonomously"
             ),
         )
 

@@ -1,0 +1,129 @@
+T-13 — Adversarial review, fresh Claude Code session (no prior context of
+this codebase, no authorship bias). Scope: app/risk/scorer.py,
+app/risk/floors.py, app/risk/tiers.py (plus router.py/main.py/schemas.py/
+confidence.py/llm.py/store.py for context). NO FILES MODIFIED during the
+review — report only, per instruction.
+
+All numbers below were produced by the fresh session importing and
+running the actual module code (score_action, evaluate_floors,
+final_tier), not estimated.
+
+================================================================================
+FINDING 1 — Plainly dangerous action that does NOT reach FULL_REVIEW
+================================================================================
+
+Irreversible single-transaction action, no regulatory tag (e.g. "wire
+$500,000 to this external account"):
+
+  Input: reversibility=IRREVERSIBLE, affected_records=1, regulatory=NONE,
+         llm_confidence=0.99
+  Scores: reversibility=1.0, data_scope=0.2, regulatory=0.0, confidence=0.01
+  Composite = 0.40*1.0 + 0.30*0.2 + 0.20*0.0 + 0.10*0.01 = 0.461
+  Weighted tier: CONFIRM. Floor 1 needs affected_records>=100 (this is 1) -
+  does not fire. Floors 2/3 do not apply.
+  FINAL TIER: CONFIRM — not FULL_REVIEW, for an irreversible, unrecoverable
+  single action.
+
+Second instance, reaching the LEAST restrictive tier (AUTONOMOUS, zero
+human oversight) for an unrecoverable mutation:
+
+  Input: reversibility=UPDATE_WITHOUT_SNAPSHOT, affected_records=0,
+         regulatory=NONE, llm_confidence=1.0
+  Composite = 0.40*0.7 + 0 + 0 + 0 = 0.28
+  FINAL TIER: AUTONOMOUS. No floor covers UPDATE_WITHOUT_SNAPSHOT at all -
+  floors only key on IRREVERSIBLE and PHI_SOX/confidence.
+
+Root cause: data_scope measures record COUNT, not blast radius / monetary
+value / severity. Any irreversible action that inherently touches "1
+record" is structurally capped below Floor 1's affected_records>=100 gate.
+
+================================================================================
+FINDING 2 — Weakest floor: regulated_mutation (Floor 2, PHI_SOX-only)
+================================================================================
+
+Floor 2 fires only for regulatory==PHI_SOX, ignoring PII_GDPR entirely -
+even though the scorer's OWN regulatory band scores PII_GDPR at 0.7 vs
+PHI_SOX at 1.0 (i.e. the scorer treats them as comparably severe, but the
+floor does not).
+
+Floors 1 and 3 are regulatory-agnostic (verified: fire identically for
+NONE/PII_GDPR/PHI_SOX given matching other conditions). Floor 2 alone
+discriminates by label.
+
+  reversibility=UPDATE_WITH_SNAPSHOT, affected_records=1,
+  regulatory=PHI_SOX, llm_confidence=1.0
+    -> composite 0.42, weighted CONFIRM, Floor 2 FIRES -> FULL_REVIEW
+
+  Same action with regulatory=PII_GDPR instead
+    -> composite 0.36, weighted CONFIRM, NO floor fires -> stays CONFIRM
+
+Identical real-world severity (regulated personal data, comparable breach/
+fine exposure), different guaranteed oversight depending only on which
+label was declared.
+
+================================================================================
+FINDING 3 — Boundary brittleness within 0.03 of a threshold
+================================================================================
+
+reversibility=IRREVERSIBLE, affected_records=1, regulatory=PII_GDPR,
+varying llm_confidence by 0.006:
+
+  llm_confidence=0.505 -> composite 0.6495 -> CONFIRM
+  llm_confidence=0.499 -> composite 0.6501 -> FULL_REVIEW
+
+Both sit ~0.0005/0.0001 from the 0.65 threshold. A 0.006 change in a
+single self-reported confidence value flips "no automatic human check
+beyond CONFIRM" vs "FULL_REVIEW."
+
+Second instance near the 0.30 boundary:
+  reversibility=UPDATE_WITHOUT_SNAPSHOT, affected_records=0, regulatory=NONE
+  llm_confidence=0.80 -> composite 0.30 -> CONFIRM
+  llm_confidence=0.81 -> composite 0.299 -> AUTONOMOUS
+A 0.01 swing flips fully-unattended execution vs. requiring confirmation.
+
+================================================================================
+FINDING 4 — What a malicious/compromised agent controls to lower its score
+================================================================================
+
+Per app/schemas.py (EvaluateRequest) and app/main.py (evaluate()), the
+caller directly supplies reversibility, affected_records, and regulatory
+in the request body, with NO server-side validation against the actual
+action_type/resource/params. These three fields carry 0.90 of total
+weight (0.40+0.30+0.20). An agent can:
+
+  - Declare reversibility=update_with_snapshot for an actually
+    unrecoverable delete/send/pay - this ALSO flips is_mutation
+    (floors.py: is_mutation = reversibility != READ), bypassing Floor 2
+    entirely and zeroing the reversibility term.
+  - Declare affected_records=1 regardless of true scope (e.g. a bulk
+    WHERE-clause update), defeating Floor 1's >=100 gate directly.
+  - Declare regulatory=none/internal for data that is actually PII/PHI -
+    nothing cross-checks the declared classification against
+    resource/params.
+
+llm_confidence is not directly settable (min(self_reported, structural),
+computed server-side) but is still gameable indirectly:
+  - structural_completeness() (app/risk/confidence.py) only checks
+    required KEYS are present in params, never validates VALUES. An agent
+    can satisfy structural=1.0 with arbitrary/malicious values.
+  - app/llm.py::_call() interpolates the fully agent-controlled
+    action_type, resource, and params verbatim into the confidence-rating
+    prompt: "...action_type: {action_type}\nresource: {resource}\n
+    params: {params}". Since params is an arbitrary dict, this is a
+    direct prompt-injection surface - an agent can embed instruction-like
+    text in a params value telling the rating model to report
+    self_reported_confidence: 1.0. A successful injection yields
+    llm_confidence≈1.0, zeroing the confidence term AND clearing Floor 3's
+    <0.5 gate.
+
+Net effect: three of four scoring dimensions are self-declared with no
+cross-validation against the actual action; the fourth is computed from a
+prompt embedding attacker-controlled text unsanitized. A compromised
+agent has plausible control over effectively the entire risk score.
+
+================================================================================
+STATUS: report only. No files modified. Awaiting product owner's decision
+on each finding (T-13's DoD: "findings pasted with my decision on each" -
+"my" = product owner, per SP-1's own framing "I decide which become new
+floors"). Not marked Done until decisions are recorded.
+================================================================================
