@@ -7,6 +7,7 @@ from app.risk.scorer import (
     Reversibility,
     score_action,
 )
+from app.risk.tiers import Tier
 
 
 @pytest.mark.parametrize(
@@ -84,3 +85,27 @@ def test_composite_is_weighted_sum():
     assert result.composite == pytest.approx(expected)
     assert result.weights == WEIGHTS
     assert result.weights_version == WEIGHTS_VERSION
+
+
+def test_counterfactual_names_a_real_dimension_when_tier_would_change():
+    # irreversible + 100 records + PII + confident -> composite 0.40*1.0 +
+    # 0.30*0.6 + 0.20*0.7 + 0.10*0.0 = 0.72 -> FULL_REVIEW. Dropping
+    # reversibility to its next-lower band (0.7) alone brings composite to
+    # 0.40*0.7+0.30*0.6+0.20*0.7+0.10*0.0 = 0.6 -> CONFIRM: a real lever.
+    result = score_action(
+        Reversibility.IRREVERSIBLE, 100, Regulatory.PII_GDPR, 1.0
+    )
+    assert result.tier == Tier.FULL_REVIEW
+    assert "Would have been" in result.explanation
+    assert any(
+        name in result.explanation
+        for name in ("reversibility", "data_scope", "regulatory")
+    )
+
+
+def test_counterfactual_states_none_explicitly_when_no_lever_changes_tier():
+    # every dimension already at its floor band -> composite 0.0, and no
+    # dimension has a next-lower band to drop to.
+    result = score_action(Reversibility.READ, 0, Regulatory.NONE, 1.0)
+    assert result.tier == Tier.AUTONOMOUS
+    assert "No single dimension change would alter the tier" in result.explanation

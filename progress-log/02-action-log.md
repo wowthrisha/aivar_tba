@@ -89,3 +89,23 @@ since the spec gave anchor points, not a continuous formula — documented as
 a comment in scorer.py. Commit SHA: (see next commit).
 Result: 24/24 tests pass, weights verified frozen (0.40/0.30/0.20/0.10).
 Evidence: reports/evidence/T-06-pytest.txt (`24 passed in 0.02s`).
+
+### [2026-08-19 22:20 IST] [T-06a] [delivery engineer]
+Action: Added counterfactual explanation to `RiskAssessmentResult`.
+Dependency note: this required a tier-from-composite function that no
+prior task ID owns — introduced `app/risk/tiers.py` (Tier IntEnum,
+THRESHOLD_CONFIRM=0.30, THRESHOLD_FULL_REVIEW=0.65, `tier_for_composite`)
+using the exact boundary semantics you approved for T-07a
+(composite<0.30→AUTONOMOUS, 0.30<=composite<0.65→CONFIRM,
+composite>=0.65→FULL_REVIEW), since it's the same frozen thresholds and
+T-07/floors.py will need it too ("final_tier = max(weighted_tier,
+highest_floor_tier)"). Design decision: counterfactual sweep covers
+reversibility, data_scope, regulatory (all have discrete named bands) but
+NOT confidence (continuous, 1.0 - llm_confidence, no discrete band) —
+documented as a comment in scorer.py. Wrote the two new tests in
+tests/test_scoring.py FIRST (confirmed red: `ModuleNotFoundError: No
+module named 'app.risk.tiers'`), then implemented.
+Result: 26/26 tests pass (24 from T-06 unchanged + 2 new). No regressions.
+Evidence: reports/evidence/T-06a-pytest.txt (`26 passed in 0.02s`). Sample
+real output: `0.72 -> FULL_REVIEW. Would have been CONFIRM if
+reversibility were update_without_snapshot instead of irreversible.`
