@@ -55,3 +55,25 @@ Evidence:
 - Model retrieval: `HTTP_STATUS:200`, body `{"id":"gpt-5.6-luna","object":"model","created":1782228658,"owned_by":"system","shutdown_date":null}`
 - Minimal completion: `HTTP_STATUS:200`, `"content":"OK"`, `"finish_reason":"stop"`, `"model":"gpt-5.6-luna"` echoed, `usage.total_tokens: 15`. Full raw response pasted in the T-03 completion message to the product owner.
 - No secrets included in either response body; `OPENAI_API_KEY` was never printed.
+
+### [2026-08-19 21:40 IST] [T-05] [delivery engineer]
+Action: Hello-world deploy to Railway. Created `app/main.py` (FastAPI,
+single `GET /livez` route, no I/O), `Procfile`
+(`web: uvicorn app.main:app --host 0.0.0.0 --port $PORT` — confirmed via
+docs subagent, not guessed), and `railway.json`
+(`{"deploy":{"healthcheckPath":"/livez"}}` — field name/nesting confirmed
+via docs subagent). Re-authenticated Railway CLI (prior token was
+invalid), linked to existing project `zippy-expression` / service
+`aivar_tba` (already connected to `wowthrisha/aivar_tba` on GitHub, prior
+status `Failed` since no app existed yet). Deployed via `railway up --ci`
+(image built `linux/amd64` per Railpack's manifest annotation, matching
+CLAUDE.md's known constraint). Generated public domain via `railway
+domain`.
+Result: Live HTTPS URL confirmed serving `/livez` with 200 and no I/O.
+Evidence:
+- `curl -s -w "HTTP_STATUS:%{http_code}" https://aivartba-production.up.railway.app/livez`
+  → body `{"status":"ok"}`, `HTTP_STATUS:200`.
+- Deploy log: Railpack detected Python + "Found web command in Procfile";
+  image descriptor annotated `"architecture":"amd64","os":"linux"`;
+  "Deploy complete".
+- No secrets in response body or deploy log.
