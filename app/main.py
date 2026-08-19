@@ -1,8 +1,10 @@
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -10,6 +12,7 @@ from app.audit import AuditLog
 from app.db import make_app_engine
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
 from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
+from app.logging_config import configure_logging, request_id_var
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.router import route_action
 from app.risk.scorer import score_action
@@ -25,7 +28,37 @@ from app.schemas import (
 from app.state_machine import ActionState, transition
 from app.store import ApprovalRecord, InMemoryStore
 
+configure_logging()
+logger = logging.getLogger("app")
+
 app = FastAPI()
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    # Stored on request.state (not just the contextvar) because if
+    # call_next raises, the `finally` below resets the contextvar BEFORE
+    # the exception reaches unhandled_exception_handler - request.state
+    # survives that unwind, so the error path can still recover it.
+    request.state.request_id = str(uuid.uuid4())
+    token = request_id_var.set(request.state.request_id)
+    try:
+        response = await call_next(request)
+        logger.info(f"{request.method} {request.url.path} -> {response.status_code}")
+        return response
+    finally:
+        request_id_var.reset(token)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # FAIL CLEAN: Starlette's default handler for a genuinely unhandled
+    # exception returns a plain-text body, not JSON. This is the only
+    # error path in the app that isn't already an HTTPException (which
+    # FastAPI already renders as clean JSON).
+    request_id_var.set(getattr(request.state, "request_id", None))
+    logger.error(f"unhandled exception on {request.method} {request.url.path}", exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "internal server error"})
 
 # FROZEN (T-12/S-3): CONFIRM 30 min, FULL_REVIEW 4 hours.
 CONFIRM_TTL = timedelta(minutes=30)

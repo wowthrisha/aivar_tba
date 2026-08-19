@@ -712,3 +712,48 @@ GitHub variable inspection used names-only output, and every log/error
 message was grepped for secret-shaped patterns before display.
 
 Evidence: reports/evidence/T-14-curl.txt (all 5 checks, final run).
+
+### [2026-08-20 03:22 IST] [T-16] [delivery engineer]
+
+Implemented Observability. No detailed `## T-16` task-prompt section
+exists in `PS-9-1-Prompt-Pack-v1.0.md` (confirmed by grep, unlike T-06
+through T-15/T-18) - used the one-line task-board entry as the complete
+spec, per product owner confirmation: "JSON log line with request_id;
+forced error returns clean JSON."
+
+Added `app/logging_config.py` (JSON log formatter + a `request_id`
+contextvar, stdlib `logging`/`json` only, no new dependency) and wired
+it into `app/main.py`: a `request_id_middleware` generating a UUID per
+request, and `@app.exception_handler(Exception)` returning
+`{"detail": "internal server error"}` (reusing the app's existing
+error-body convention) instead of Starlette's default plain-text 500
+for genuinely unhandled exceptions.
+
+**D-11** (see `progress-log/03-errors-and-fixes.md`): while capturing
+T-16's own raw evidence (not from a failing test), the forced-error
+JSON log line showed `"request_id": null` — the middleware's
+`finally: request_id_var.reset(token)` ran before the exception reached
+the handler, clearing the contextvar first. Fixed by also storing
+`request_id` on `request.state` (survives that unwind) and having the
+exception handler re-set the contextvar from there before logging.
+Added a regression test asserting the ERROR log line itself carries a
+non-null `request_id`. Fixed on the first attempt.
+
+Result: `tests/test_observability.py` 3/3 pass. Full suite 109/109
+passed, 6 skipped (unchanged real-DB skip count). `tests/test_routing.py`
+(T-08, frozen) re-verified zero-diff against commit `a573663`. No
+`app/risk/*.py` file touched - frozen weights/thresholds/floors/
+fail-closed direction unaffected.
+
+DoD verification (raw evidence in `reports/evidence/T-16-raw-demo.txt`):
+  - JSON log line with request_id: PASS on both the success path
+    (`GET /livez`) and, after the D-11 fix, the forced-error path.
+  - Forced error returns clean JSON: PASS - `RuntimeError` forced via a
+    broken `get_store` dependency override returns `HTTP 500`,
+    `Content-Type: application/json`, body
+    `{"detail":"internal server error"}`, parses cleanly with
+    `json.loads`.
+
+Evidence: reports/evidence/T-16-pytest.txt (3/3 + full suite 109
+passed/6 skipped), reports/evidence/T-16-raw-demo.txt (literal JSON log
+lines and forced-error response, before/after the D-11 fix).
