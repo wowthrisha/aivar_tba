@@ -86,3 +86,16 @@ breakdown · the video with verified sharing
 
 stretch items, then CLI, then concurrency proof, then AWS deploy (Railway
 already satisfies deployed-not-localhost).
+
+## NOVELTY ADD-ONS (experimental — branch `feature/novelty-addons`, source: `PS-9-1-Novelty-Addons-v1.0.md`)
+
+Separate from the task board above — different branch, different source
+document, not part of the original task IDs. Distinct from the STRETCH
+table's `T-B2 (Reviewer bias metrics)`, which remains untouched and
+`Not started`.
+
+| Item | Description | Status |
+|---|---|---|
+| Item 0 | Theoretical reframing (README + video line, no code) | Done |
+| Feature A | Reviewer oversight metrics (`GET /v1/oversight/reviewers`) | Not started |
+| Feature B | Precedent retrieval + novelty escalation | Not started (out of scope for this batch) |

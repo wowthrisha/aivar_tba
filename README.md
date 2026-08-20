@@ -371,3 +371,50 @@ to add calibration/smoothing logic under deadline pressure (see §9
 above). Any future fuzzy-rejection design would need explicit sign-off
 before touching the frozen thresholds it would necessarily interact
 with.
+
+## 13. Theoretical grounding
+
+This engine implements a **cost-sensitive deferral policy**. The
+formalism dates to Chow's (1970) *classification with a reject
+option*, was generalised by El-Yaniv and Wiener as *selective
+classification* — a predictor paired with a selection function that
+decides whether to act or abstain — and extended by Madras et al.
+(2018) into *learning to defer*, where abstention routes an instance to
+an external decision-maker rather than simply withholding output.
+
+The mapping is direct. The **predictor** is the agent's proposed
+action. The **rejector** is the risk router. **Abstention** is not a
+null output but an escalation to a named human tier. The three-tier
+structure corresponds to the scalable-oversight view of a principal as
+a tiered system whose composite competence exceeds any single
+component's.
+
+**Design decision: the rejector is deterministic and rule-based, not
+learned.** This is deliberate, for three reasons.
+
+1. **Cold start.** Learned deferral requires human decisions for every
+   instance in a training set. At deployment there is no such history —
+   the system must be correct on day one.
+2. **Explainability.** Success criterion 4 requires a human-readable
+   breakdown. A learned rejector produces a score, not a reason. A
+   black-box rejector inside a system whose purpose is human oversight
+   is self-defeating.
+3. **Auditability.** Deterministic weights carry a version. Any
+   historical decision can be recomputed exactly. A learned rejector's
+   decisions are reproducible only if the model checkpoint is also
+   versioned and retained.
+
+**Known limitation, precisely stated.** Madras et al. (2018) show that
+confidence-based deferral is suboptimal because it ignores the
+downstream human's performance: at high model uncertainty the human may
+be no more accurate than the model, so it can be preferable to defer
+*other*, lower-uncertainty instances where the human genuinely
+outperforms. This engine defers on action risk, not on modelled human
+competence. The reviewer oversight metrics endpoint (below) is the
+first step toward closing that gap — measuring the human is the
+prerequisite for ever routing to them optimally.
+
+A second acknowledged gap: the deferral literature largely ignores
+**capacity management**. A review queue is a finite resource. This
+engine records queue depth and decision latency but does not yet
+allocate against a capacity budget.

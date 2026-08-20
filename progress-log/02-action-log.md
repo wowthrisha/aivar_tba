@@ -969,3 +969,27 @@ recording p95, not a specific bound - reporting this transparently
 rather than characterizing it as fast.
 
 Evidence: reports/evidence/T-19-concurrency.txt.
+
+### [2026-08-20 10:02 IST] [Item 0 - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
+
+Added the "Theoretical grounding" README section (`## 13.`) and a video
+script line, per `PS-9-1-Novelty-Addons-v1.0.md` ("ITEM 0 - The
+reframing"). The user's message referenced this file with a "(1)"
+suffix that does not exist - found the real, unsuffixed file
+(`PS-9-1-Novelty-Addons-v1.0.md`, repo root) via a broad filesystem
+search before treating any content as authoritative, same discipline
+applied earlier this session to the "(2)"-suffixed prompt pack.
+
+Content pasted matches the source's "Paste into README, new section:
+'Theoretical grounding'" block (lines 40-52) exactly, converted from
+the source's own blockquote-as-paste-target convention to plain README
+prose - not literal `>` blockquote markup, to avoid reintroducing D-12's
+line-wrap blockquote bug (checked: 0 lines start with `>` after the
+edit). The video line (lines 56-60) went into a new
+`reports/video-script.md`, since no video-script file/convention
+existed yet in this project.
+
+Zero code changed - `git diff --name-only` shows only `README.md`;
+`app/risk/` and `tests/test_routing.py` (T-08) confirmed zero-diff.
+
+Evidence: reports/evidence/Item0-verification.txt.
