@@ -85,6 +85,35 @@ human ever touching them; `CONFIRM`/`FULL_REVIEW` actions sit at
 `EVALUATED`'s far side until `POST /v1/actions/{id}/decision` moves them
 to `APPROVED` or `REJECTED` — a genuinely separate step, not a formality.
 
+**The evaluate pipeline**, as it actually runs today in
+`app/main.py::evaluate()` — not as originally designed, since
+calibration and novelty were added after the state machine above:
+
+```mermaid
+flowchart LR
+    A[evaluate request] --> B["scorer\n(4 weighted dimensions)"]
+    B --> C["calibration\nCALIBRATION_MODE=shadow\ncomputed, exposed, NOT applied"]
+    C --> D["tier_for_composite\n(0.30 / 0.65 thresholds)"]
+    D --> E["floors\n(escalate-only, on raw inputs)"]
+    E --> F["novelty escalation\n(precedent similarity < 0.75)"]
+    F --> G[final tier]
+    G -->|AUTONOMOUS| H[commit boundary: auto-execute]
+    G -->|CONFIRM / FULL_REVIEW| I[commit boundary: human decision required]
+    I --> J[POST .../decision or .../confirm]
+    J --> K[POST .../execute]
+```
+
+In `shadow` mode (the default; `enforce` is not set anywhere in this
+repo or its Railway config) calibration's output is attached to the
+response but never reaches step D — the composite that determines the
+tier is the scorer's output unmodified. Floors read the *raw* request
+fields (`reversibility`, `affected_records`, `regulatory`,
+`llm_confidence`), not the composite, so calibration cannot suppress a
+floor even in `enforce` mode (`app/risk/floors.py::final_tier` is a
+`max()` over the weighted tier and the floor tier — escalate-only,
+proven by `tests/test_floors.py` and, for calibration specifically,
+`tests/test_calibration.py::test_enforce_mode_cannot_suppress_full_review_floor`).
+
 ## 4. The risk model
 
 Four dimensions, each normalized to 0.0–1.0, combined as a weighted sum
@@ -124,17 +153,23 @@ are two separate mechanisms reading the same signal.
 
 Floors (`app/risk/floors.py`) are checked *after* the weighted score and
 can only escalate a tier, never lower one — proven by the escalate-only
-sweep (T-07). Real, live example (`reports/evidence/T-14-curl.txt`):
+sweep (T-07). Real, live example (`reports/evidence/OD-1-raw-full-review-case.json`):
 
 ```
 REQUEST:  {"action_type":"delete","reversibility":"irreversible",
-           "affected_records":500,"regulatory":"none"}
-RESPONSE: composite=0.58, tier=FULL_REVIEW,
-          explanation="0.58 -> FULL_REVIEW (floor: irreversible action
-          affecting 500 records (>= 100))."
+           "affected_records":5000,"regulatory":"none"}
+DIMENSIONS: reversibility 1.00 × 0.40 = 0.400
+            data_scope    0.80 × 0.30 = 0.240
+            regulatory    0.00 × 0.20 = 0.000
+            confidence    0.02 × 0.10 = 0.002
+                                        -------
+                          composite  = 0.642
+RESPONSE: composite=0.642, tier=FULL_REVIEW, floor_name=irreversible_bulk,
+          explanation="0.64 -> FULL_REVIEW (floor: irreversible action
+          affecting 5000 records (>= 100))."
 ```
 
-The weighted composite alone is **0.58** — inside the 0.30–0.65 CONFIRM
+The weighted composite alone is **0.642** — inside the 0.30–0.65 CONFIRM
 band, not FULL_REVIEW. Left to the weighted sum by itself, a genuinely
 confident LLM call on a large irreversible action could land at
 CONFIRM: any single human could wave it through. The `irreversible_bulk`
@@ -143,7 +178,9 @@ an irreversible action, forcing FULL_REVIEW regardless of how the four
 weighted dimensions add up. The other three floors do the same for
 regulated-data mutations, low LLM confidence, and any unrecoverable
 mutation — each closes a specific way the weighted sum alone could
-under-escalate.
+under-escalate. (This composite is not a fixed constant: the confidence/
+uncertainty dimension comes from a live LLM call, so it varies a few
+hundredths between runs — see §11's note on re-evaluation reproducibility.)
 
 ## 6. Security controls
 
@@ -212,14 +249,43 @@ Project) — several `ASI` categories map to specific controls here:
 
 ## 8. Project management
 
+**Method**: Kanban, WIP limit 1 (one task in progress at a time, per
+`CLAUDE.md`'s operating contract), a Definition of Done per task, and
+six gates (G0–G5) — see `reports/gates/`.
+
 - `progress-log/01-implementation-plan.md` — task board and status.
 - `progress-log/02-action-log.md` — append-only record of what was done
   and why, per task.
 - `progress-log/03-errors-and-fixes.md` — defect register plus the
   `LEFT OUT` section (scope explicitly cut or deferred).
 - `reports/00-project-charter.md` — scope, frozen list, gate schedule.
+- `reports/gates/`, `reports/blocks/` — gate and block reports; each one
+  records its own branch and commit (see L-J below — why that matters).
 - `reports/evidence/` — raw command/curl/pytest output backing every
   DoD claim in the action log.
+
+**Evidence discipline**: no task in the action log is marked done
+without a pasted command/curl/pytest artifact alongside it — a green
+build log alone is never treated as proof (see §10, DMAIC/Measure).
+
+**Measured metrics** (each traceable to the exact command that produced
+it — see the commit that added this table for the full command log):
+
+| Metric | Value | Command |
+|---|---|---|
+| Tests passing / skipped | 144 passed, 6 skipped | `pytest -q` |
+| Source LOC (`app/` + `app/risk/` + `cli.py`) | 2,844 | `wc -l app/*.py app/risk/*.py cli.py` |
+| Test LOC (`tests/`) | 2,169 | `wc -l tests/*.py` |
+| Test-to-source ratio | ≈0.76:1 | 2,169 / 2,844 |
+| Endpoints | 12 | `grep -c "^@app\.\(get\|post\)" app/main.py` |
+| Commits | 49 | `git rev-list --all --count` |
+| First commit | 2026-08-19 18:39:53 +0530 | `git log --reverse --format="%ci" \| head -1` |
+| Latest commit | 2026-08-20 16:22:15 +0530 | `git log -1 --format="%ci"` |
+| Defects logged | 13 (D-01–D-13) | `grep -cE "^\| D-[0-9]+" progress-log/03-errors-and-fixes.md` |
+| LEFT OUT entries | 23 | counted directly in `progress-log/03-errors-and-fixes.md`'s `## LEFT OUT` section |
+| Evidence files | 61 | `find reports/evidence -type f \| wc -l` |
+| Live concurrency p95 (T-19, 50 concurrent requests) | 29,796 ms – 29,796.1 ms across two runs | read from `reports/evidence/T-19-concurrency.txt`, not re-run |
+| Coverage | not measured | `pytest --cov` is not a registered pytest option in this environment despite `pytest-cov` being importable — not installed/fixed to avoid a scope-creep environment change |
 
 ## 9. Known limitations and next steps
 
@@ -301,6 +367,71 @@ Project) — several `ASI` categories map to specific controls here:
   code edit + redeploy, not a config change. Production approach: move
   to env vars (`CONFIRM_TTL_MINUTES`, `FULL_REVIEW_TTL_HOURS`) with the
   same defaults, read once at startup.
+- **L-A** Re-evaluation is not reproducible across restarts. Audit
+  records ARE reproducible (all inputs, `weights_version`, and
+  `llm_model` are persisted; composite recomputes exactly from them).
+  Re-evaluation calls a live model at default temperature (the pinned
+  model rejects `temperature=0`), so composites vary between processes
+  — observed directly this session: the same bulk-delete payload scored
+  0.642 in one deploy and 0.735/0.737 after restarts wiped the
+  in-process LLM confidence cache. Tiers stay stable where a floor
+  applies, because floors are deterministic on raw inputs, never on
+  composite. Deliberate: an audit must replay exactly; a fresh
+  evaluation should reflect current model evidence. Production
+  approach: an explicit `/replay` endpoint scoring from persisted inputs
+  only, distinct from `/evaluate`.
+- **L-B** Two tier decision points. `route_action()` (`app/risk/`)
+  returns the BASE tier; the enforced tier is composed in
+  `app/main.py`'s `evaluate()` (calibration → floors → novelty). The
+  audit record reflects the ENFORCED tier and reason, but the risk
+  module is no longer sole authority. Found in self-review, not from a
+  failing test. Production approach: a single `compose_final_decision()`
+  owning the whole chain. Not refactored under deadline — the current
+  path is fully, independently tested and a rushed restructure would
+  risk verified behaviour for a structural gain, not a correctness one.
+- **L-C** Adaptive calibration ships in SHADOW mode: computed, audited,
+  not applied (`CALIBRATION_MODE` unset in this repo and on Railway →
+  defaults to `shadow`; `enforce` is never set anywhere). Bounded
+  (±0.10, minimum 5 decisions, floors always win — proven by
+  `tests/test_calibration.py`). Promotion criterion: sustained agreement
+  between the shadow adjustment and actual reviewer outcomes, not just
+  passing tests.
+- **L-D** Calibration input is observational, not ground truth. Reviewer
+  behaviour may itself be biased — the automation-bias metrics
+  (`app/oversight.py`) exist to surface that. Advisory until its inputs
+  are themselves validated.
+- **L-E** AWS: an ECR repository and a `linux/amd64` image were built;
+  an IAM execution role and policy were created. The Lambda function and
+  Function URL were NOT completed. Railway is the deployed environment
+  of record for this entire submission. App Runner was never an option
+  — closed to new customers since 30 Apr 2026. AWS is not deployed.
+- **L-F** Reviewer metrics report `decisions_total` alongside every
+  rate, so a small sample cannot be misread as an extreme signal —
+  confirmed both in code (`app/oversight.py`) and live via
+  `GET /v1/oversight/reviewers`.
+- **L-G** Semantic duplication of the confidence signal. `floors.py`
+  uses raw `llm_confidence` (< 0.5 forces CONFIRM); `scorer.py` and the
+  `confidence_score` field hold `1 - llm_confidence`, an uncertainty —
+  the CLI labels this "uncertainty" for the same reason. One signal
+  exists under one name in two orientations; a future edit reaching for
+  "confidence" would silently get the inverse. Production approach:
+  rename to `uncertainty_score`, persist raw `llm_confidence`
+  separately. Deferred: needs a migration and a redeploy of a verified
+  system.
+- **L-H** `params_hash` is not Unicode-normalised. NFC and NFD forms of
+  one string hash differently since `json.dumps` doesn't normalise.
+  FAILS CLOSED — a mismatch returns 409 and cannot authorise anything;
+  the impact is rejecting a legitimate confirmation, never admitting an
+  illegitimate one. One-line fix (`unicodedata.normalize("NFC", ...)`),
+  deferred because it changes hashing semantics for existing rows.
+- **L-I** Cross-layer reconciliation (API / `risk_assessments` / audit /
+  CLI) is verified manually, repeatedly, not by a standing test.
+  Production approach: one test asserting pairwise equality across all
+  four layers for a single evaluate call.
+- **L-J** Audit provenance: a finding is only as good as the tree it was
+  run against — a stale semantic audit run in a pre-merge clone reported
+  shipped features as absent. Every gate report in this project records
+  its own branch and commit for exactly this reason.
 
 ## 10. DMAIC
 
@@ -323,7 +454,7 @@ artifacts — it isn't a new process being introduced.
   `reports/evidence/T-13-adversarial-review.txt`) found and classified
   real findings, including boundary brittleness (Finding 3) and
   prompt-injection surface (Finding 4a). The defect register
-  (`progress-log/03-errors-and-fixes.md`, D-01–D-12) records every other
+  (`progress-log/03-errors-and-fixes.md`, D-01–D-13) records every other
   defect's root cause the same way.
 - **Improve** — fixes approved only where they didn't touch the frozen
   list: broadening the `regulated_mutation` floor to cover `PII_GDPR`
