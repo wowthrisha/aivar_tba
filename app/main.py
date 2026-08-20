@@ -52,6 +52,12 @@ logger = logging.getLogger("app")
 
 app = FastAPI()
 
+# No CORSMiddleware, deliberately: this API is a service-to-service
+# governance endpoint (agents/CI/CLI call it directly), not consumed
+# from browser JS on a different origin. Add CORSMiddleware with an
+# explicit allow-list if a browser-based client ever needs it - never
+# a wildcard origin on an endpoint that gates real actions.
+
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):

@@ -309,9 +309,10 @@ it — see the commit that added this table for the full command log):
 (from `governance/plan/03-errors-and-fixes.md`'s `LEFT OUT` section, verbatim)
 
 - No application logic in T-04 (scaffold only, per task spec).
-- `requirements.txt` dependency versions left unpinned — pinning exact
-  versions now would be guessing; to be finalized when feature code lands
-  and real compatibility constraints are known.
+- No CORS configuration — deliberate, not an oversight. This API is a
+  service-to-service governance endpoint, not consumed from browser JS
+  on a different origin. See `app/main.py`'s comment above `app =
+  FastAPI()`.
 - T-08: `router.route_action`'s explanation, when a floor fires, states the
   floor's own reason (e.g. "irreversible action affecting 500 records (>=
   100)") but does not compute a floor-specific counterfactual ("would have
