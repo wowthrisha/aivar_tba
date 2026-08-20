@@ -19,6 +19,7 @@ established (a real atomic operation, not read-then-write) applied to
 the audit log.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -30,6 +31,8 @@ from app.audit import GENESIS_HASH, AuditRecord, AuditVerifyResult, _entry_hash
 from app.db_models import ActionORM, ApprovalORM, AuditRecordORM, RiskAssessmentORM
 from app.state_machine import ActionState
 from app.store import ActionRecord, ApprovalRecord, canonical_params_hash
+
+logger = logging.getLogger("app")
 
 _AUDIT_LOCK_KEY = 727_002_026  # arbitrary fixed key for pg_advisory_xact_lock
 
@@ -188,7 +191,17 @@ class SQLAlchemyStore:
                 .values(state=new_state.value)
             )
             await session.commit()
-            return result.rowcount == 1
+            succeeded = result.rowcount == 1
+            if not succeeded:
+                # Not necessarily a bug: a lost race under normal concurrent
+                # operation looks identical to an invalid-transition attempt
+                # from here. Logged either way so a caller's resulting 409
+                # is traceable back to which action/expected-state it was.
+                logger.warning(
+                    f"conditional_transition_failed action_id={action_id} "
+                    f"expected_state={expected_state.value} new_state={new_state.value}"
+                )
+            return succeeded
 
     async def was_executed_with_key(self, action_id: str, idempotency_key: str) -> bool:
         async with self._sessionmaker() as session:

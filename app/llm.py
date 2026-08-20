@@ -19,6 +19,7 @@ source before writing this (not guessed, per E-3):
 
 import hashlib
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -26,6 +27,8 @@ from typing import Any, Protocol
 
 from openai import APITimeoutError, OpenAIError
 from pydantic import BaseModel, ValidationError, field_validator
+
+logger = logging.getLogger("app")
 
 TIMEOUT_SECONDS = 3.0
 
@@ -150,15 +153,24 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
                 timeout=TIMEOUT_SECONDS,
             )
         except APITimeoutError:
+            logger.warning(f"llm_degraded=true reason=timeout action_type={action_type} resource={resource}")
             return ConfidenceResult(confidence=0.0, degraded=True, reason="timeout", latency_ms=elapsed_ms())
         except ValidationError as exc:
             # structural parse succeeded but a value was out of range
+            logger.warning(
+                f"llm_degraded=true reason=out_of_range_validation action_type={action_type} "
+                f"resource={resource} detail={exc}"
+            )
             return ConfidenceResult(
                 confidence=0.0, degraded=True, reason=f"out_of_range_validation: {exc}", latency_ms=elapsed_ms()
             )
         except OpenAIError as exc:
             # FAIL CLOSED: any other API error, including refusal-adjacent
             # finish reasons (length, content_filter) - never fail open.
+            logger.warning(
+                f"llm_degraded=true reason=api_error action_type={action_type} "
+                f"resource={resource} detail={exc}"
+            )
             return ConfidenceResult(
                 confidence=0.0, degraded=True, reason=f"api_error: {exc}", latency_ms=elapsed_ms()
             )
@@ -168,11 +180,18 @@ class OpenAIConfidenceProvider(ConfidenceProvider):
         if message.refusal is not None:
             # TERMINAL. Never retried - a retry loop that ignores refusals
             # loops forever.
+            logger.warning(
+                f"llm_degraded=true reason=refusal action_type={action_type} "
+                f"resource={resource} detail={message.refusal}"
+            )
             return ConfidenceResult(
                 confidence=0.0, degraded=True, reason=f"refusal: {message.refusal}", latency_ms=elapsed_ms()
             )
 
         if message.parsed is None:
+            logger.warning(
+                f"llm_degraded=true reason=unparsed_response action_type={action_type} resource={resource}"
+            )
             return ConfidenceResult(
                 confidence=0.0, degraded=True, reason="unparsed_response", latency_ms=elapsed_ms()
             )
