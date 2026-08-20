@@ -88,7 +88,7 @@ version). `data_scope` implemented as step bands (lower-bound thresholds)
 since the spec gave anchor points, not a continuous formula — documented as
 a comment in scorer.py. Commit SHA: (see next commit).
 Result: 24/24 tests pass, weights verified frozen (0.40/0.30/0.20/0.10).
-Evidence: reports/evidence/T-06-pytest.txt (`24 passed in 0.02s`).
+Evidence: governance/evidence/T-06-pytest.txt (`24 passed in 0.02s`).
 
 ### [2026-08-19 22:20 IST] [T-06a] [delivery engineer]
 Action: Added counterfactual explanation to `RiskAssessmentResult`.
@@ -106,7 +106,7 @@ documented as a comment in scorer.py. Wrote the two new tests in
 tests/test_scoring.py FIRST (confirmed red: `ModuleNotFoundError: No
 module named 'app.risk.tiers'`), then implemented.
 Result: 26/26 tests pass (24 from T-06 unchanged + 2 new). No regressions.
-Evidence: reports/evidence/T-06a-pytest.txt (`26 passed in 0.02s`). Sample
+Evidence: governance/evidence/T-06a-pytest.txt (`26 passed in 0.02s`). Sample
 real output: `0.72 -> FULL_REVIEW. Would have been CONFIRM if
 reversibility were update_without_snapshot instead of irreversible.`
 
@@ -125,7 +125,7 @@ Result: 9/9 floors tests pass, including a sweep test over all 4x9x4x9=1296
 combinations of (reversibility, affected_records, regulatory,
 llm_confidence) asserting final_tier never falls below weighted_tier. Full
 suite 35/35, no regressions.
-Evidence: reports/evidence/T-07-pytest.txt (`35 passed in 0.03s`).
+Evidence: governance/evidence/T-07-pytest.txt (`35 passed in 0.03s`).
 
 ### [2026-08-19 22:45 IST] [T-07a] [delivery engineer]
 Action: No task-specific prompt exists for T-07a in the Prompt Pack
@@ -140,7 +140,7 @@ never regresses as composite rises. No implementation change was needed —
 tiers.py already matched the approved semantics from T-06a; this task
 formalizes the dedicated boundary-precision coverage the DoD asks for.
 Result: 12/12 new tests pass. Full suite 47/47, no regressions.
-Evidence: reports/evidence/T-07a-pytest.txt (`47 passed in 0.04s`).
+Evidence: governance/evidence/T-07a-pytest.txt (`47 passed in 0.04s`).
 
 ### [2026-08-19 23:00 IST] [T-08] [delivery engineer]
 Action: THE FOUR CRITERION TESTS — tests/test_routing.py, now READ-ONLY.
@@ -164,7 +164,7 @@ task's scope. Logged to 03-errors-and-fixes.md.
 Result: THE FOUR CRITERION TESTS pass. GATE G1 met: `pytest
 tests/test_routing.py -vv` → 4/4 passed, NO FastAPI, NO database imported
 anywhere in app/risk/. Full suite 51/51, no regressions.
-Evidence: reports/evidence/T-08-pytest.txt (full suite, `51 passed in
+Evidence: governance/evidence/T-08-pytest.txt (full suite, `51 passed in
 0.04s`). Named results:
   tests/test_routing.py::test_bulk_delete_routes_to_review PASSED
   tests/test_routing.py::test_single_update_routes_to_confirm PASSED
@@ -200,7 +200,7 @@ variable. Logged as D-01 in 03-errors-and-fixes.md.
 Result: 5/5 new tests pass (happy path, refusal terminal+not retried,
 timeout fails closed, out-of-range rejected, cache hit). Full suite
 56/56, no regressions.
-Evidence: reports/evidence/T-09-pytest.txt (`56 passed in 0.32s`).
+Evidence: governance/evidence/T-09-pytest.txt (`56 passed in 0.32s`).
 
 ### [2026-08-19 23:30 IST] [T-09a] [delivery engineer]
 Action: Design decision, documented rather than silently done: did NOT
@@ -221,7 +221,7 @@ Result: 6/6 new tests pass, including the required "high self-report + low
 completeness -> low confidence" case (0.95 self-reported, missing
 required param -> structural=0.0 -> combined=0.0). Full suite 62/62, no
 regressions.
-Evidence: reports/evidence/T-09a-pytest.txt (`62 passed in 0.29s`).
+Evidence: governance/evidence/T-09a-pytest.txt (`62 passed in 0.29s`).
 
 ### [2026-08-20 00:20 IST] [T-09 fix, discovered during T-10] [delivery engineer]
 Action: T-10's live curl verification (POST /v1/actions/evaluate against
@@ -246,7 +246,7 @@ Result: tests/test_llm.py 5/5 pass (unchanged — mocks never asserted on
 `temperature`). Full suite 80/80. Direct live call:
 `confidence: 0.82, degraded: False, reason: None`. Audit record for a
 real evaluate call now shows `"llm_degraded": false`.
-Evidence: reports/evidence/T-09-fix-live-verification.txt; D-02 logged in
+Evidence: governance/evidence/T-09-fix-live-verification.txt; D-02 logged in
 03-errors-and-fixes.md.
 
 ### [2026-08-20 00:30 IST] [T-10] [delivery engineer]
@@ -305,8 +305,8 @@ call).
 Result: 18/18 new tests pass, full suite 80/80. Live curl walkthrough:
 all 9 endpoints proven, hash chain valid across 10 real audit records
 (`{"valid":true,"records_checked":10,"first_invalid_id":null}`).
-Evidence: reports/evidence/T-10-pytest.txt (`80 passed`),
-reports/evidence/T-10-curl.txt (full request/response pairs for all 9
+Evidence: governance/evidence/T-10-pytest.txt (`80 passed`),
+governance/evidence/T-10-curl.txt (full request/response pairs for all 9
 endpoints).
 
 ### [2026-08-20 01:10 IST] [T-11] [delivery engineer]
@@ -354,9 +354,9 @@ actions/approvals/audit_records/risk_assessments (+ alembic's own
 bookkeeping table). All 3 named indexes confirmed present. Live
 `/readyz` -> `{"status":"ok","checks":{"llm":"ok","db":"ok"}}`. Full
 suite 80/80, no regressions.
-Evidence: reports/evidence/T-11-verification.txt (alembic current,
+Evidence: governance/evidence/T-11-verification.txt (alembic current,
 alembic history, table list, index list, live /readyz curl),
-reports/evidence/T-11-pytest.txt (`80 passed`).
+governance/evidence/T-11-pytest.txt (`80 passed`).
 
 ### [2026-08-20 01:40 IST] [T-12] [delivery engineer]
 Action: Five named security controls plus the race test. Assessed what
@@ -396,8 +396,8 @@ Result: 8/8 new tests pass (S-1, S-1, S-2, S-2, S-3, S-5, S-6, race).
 Full suite 88/88, stable across 3 repeat runs (checked given the race
 test's inherent flakiness risk). No frozen-list changes; T-08's
 tests/test_routing.py untouched.
-Evidence: reports/evidence/T-12-pytest.txt (dedicated security tests),
-reports/evidence/T-12-full-suite.txt (`88 passed`).
+Evidence: governance/evidence/T-12-pytest.txt (dedicated security tests),
+governance/evidence/T-12-full-suite.txt (`88 passed`).
 
 ### [2026-08-20 02:00 IST] [T-13] [delivery engineer]
 Action: Adversarial review (a genuinely fresh, no-prior-context Claude
@@ -417,7 +417,7 @@ floors.py, tiers.py, changed nothing). Report only:
     supplied with no cross-validation (90% of composite weight);
     action_type/resource/params are interpolated verbatim into the LLM
     confidence prompt, a direct prompt-injection surface.
-Full findings: reports/evidence/T-13-adversarial-review.txt.
+Full findings: governance/evidence/T-13-adversarial-review.txt.
 
 Product owner decisions:
   Finding 1: FIX NOW - new floor, reversibility in
@@ -474,10 +474,10 @@ just doesn't change its final tier since weighted score already gave
 CONFIRM.
 No frozen weights or thresholds touched (0.40/0.30/0.20/0.10,
 0.30/0.65 unchanged) - confirmed by diff review before each fix.
-Evidence: reports/evidence/T-13-adversarial-review.txt (original
-findings), reports/evidence/T-13-fixes-pytest.txt (17/17 regression
-tests), reports/evidence/T-13-fixes-full-suite.txt (`105 passed`),
-reports/evidence/T-13-adversarial-cases-rerun.txt (before/after on the
+Evidence: governance/evidence/T-13-adversarial-review.txt (original
+findings), governance/evidence/T-13-fixes-pytest.txt (17/17 regression
+tests), governance/evidence/T-13-fixes-full-suite.txt (`105 passed`),
+governance/evidence/T-13-adversarial-cases-rerun.txt (before/after on the
 exact original cases).
 T-13 CLOSED — all approved fixes implemented and verified.
 
@@ -502,8 +502,8 @@ failed results be cached?) for a future task, not fixed now - outside
 G2's scope.
 Result: Gate G2 PASS. Full suite 105/105. State machine proven live by
 curl across all terminal paths, hash chain valid across 15 real records.
-Evidence: reports/evidence/G2-state-machine-curl.txt,
-reports/gates/G2-report.md, reports/blocks/block-2-report.md.
+Evidence: governance/evidence/G2-state-machine-curl.txt,
+governance/gates/G2-report.md, governance/blocks/block-2-report.md.
 BLOCK 2 COMPLETE. Not starting Block 3.
 
 ### [2026-08-20 01:15 IST] [Issue 2 fix] [delivery engineer]
@@ -522,8 +522,8 @@ Result: 6/6 tests in test_llm.py pass. Full suite 106/106. T-08's four
 criterion tests re-verified unchanged (`tests/test_routing.py` zero
 diff). No frozen weights/thresholds/floors touched - this file isn't
 imported by any risk-engine module.
-Evidence: reports/evidence/issue2-llm-cache-fix-pytest.txt,
-reports/evidence/issue2-full-suite.txt (`106 passed`).
+Evidence: governance/evidence/issue2-llm-cache-fix-pytest.txt,
+governance/evidence/issue2-full-suite.txt (`106 passed`).
 
 ### [2026-08-20 02:00 IST] [Issue 1 fix] [delivery engineer]
 Action: Pre-T-14 persistence fix, plan-mode approved with 4 open design
@@ -616,9 +616,9 @@ the same decision endpoint, run twice, both times exactly one 200 / one
 multi-connection concurrency, which the in-memory lock could never prove.
 No frozen weights/thresholds/floors touched; app/risk/*.py never
 imported by anything this fix changed.
-Evidence: reports/evidence/issue1-db-store-pytest.txt (6/6 real-DB
-tests), reports/evidence/issue1-full-suite.txt (`106 passed, 6
-skipped`), reports/evidence/issue1-db-backed-curl.txt (full walkthrough,
+Evidence: governance/evidence/issue1-db-store-pytest.txt (6/6 real-DB
+tests), governance/evidence/issue1-full-suite.txt (`106 passed, 6
+skipped`), governance/evidence/issue1-db-backed-curl.txt (full walkthrough,
 direct-DB-query proof, and the concurrency proof, both runs).
 
 ### [2026-08-20 03:06 IST] [T-14] [delivery engineer]
@@ -711,7 +711,7 @@ No secret values were printed at any point in this task; every Railway/
 GitHub variable inspection used names-only output, and every log/error
 message was grepped for secret-shaped patterns before display.
 
-Evidence: reports/evidence/T-14-curl.txt (all 5 checks, final run).
+Evidence: governance/evidence/T-14-curl.txt (all 5 checks, final run).
 
 ### [2026-08-20 03:22 IST] [T-16] [delivery engineer]
 
@@ -729,7 +729,7 @@ request, and `@app.exception_handler(Exception)` returning
 error-body convention) instead of Starlette's default plain-text 500
 for genuinely unhandled exceptions.
 
-**D-11** (see `progress-log/03-errors-and-fixes.md`): while capturing
+**D-11** (see `governance/plan/03-errors-and-fixes.md`): while capturing
 T-16's own raw evidence (not from a failing test), the forced-error
 JSON log line showed `"request_id": null` — the middleware's
 `finally: request_id_var.reset(token)` ran before the exception reached
@@ -745,7 +745,7 @@ passed, 6 skipped (unchanged real-DB skip count). `tests/test_routing.py`
 `app/risk/*.py` file touched - frozen weights/thresholds/floors/
 fail-closed direction unaffected.
 
-DoD verification (raw evidence in `reports/evidence/T-16-raw-demo.txt`):
+DoD verification (raw evidence in `governance/evidence/T-16-raw-demo.txt`):
   - JSON log line with request_id: PASS on both the success path
     (`GET /livez`) and, after the D-11 fix, the forced-error path.
   - Forced error returns clean JSON: PASS - `RuntimeError` forced via a
@@ -754,8 +754,8 @@ DoD verification (raw evidence in `reports/evidence/T-16-raw-demo.txt`):
     `{"detail":"internal server error"}`, parses cleanly with
     `json.loads`.
 
-Evidence: reports/evidence/T-16-pytest.txt (3/3 + full suite 109
-passed/6 skipped), reports/evidence/T-16-raw-demo.txt (literal JSON log
+Evidence: governance/evidence/T-16-pytest.txt (3/3 + full suite 109
+passed/6 skipped), governance/evidence/T-16-raw-demo.txt (literal JSON log
 lines and forced-error response, before/after the D-11 fix).
 
 ### [2026-08-20 03:37 IST] [T-18] [delivery engineer]
@@ -777,7 +777,7 @@ owner, who reviewed and approved before this was committed):
   - Architecture Mermaid diagram: built directly from
     `app/state_machine.py`'s real `VALID_TRANSITIONS`, not invented.
   - Override-floors worked example: used REAL evidence (composite 0.58,
-    `reports/evidence/T-14-curl.txt`) instead of the prompt's
+    `governance/evidence/T-14-curl.txt`) instead of the prompt's
     illustrative "0.69" - no live call was forced to hit that exact
     number, and the "would have been CONFIRM" reasoning is written
     prose, not a literal system-generated string (a known gap already
@@ -804,7 +804,7 @@ owner, who reviewed and approved before this was committed):
     README. Including "configurable" would have contradicted the
     project's own recorded limitation within one document.
 
-**D-12** (see `progress-log/03-errors-and-fixes.md`): found while
+**D-12** (see `governance/plan/03-errors-and-fixes.md`): found while
 fetching GitHub's own rendered HTML as the required render-proof step
 (`gh api repos/.../readme -H "Accept: application/vnd.github.html"`),
 not from reading the raw markdown - a wrapped line in the weight-
@@ -816,7 +816,7 @@ re-verified via the same render API (0 `<blockquote>` tags) and grepped
 the whole file for any other `^>` line (none found). Fixed on the first
 attempt.
 
-Verification (all raw output in `reports/evidence/T-18-verification.txt`):
+Verification (all raw output in `governance/evidence/T-18-verification.txt`):
   - All 4 traceability-table test names confirmed present in
     `tests/test_routing.py` (T-08, frozen - re-verified zero-diff
     against commit `a573663`).
@@ -831,7 +831,7 @@ Verification (all raw output in `reports/evidence/T-18-verification.txt`):
     locally) both before and after the D-12 fix - the actual proof this
     task's DoD ("table rendering on GitHub") requires.
 
-Evidence: reports/evidence/T-18-verification.txt.
+Evidence: governance/evidence/T-18-verification.txt.
 
 ### [2026-08-20 03:41 IST] [T-17] [autonomous overnight batch - delivery engineer]
 
@@ -862,7 +862,7 @@ No frozen weights/thresholds/floors/fail-closed direction touched -
 `cli.py` is a pure HTTP client, imports nothing from `app.risk.*`.
 `tests/test_routing.py` (T-08) not touched.
 
-Evidence: reports/evidence/T-17-cli-session.txt.
+Evidence: governance/evidence/T-17-cli-session.txt.
 
 ### [2026-08-20 03:44 IST] [T-18a] [autonomous overnight batch - delivery engineer]
 
@@ -898,13 +898,13 @@ elements).
 No code changed. `tests/test_routing.py` (T-08) untouched. No frozen
 weights/thresholds/floors/fail-closed direction modified.
 
-Evidence: reports/evidence/T-18a-verification.txt.
+Evidence: governance/evidence/T-18a-verification.txt.
 
 ### [2026-08-20 03:46 IST] [G3] [autonomous overnight batch - delivery engineer]
 
 Report-only gate check, no code/config changes. Gate condition (task
 board/prompt pack): "Live URL + green suite + README". Noted a naming
-collision: `reports/00-project-charter.md`'s own Gate-schedule table
+collision: `governance/charter.md`'s own Gate-schedule table
 also has a row labeled "G3" with a different, already-satisfied
 condition ("API + audit log wired end-to-end") - evaluated the task-
 board/prompt-pack G3 per this batch's explicit instruction, not the
@@ -915,7 +915,7 @@ evidence): live `/livez` check (200), latest GitHub Actions run
 confirmed at the exact current HEAD commit (`430fab6`, 115/115 passed),
 README's 12 sections + 4-row traceability table confirmed present.
 
-**G3: PASS.** Full report: `reports/gates/G3-report.md`. T-15 (AWS)
+**G3: PASS.** Full report: `governance/gates/G3-report.md`. T-15 (AWS)
 remains Not started - out of scope for this batch, not required by
 G3's own condition. Continuing to T-19 per the batch's instruction.
 
@@ -968,7 +968,7 @@ DoD ("50 requests, 0 failures, p95, matching audit rows") only requires
 recording p95, not a specific bound - reporting this transparently
 rather than characterizing it as fast.
 
-Evidence: reports/evidence/T-19-concurrency.txt.
+Evidence: governance/evidence/T-19-concurrency.txt.
 
 ### [2026-08-20 10:02 IST] [Item 0 - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
 
@@ -986,13 +986,13 @@ the source's own blockquote-as-paste-target convention to plain README
 prose - not literal `>` blockquote markup, to avoid reintroducing D-12's
 line-wrap blockquote bug (checked: 0 lines start with `>` after the
 edit). The video line (lines 56-60) went into a new
-`reports/video-script.md`, since no video-script file/convention
+`governance/video-script.md`, since no video-script file/convention
 existed yet in this project.
 
 Zero code changed - `git diff --name-only` shows only `README.md`;
 `app/risk/` and `tests/test_routing.py` (T-08) confirmed zero-diff.
 
-Evidence: reports/evidence/Item0-verification.txt.
+Evidence: governance/evidence/Item0-verification.txt.
 
 ### [2026-08-20 10:09 IST] [Feature A - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
 
@@ -1058,7 +1058,7 @@ action, `oldest_pending_age_seconds` correctly populated.
 No defects found this task - first-attempt implementation, all tests
 green on first run.
 
-Evidence: reports/evidence/FeatureA-verification.txt.
+Evidence: governance/evidence/FeatureA-verification.txt.
 
 ### [2026-08-20 12:31 IST] [Feature B - novelty add-on] [autonomous pre-video batch - delivery engineer] [branch: feature/novelty-addons]
 
@@ -1139,7 +1139,7 @@ green on all 4 required tests and the full suite.
 Elapsed: ~12 minutes (started ~12:19 IST after switching from the
 blocked AWS task, well under the 50-minute box).
 
-Evidence: reports/evidence/FeatureB-verification.txt.
+Evidence: governance/evidence/FeatureB-verification.txt.
 
 ### [2026-08-20 13:08 IST] [Merge to master + redeploy] [delivery engineer]
 
@@ -1191,7 +1191,7 @@ order. Followed that order exactly; no step was skipped or reordered.
    merge/deploy/seed/gate-check work.
 9. **Tagged and pushed `submission-v2`** ("Item 0 + Feature A + Feature
    B") on the merge commit.
-10. Updated `reports/00-project-charter.md` with a new "Submission
+10. Updated `governance/charter.md` with a new "Submission
     tags" section recording both tags and the rollback command.
 
 No step in this sequence hit red - every gate passed on the first
@@ -1248,10 +1248,10 @@ without me mistaking it for a bug (verified against raw `GET
 block was legitimately empty against that pre-deploy backend, since the
 old schema doesn't carry the new fields yet - correct degrade-clean
 behavior, not a defect.
-Evidence: `reports/evidence/OD-1-full-suite.txt`,
-`reports/evidence/OD-1-test-routing-diff.txt` (empty file = proof),
-`reports/evidence/OD-1-raw-autonomous-case.json`,
-`reports/evidence/OD-1-cli-autonomous.txt`.
+Evidence: `governance/evidence/OD-1-full-suite.txt`,
+`governance/evidence/OD-1-test-routing-diff.txt` (empty file = proof),
+`governance/evidence/OD-1-raw-autonomous-case.json`,
+`governance/evidence/OD-1-cli-autonomous.txt`.
 
 ### [2026-08-20 13:50 IST] [OD-1] [delivery engineer]
 Action: Committed (`fddaec7`) and pushed to `origin/master`, which
@@ -1276,10 +1276,10 @@ FULL_REVIEW case verified byte-for-byte free of ANSI escape codes
 (checked programmatically, not by eye) and remained fully readable.
 Full suite re-run green after all live calls (125 passed, 6 skipped,
 same as before deploy - the deploy didn't regress anything).
-Evidence: `reports/evidence/OD-1-raw-{autonomous,confirm,full-review}-case.json`,
-`reports/evidence/OD-1-cli-{autonomous,confirm,full-review}.txt`,
-`reports/evidence/OD-1-cli-no-color.txt`,
-`reports/evidence/OD-1-numerical-reconciliation.txt`.
+Evidence: `governance/evidence/OD-1-raw-{autonomous,confirm,full-review}-case.json`,
+`governance/evidence/OD-1-cli-{autonomous,confirm,full-review}.txt`,
+`governance/evidence/OD-1-cli-no-color.txt`,
+`governance/evidence/OD-1-numerical-reconciliation.txt`.
 Commit: `fddaec7`. `git log --oneline -1 origin/master` == `fddaec7`
 after push (HEAD == origin/master).
 
@@ -1342,7 +1342,7 @@ omits `calibration` entirely. H) a 4th action_type ("send") seeded with
 6 clean confirmations produced a real -0.10 adjustment in shadow mode
 (still applied=False). I) GET /v1/calibration returns per-action_type
 counts/adjustment/sample_size/has_min_evidence + current mode.
-Evidence: `reports/evidence/bonus-calibration/A-full-suite.txt`,
+Evidence: `governance/evidence/bonus-calibration/A-full-suite.txt`,
 `B-D-safety-checks.txt`, `EFGHI-verification.txt`,
 `EFGHI-verification.json`.
 Not pushed, not deployed, per explicit instruction.
@@ -1363,7 +1363,7 @@ Verified live, not just "State: Active": `GET /livez` -> 200
 read-only scenario via `cli.py` (same inputs as `demo.sh read`) against
 the Function URL -> AUTONOMOUS, composite 0.098 - confirms the actual
 governance logic works end-to-end on Lambda, not only the health
-endpoints. Evidence: `reports/evidence/T-15-curl.txt`.
+endpoints. Evidence: `governance/evidence/T-15-curl.txt`.
 
 **Security incident (mid-task)**: `aws lambda get-function
 --function-name ps91-t15` was run to inspect the function's config and
@@ -1380,7 +1380,7 @@ used instead, neither of which return secrets.
 Synced documentation to match verified reality (this was previously
 inconsistent - the repo said "AWS is not deployed" while AWS was
 actually live): `README.md` (Live URLs section + L-E),
-`progress-log/03-errors-and-fixes.md` (L-E), `progress-log/01-implementation-plan.md`
+`governance/plan/03-errors-and-fixes.md` (L-E), `governance/plan/01-implementation-plan.md`
 (T-15 status Not started -> Done). Not yet committed - append-to-log-
 before-commit (L-6) done first, per this project's own operating
 contract.

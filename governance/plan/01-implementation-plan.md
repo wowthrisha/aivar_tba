@@ -1,7 +1,7 @@
 # Implementation Plan — Task Board
 
 Status reflects only what is documented with evidence in
-`progress-log/02-action-log.md` for that exact task ID — not inferred from
+`governance/plan/02-action-log.md` for that exact task ID — not inferred from
 incidental state. Rows with no such log entry are `Not started`.
 
 ## BLOCK 0 — Foundation
@@ -29,7 +29,7 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-09a | Two-signal confidence | test: high self-report + low completeness = low | 20m | Done |
 
 >>> **GATE G1**: four criterion tests green, NO framework, NO database —
-    **PASS** (see reports/gates/G1-report.md, reports/blocks/block-1-report.md)
+    **PASS** (see governance/gates/G1-report.md, governance/blocks/block-1-report.md)
 
 ## BLOCK 2 — Service
 
@@ -41,7 +41,7 @@ incidental state. Rows with no such log entry are `Not started`.
 | T-13 | Adversarial review (fresh session) | findings pasted with my decision on each | 30m | Done |
 
 >>> **GATE G2**: full suite green locally, state machine proven by curl —
-    **PASS** (see reports/gates/G2-report.md, reports/blocks/block-2-report.md)
+    **PASS** (see governance/gates/G2-report.md, governance/blocks/block-2-report.md)
 
 ## BLOCK 3 — Deploy and polish
 

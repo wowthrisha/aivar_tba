@@ -1,19 +1,19 @@
 # Block 1 Report — 2026-08-19
 
 Risk engine. All seven tasks done, Gate G1 passed (see
-`reports/gates/G1-report.md`).
+`governance/gates/G1-report.md`).
 
 ## Tasks
 
 | ID | Status | Evidence file | Box | Actual |
 |---|---|---|---|---|
-| T-06 | Done | reports/evidence/T-06-pytest.txt | 2h | ~3m (commit-to-commit) |
-| T-06a | Done | reports/evidence/T-06a-pytest.txt | 15m | ~2m |
-| T-07 | Done | reports/evidence/T-07-pytest.txt | 45m | ~2m |
-| T-07a | Done | reports/evidence/T-07a-pytest.txt | 10m | ~1m |
-| T-08 | Done | reports/evidence/T-08-pytest.txt | 45m | ~2m |
-| T-09 | Done | reports/evidence/T-09-pytest.txt | 45m | ~5m |
-| T-09a | Done | reports/evidence/T-09a-pytest.txt | 20m | ~2m |
+| T-06 | Done | governance/evidence/T-06-pytest.txt | 2h | ~3m (commit-to-commit) |
+| T-06a | Done | governance/evidence/T-06a-pytest.txt | 15m | ~2m |
+| T-07 | Done | governance/evidence/T-07-pytest.txt | 45m | ~2m |
+| T-07a | Done | governance/evidence/T-07a-pytest.txt | 10m | ~1m |
+| T-08 | Done | governance/evidence/T-08-pytest.txt | 45m | ~2m |
+| T-09 | Done | governance/evidence/T-09-pytest.txt | 45m | ~5m |
+| T-09a | Done | governance/evidence/T-09a-pytest.txt | 20m | ~2m |
 
 "Actual" is commit-timestamp spacing (git log), not human-equivalent
 effort — AI-paced sequential execution, not a claim the boxes are wrong

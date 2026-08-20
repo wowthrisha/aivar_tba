@@ -1,10 +1,10 @@
 # Gate G3 Report — 2026-08-20
 
 Gate condition (task board / prompt pack, `PS-9-1-Prompt-Pack-v1.0.md:175`,
-`progress-log/01-implementation-plan.md:57`): **SCOPE FREEZE. Live URL +
+`governance/plan/01-implementation-plan.md:57`): **SCOPE FREEZE. Live URL +
 green suite + README.**
 
-Note: `reports/00-project-charter.md:31` also lists a gate labeled "G3"
+Note: `governance/charter.md:31` also lists a gate labeled "G3"
 with a different condition ("API + audit log wired end-to-end") — that
 is the charter's separate Gate-schedule numbering (already satisfied
 back in the T-10/T-12 era) and is **not** the gate being evaluated here.
@@ -15,22 +15,22 @@ condition given for this batch.
 
 | ID | Status | Evidence file | Box | Notes |
 |---|---|---|---|---|
-| T-14 | Done | reports/evidence/T-14-curl.txt | 1h | Railway deploy + CI |
+| T-14 | Done | governance/evidence/T-14-curl.txt | 1h | Railway deploy + CI |
 | T-15 | Not started | — | 2h | AWS deploy — explicitly out of scope for this batch (global rule: "Do not start T-15 AWS"). G3's condition does not require it — "Live URL" is satisfied by Railway alone, per the gate's own wording. |
-| T-16 | Done | reports/evidence/T-16-pytest.txt, T-16-raw-demo.txt | 45m | Observability |
-| T-17 | Done | reports/evidence/T-17-cli-session.txt | 45m | CLI |
-| T-18 | Done | reports/evidence/T-18-verification.txt | 45m | README + traceability table |
-| T-18a | Done | reports/evidence/T-18a-verification.txt | 15m | DMAIC/versioning/fuzzy-rejection sections |
+| T-16 | Done | governance/evidence/T-16-pytest.txt, T-16-raw-demo.txt | 45m | Observability |
+| T-17 | Done | governance/evidence/T-17-cli-session.txt | 45m | CLI |
+| T-18 | Done | governance/evidence/T-18-verification.txt | 45m | README + traceability table |
+| T-18a | Done | governance/evidence/T-18a-verification.txt | 15m | DMAIC/versioning/fuzzy-rejection sections |
 
 ## 2. Evidence file check
 
 ```
-OK   reports/evidence/T-14-curl.txt (87 lines)
-OK   reports/evidence/T-16-pytest.txt (43 lines)
-OK   reports/evidence/T-16-raw-demo.txt (17 lines)
-OK   reports/evidence/T-17-cli-session.txt (11 lines)
-OK   reports/evidence/T-18-verification.txt (113 lines)
-OK   reports/evidence/T-18a-verification.txt (22 lines)
+OK   governance/evidence/T-14-curl.txt (87 lines)
+OK   governance/evidence/T-16-pytest.txt (43 lines)
+OK   governance/evidence/T-16-raw-demo.txt (17 lines)
+OK   governance/evidence/T-17-cli-session.txt (11 lines)
+OK   governance/evidence/T-18-verification.txt (113 lines)
+OK   governance/evidence/T-18a-verification.txt (22 lines)
 ```
 
 No task marked Done has a missing or empty evidence file.
@@ -82,7 +82,7 @@ $ grep -n "^## " README.md
 348:## 12. Fuzzy rejection
 ```
 Traceability table: 4 data rows present (confirmed in
-`reports/evidence/T-18-verification.txt`'s GitHub-rendered-HTML check).
+`governance/evidence/T-18-verification.txt`'s GitHub-rendered-HTML check).
 
 **PASS.**
 

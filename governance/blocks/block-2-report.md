@@ -1,7 +1,7 @@
 # Block 2 Report — 2026-08-20
 
 Service (API, persistence, security controls, adversarial review). All
-four tasks done, Gate G2 passed (see `reports/gates/G2-report.md`).
+four tasks done, Gate G2 passed (see `governance/gates/G2-report.md`).
 
 ## Tasks
 
@@ -12,7 +12,7 @@ four tasks done, Gate G2 passed (see `reports/gates/G2-report.md`).
 | T-12 | Done | T-12-pytest.txt, T-12-full-suite.txt | 1h | ~6m |
 | T-13 | Done | T-13-adversarial-review.txt, T-13-fixes-pytest.txt, T-13-fixes-full-suite.txt, T-13-adversarial-cases-rerun.txt | 30m | ~56m |
 
-All paths relative to `reports/evidence/`. "Actual" is commit-timestamp
+All paths relative to `governance/evidence/`. "Actual" is commit-timestamp
 spacing, AI-paced, not human-equivalent effort.
 
 ## DoD verification
@@ -71,7 +71,7 @@ spacing, AI-paced, not human-equivalent effort.
 | D-04 | S-5 tamper test passed in isolation, failed in the full suite | Indexed into a session-shared `_audit` singleton; tampered a no-op value | Test now uses an isolated `AuditLog` instance | Fixed |
 | D-05 | T-13 fix regression test failed: `0.38 != 0.28` | Test used `llm_confidence=0.0` instead of `1.0`, not matching the reviewed case | Corrected the test input | Fixed |
 
-Full detail for each in `progress-log/03-errors-and-fixes.md`.
+Full detail for each in `governance/plan/03-errors-and-fixes.md`.
 
 ## Cut / deferred
 
@@ -95,7 +95,7 @@ Full detail for each in `progress-log/03-errors-and-fixes.md`.
   is correct per T-09's spec; flagged as a design question for a future
   task rather than fixed now.
 
-All items above are also recorded in `progress-log/03-errors-and-fixes.md`'s
+All items above are also recorded in `governance/plan/03-errors-and-fixes.md`'s
 LEFT OUT section.
 
 ## RAG: **GREEN**

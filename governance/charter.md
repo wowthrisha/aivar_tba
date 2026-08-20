@@ -33,7 +33,7 @@ Deadline: 20 Aug 2026, 17:00 IST. Target submission: 13:00 IST.
 | G5 | Final submission | 2026-08-20 13:00 IST |
 
 Gate dates beyond G0 depend on the task list to be provided next
-(`progress-log/01-implementation-plan.md`).
+(`governance/plan/01-implementation-plan.md`).
 
 ## Live deployment (G4, T-14)
 
@@ -41,8 +41,8 @@ Gate dates beyond G0 depend on the task list to be provided next
 - **Platform**: Railway (ECS Express Mode successor product; App Runner
   is closed to new customers, per the known constraints)
 - Curl-verified against all three routing tiers plus `/livez` and
-  `/v1/audit` — see `progress-log/02-action-log.md` (T-14 entry) and
-  `reports/evidence/T-14-curl.txt` for full raw evidence.
+  `/v1/audit` — see `governance/plan/02-action-log.md` (T-14 entry) and
+  `governance/evidence/T-14-curl.txt` for full raw evidence.
 - CI: GitHub Actions runs the full test suite on every push —
   https://github.com/wowthrisha/aivar_tba/actions/runs/32303917004
 
@@ -57,5 +57,5 @@ Gate dates beyond G0 depend on the task list to be provided next
   check (all three original criterion actions still route correctly,
   none escalated by the new novelty floor) and a deliberate novelty
   firing are both verified against this live deployment — see
-  `progress-log/02-action-log.md` for the full record.
+  `governance/plan/02-action-log.md` for the full record.
 - Rollback path if needed: `git reset --hard submission-v1`.

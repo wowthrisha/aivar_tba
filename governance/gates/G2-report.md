@@ -6,11 +6,11 @@ Gate condition (task board): **full suite green locally, state machine proven by
 
 | ID | Status | Evidence file | Box | Actual (commit span) |
 |---|---|---|---|---|
-| T-10 | Done | reports/evidence/T-10-pytest.txt, T-10-curl.txt | 1h | ~40m (incl. mid-task T-09 fix) |
-| (fix) | Done | reports/evidence/T-09-fix-live-verification.txt | — | — |
-| T-11 | Done | reports/evidence/T-11-verification.txt, T-11-pytest.txt | 1h | ~11m |
-| T-12 | Done | reports/evidence/T-12-pytest.txt, T-12-full-suite.txt | 1h | ~6m |
-| T-13 | Done | reports/evidence/T-13-adversarial-review.txt, T-13-fixes-pytest.txt, T-13-fixes-full-suite.txt, T-13-adversarial-cases-rerun.txt | 30m | ~56m (incl. review round-trip + 3 approved fixes) |
+| T-10 | Done | governance/evidence/T-10-pytest.txt, T-10-curl.txt | 1h | ~40m (incl. mid-task T-09 fix) |
+| (fix) | Done | governance/evidence/T-09-fix-live-verification.txt | — | — |
+| T-11 | Done | governance/evidence/T-11-verification.txt, T-11-pytest.txt | 1h | ~11m |
+| T-12 | Done | governance/evidence/T-12-pytest.txt, T-12-full-suite.txt | 1h | ~6m |
+| T-13 | Done | governance/evidence/T-13-adversarial-review.txt, T-13-fixes-pytest.txt, T-13-fixes-full-suite.txt, T-13-adversarial-cases-rerun.txt | 30m | ~56m (incl. review round-trip + 3 approved fixes) |
 
 ## 2. Evidence file check
 
@@ -19,17 +19,17 @@ report (see command output pasted in the T-13 close-out and reproduced
 here):
 
 ```
-OK   reports/evidence/T-10-pytest.txt (96 lines)
-OK   reports/evidence/T-10-curl.txt (238 lines)
-OK   reports/evidence/T-09-fix-live-verification.txt (29 lines)
-OK   reports/evidence/T-11-verification.txt (23 lines)
-OK   reports/evidence/T-11-pytest.txt (96 lines)
-OK   reports/evidence/T-12-pytest.txt (23 lines)
-OK   reports/evidence/T-12-full-suite.txt (104 lines)
-OK   reports/evidence/T-13-adversarial-review.txt (129 lines)
-OK   reports/evidence/T-13-fixes-pytest.txt (32 lines)
-OK   reports/evidence/T-13-fixes-full-suite.txt (121 lines)
-OK   reports/evidence/T-13-adversarial-cases-rerun.txt (52 lines)
+OK   governance/evidence/T-10-pytest.txt (96 lines)
+OK   governance/evidence/T-10-curl.txt (238 lines)
+OK   governance/evidence/T-09-fix-live-verification.txt (29 lines)
+OK   governance/evidence/T-11-verification.txt (23 lines)
+OK   governance/evidence/T-11-pytest.txt (96 lines)
+OK   governance/evidence/T-12-pytest.txt (23 lines)
+OK   governance/evidence/T-12-full-suite.txt (104 lines)
+OK   governance/evidence/T-13-adversarial-review.txt (129 lines)
+OK   governance/evidence/T-13-fixes-pytest.txt (32 lines)
+OK   governance/evidence/T-13-fixes-full-suite.txt (121 lines)
+OK   governance/evidence/T-13-adversarial-cases-rerun.txt (52 lines)
 ```
 
 No task marked DONE has a missing or empty evidence file.
@@ -44,7 +44,7 @@ No task marked DONE has a missing or empty evidence file.
 
 **State machine proven by curl** — full live walkthrough against a local
 uvicorn instance (`app/main.py`, current code including all T-13 fixes),
-saved in full to `reports/evidence/G2-state-machine-curl.txt`:
+saved in full to `governance/evidence/G2-state-machine-curl.txt`:
 
 - `PROPOSED -> EVALUATED -> AUTONOMOUS -> EXECUTED` (read action): evaluate
   201 (`state: autonomous`), execute 200 (`state: executed`).

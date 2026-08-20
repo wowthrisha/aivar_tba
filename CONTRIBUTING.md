@@ -10,7 +10,7 @@ pytest -q
 No live services are required — `tests/` uses fakes/in-memory doubles
 for the LLM provider, embedding provider, and database. A handful of
 `tests/test_db_store.py` tests do hit a real Postgres instance and are
-function-scoped (see `progress-log/03-errors-and-fixes.md`, D-08).
+function-scoped (see `governance/plan/03-errors-and-fixes.md`, D-08).
 
 ## Definition of Done
 
@@ -18,7 +18,7 @@ Per task, per `CLAUDE.md`'s operating contract:
 
 - Tests pass before the task is marked done; a green build log alone is
   never treated as proof — a pasted command/curl artifact goes in
-  `progress-log/02-action-log.md` and/or `reports/evidence/`.
+  `governance/plan/02-action-log.md` and/or `governance/evidence/`.
 - The four criterion tests in `tests/test_routing.py` are READ-ONLY —
   never edited to make a change pass.
 - The FROZEN list in `CLAUDE.md` (risk weights, thresholds, floor
@@ -30,7 +30,10 @@ Per task, per `CLAUDE.md`'s operating contract:
 
 ## Where things go
 
-- `progress-log/` — task board, append-only action log, defect register.
-- `reports/` — gate reports, block reports, raw evidence.
+- `governance/` — plan, gates, blocks, evidence, charter, video script. See
+  `governance/README.md`.
+- `governance/plan/` — task board, append-only action log, defect register.
+- `governance/gates/`, `governance/blocks/` — gate and block reports.
+- `governance/evidence/` — raw command/curl/pytest output.
 - `app/risk/` — the pure scoring/floor/tier logic; no I/O.
 - `app/main.py` — the FastAPI handlers wiring everything together.

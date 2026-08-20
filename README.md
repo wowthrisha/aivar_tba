@@ -25,7 +25,7 @@ log with a plain-English explanation of why that tier was chosen.
 Both deployments run the same commit (`2a60896`) and share the same
 Neon database — curl-verified together, side by side, after a
 credential rotation on both sides; see
-`reports/evidence/deployment-sync-verified.txt` for the full output and
+`governance/evidence/deployment-sync-verified.txt` for the full output and
 parity table.
 
 - **Railway (production)**: https://aivartba-production.up.railway.app
@@ -36,7 +36,7 @@ parity table.
   — curl-verified against the same three tiers, `/livez`, `/readyz`, and
   `/v1/audit/verify`. Deploy path: `infra/aws/deploy-lambda.sh` builds
   from a throwaway sibling clone (`../gae-aws`) and pushes to ECR; see
-  D-21–D-23 in `progress-log/03-errors-and-fixes.md` for real failure
+  D-21–D-23 in `governance/plan/03-errors-and-fixes.md` for real failure
   modes hit getting this working (image manifest format, updates that
   silently didn't apply, IAM permissions that covered creation but not
   later operations). App Runner was never an option — closed to new
@@ -170,7 +170,7 @@ signal.
 
 Floors (`app/risk/floors.py`) are checked *after* the weighted score and
 can only escalate a tier, never lower one — proven by the escalate-only
-sweep (T-07). Real, live example (`reports/evidence/OD-1-raw-full-review-case.json`):
+sweep (T-07). Real, live example (`governance/evidence/OD-1-raw-full-review-case.json`):
 
 ```
 REQUEST:  {"action_type":"delete","reversibility":"irreversible",
@@ -268,17 +268,17 @@ Project) — several `ASI` categories map to specific controls here:
 
 **Method**: Kanban, WIP limit 1 (one task in progress at a time, per
 `CLAUDE.md`'s operating contract), a Definition of Done per task, and
-six gates (G0–G5) — see `reports/gates/`.
+six gates (G0–G5) — see `governance/gates/`.
 
-- `progress-log/01-implementation-plan.md` — task board and status.
-- `progress-log/02-action-log.md` — append-only record of what was done
+- `governance/plan/01-implementation-plan.md` — task board and status.
+- `governance/plan/02-action-log.md` — append-only record of what was done
   and why, per task.
-- `progress-log/03-errors-and-fixes.md` — defect register plus the
+- `governance/plan/03-errors-and-fixes.md` — defect register plus the
   `LEFT OUT` section (scope explicitly cut or deferred).
-- `reports/00-project-charter.md` — scope, frozen list, gate schedule.
-- `reports/gates/`, `reports/blocks/` — gate and block reports; each one
+- `governance/charter.md` — scope, frozen list, gate schedule.
+- `governance/gates/`, `governance/blocks/` — gate and block reports; each one
   records its own branch and commit (see L-J below — why that matters).
-- `reports/evidence/` — raw command/curl/pytest output backing every
+- `governance/evidence/` — raw command/curl/pytest output backing every
   DoD claim in the action log.
 
 **Evidence discipline**: no task in the action log is marked done
@@ -298,15 +298,15 @@ it — see the commit that added this table for the full command log):
 | Commits | 49 | `git rev-list --all --count` |
 | First commit | 2026-08-19 18:39:53 +0530 | `git log --reverse --format="%ci" \| head -1` |
 | Latest commit | 2026-08-20 16:22:15 +0530 | `git log -1 --format="%ci"` |
-| Defects logged | 14 (D-01–D-14) | `grep -cE "^\| D-[0-9]+" progress-log/03-errors-and-fixes.md` |
-| LEFT OUT entries | 23 | counted directly in `progress-log/03-errors-and-fixes.md`'s `## LEFT OUT` section |
-| Evidence files | 61 | `find reports/evidence -type f \| wc -l` |
-| Live concurrency p95 (T-19, 50 concurrent requests) | 29,796 ms – 29,796.1 ms across two runs | read from `reports/evidence/T-19-concurrency.txt`, not re-run |
+| Defects logged | 14 (D-01–D-14) | `grep -cE "^\| D-[0-9]+" governance/plan/03-errors-and-fixes.md` |
+| LEFT OUT entries | 23 | counted directly in `governance/plan/03-errors-and-fixes.md`'s `## LEFT OUT` section |
+| Evidence files | 61 | `find governance/evidence -type f \| wc -l` |
+| Live concurrency p95 (T-19, 50 concurrent requests) | 29,796 ms – 29,796.1 ms across two runs | read from `governance/evidence/T-19-concurrency.txt`, not re-run |
 | Coverage | not measured | `pytest --cov` is not a registered pytest option in this environment despite `pytest-cov` being importable — not installed/fixed to avoid a scope-creep environment change |
 
 ## 9. Known limitations and next steps
 
-(from `progress-log/03-errors-and-fixes.md`'s `LEFT OUT` section, verbatim)
+(from `governance/plan/03-errors-and-fixes.md`'s `LEFT OUT` section, verbatim)
 
 - No application logic in T-04 (scaffold only, per task spec).
 - `requirements.txt` dependency versions left unpinned — pinning exact
@@ -368,7 +368,7 @@ it — see the commit that added this table for the full command log):
   review found the composite score is brittle near both frozen
   thresholds: a 0.006 change in `llm_confidence` (0.505→0.499) flips
   CONFIRM↔FULL_REVIEW at 0.65; a 0.01 change flips CONFIRM↔AUTONOMOUS at
-  0.30 (see reports/evidence/T-13-adversarial-review.txt for the exact
+  0.30 (see governance/evidence/T-13-adversarial-review.txt for the exact
   inputs). Rationale: the two thresholds (0.30, 0.65) are FROZEN — the
   product owner has to defend each on camera and chose not to add
   calibration/smoothing logic under deadline pressure. This is a known,
@@ -421,7 +421,7 @@ it — see the commit that added this table for the full command log):
   sync with Railway. Both deployments run the same commit and share the
   same Neon database, credential rotation applied to both, all three
   canonical scenarios curl-verified with matching tiers on each
-  (`reports/evidence/deployment-sync-verified.txt`). Railway remains the
+  (`governance/evidence/deployment-sync-verified.txt`). Railway remains the
   deployment of record for the original submission; AWS is a second,
   independently verified live deployment. App Runner was never an
   option — closed to new customers since 30 Apr 2026. Getting the Lambda
@@ -472,13 +472,13 @@ artifacts — it isn't a new process being introduced.
 - **Measure** — `tests/test_scoring.py` (dimension bands),
   `tests/test_tiers.py` (boundary-band sweep, T-07a),
   `tests/test_floors.py` (escalate-only invariant, T-07), and live curl
-  verification against the deployed URL (`reports/evidence/`) — a green
+  verification against the deployed URL (`governance/evidence/`) — a green
   build log alone is never treated as proof.
 - **Analyze** — a fresh-session adversarial review (T-13,
-  `reports/evidence/T-13-adversarial-review.txt`) found and classified
+  `governance/evidence/T-13-adversarial-review.txt`) found and classified
   real findings, including boundary brittleness (Finding 3) and
   prompt-injection surface (Finding 4a). The defect register
-  (`progress-log/03-errors-and-fixes.md`, D-01–D-14) records every other
+  (`governance/plan/03-errors-and-fixes.md`, D-01–D-14) records every other
   defect's root cause the same way.
 - **Improve** — fixes approved only where they didn't touch the frozen
   list: broadening the `regulated_mutation` floor to cover `PII_GDPR`
@@ -503,8 +503,8 @@ artifacts — it isn't a new process being introduced.
   breaking request/response-shape change would ship under `/v2/`, not
   mutate `/v1/` in place.
 - **Change history** — standard git history, plus the append-only
-  `progress-log/02-action-log.md` and
-  `progress-log/03-errors-and-fixes.md` as a human-readable record of
+  `governance/plan/02-action-log.md` and
+  `governance/plan/03-errors-and-fixes.md` as a human-readable record of
   *why* each change happened, not just *what* changed.
 
 ## 12. Fuzzy rejection
@@ -524,7 +524,7 @@ fresh-session adversarial review (T-13 Finding 3) found the composite
 score is brittle right at both threshold boundaries — a 0.006 change in
 `llm_confidence` can flip CONFIRM↔FULL_REVIEW, and a 0.01 change can
 flip CONFIRM↔AUTONOMOUS
-(`reports/evidence/T-13-adversarial-review.txt`). A fuzzy-rejection
+(`governance/evidence/T-13-adversarial-review.txt`). A fuzzy-rejection
 scheme — e.g. treating scores within some margin of a threshold as
 their own "needs a second opinion" state, or blending tiers by
 confidence — would reduce that brittleness, but was deliberately not

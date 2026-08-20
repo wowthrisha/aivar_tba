@@ -6,13 +6,13 @@ Gate condition (task board): **four criterion tests green, NO framework, NO data
 
 | ID | Status | Evidence file | Box | Actual (commit span) |
 |---|---|---|---|---|
-| T-06 | Done | reports/evidence/T-06-pytest.txt | 2h | — (see block report) |
-| T-06a | Done | reports/evidence/T-06a-pytest.txt | 15m | — |
-| T-07 | Done | reports/evidence/T-07-pytest.txt | 45m | — |
-| T-07a | Done | reports/evidence/T-07a-pytest.txt | 10m | — |
-| T-08 | Done | reports/evidence/T-08-pytest.txt | 45m | — |
-| T-09 | Done | reports/evidence/T-09-pytest.txt | 45m | — |
-| T-09a | Done | reports/evidence/T-09a-pytest.txt | 20m | — |
+| T-06 | Done | governance/evidence/T-06-pytest.txt | 2h | — (see block report) |
+| T-06a | Done | governance/evidence/T-06a-pytest.txt | 15m | — |
+| T-07 | Done | governance/evidence/T-07-pytest.txt | 45m | — |
+| T-07a | Done | governance/evidence/T-07a-pytest.txt | 10m | — |
+| T-08 | Done | governance/evidence/T-08-pytest.txt | 45m | — |
+| T-09 | Done | governance/evidence/T-09-pytest.txt | 45m | — |
+| T-09a | Done | governance/evidence/T-09a-pytest.txt | 20m | — |
 
 ## 2. Evidence file check
 
@@ -20,13 +20,13 @@ All seven evidence files verified present and non-empty immediately before
 writing this report:
 
 ```
-OK   reports/evidence/T-06-pytest.txt (15 lines)
-OK   reports/evidence/T-06a-pytest.txt (15 lines)
-OK   reports/evidence/T-07-pytest.txt (17 lines)
-OK   reports/evidence/T-07a-pytest.txt (18 lines)
-OK   reports/evidence/T-08-pytest.txt (67 lines)
-OK   reports/evidence/T-09-pytest.txt (72 lines)
-OK   reports/evidence/T-09a-pytest.txt (78 lines)
+OK   governance/evidence/T-06-pytest.txt (15 lines)
+OK   governance/evidence/T-06a-pytest.txt (15 lines)
+OK   governance/evidence/T-07-pytest.txt (17 lines)
+OK   governance/evidence/T-07a-pytest.txt (18 lines)
+OK   governance/evidence/T-08-pytest.txt (67 lines)
+OK   governance/evidence/T-09-pytest.txt (72 lines)
+OK   governance/evidence/T-09a-pytest.txt (78 lines)
 ```
 
 No task marked DONE has a missing or empty evidence file.

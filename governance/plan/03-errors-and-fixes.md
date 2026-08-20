@@ -77,7 +77,7 @@ what was not done, never substitute silently.
   ECR repository, `linux/amd64` image, IAM execution role and policy,
   Lambda function (`ps91-t15`), and its Function URL are all live and
   curl-verified — `/livez`, `/readyz`, and a full read-only
-  `POST /v1/actions/evaluate` round-trip (`reports/evidence/T-15-curl.txt`).
+  `POST /v1/actions/evaluate` round-trip (`governance/evidence/T-15-curl.txt`).
   Railway (`https://aivartba-production.up.railway.app`) remains the
   deployed environment of record for the original submission; AWS is
   now a second, independently working deployment. AWS App Runner was
@@ -193,7 +193,7 @@ what was not done, never substitute silently.
   review found the composite score is brittle near both frozen
   thresholds: a 0.006 change in `llm_confidence` (0.505→0.499) flips
   CONFIRM↔FULL_REVIEW at 0.65; a 0.01 change flips CONFIRM↔AUTONOMOUS at
-  0.30 (see reports/evidence/T-13-adversarial-review.txt for the exact
+  0.30 (see governance/evidence/T-13-adversarial-review.txt for the exact
   inputs). Rationale: the two thresholds (0.30, 0.65) are FROZEN — the
   product owner has to defend each on camera and chose not to add
   calibration/smoothing logic under deadline pressure. This is a known,

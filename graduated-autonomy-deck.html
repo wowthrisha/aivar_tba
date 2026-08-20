@@ -432,12 +432,12 @@ const slideTitles = [
 ];
 
 const notes = [
-"AI agents now take real actions — updates, deletes, calls to other systems. Full autonomy under-oversees the consequential ones; full gating bottlenecks the trivial ones. The right question isn't autonomous-or-not — it's how much oversight each action deserves. (Problem framing: reports/00-project-charter.md:5-8, README.md:16-21.)",
+"AI agents now take real actions — updates, deletes, calls to other systems. Full autonomy under-oversees the consequential ones; full gating bottlenecks the trivial ones. The right question isn't autonomous-or-not — it's how much oversight each action deserves. (Problem framing: governance/charter.md:5-8, README.md:16-21.)",
 "Prior work sits at the extremes, or gates on fixed, predefined rules. NIST's AI Risk Management Framework calls for human oversight but leaves the mechanism open, and the signal you'd calibrate oversight to — model confidence — is itself known to be poorly calibrated. That's the open gap: proportional oversight.",
 "Every proposed action gets a weighted composite across four dimensions — reversibility weighted highest at 0.40, verified in app/risk/scorer.py:50-56. Two thresholds (0.30 / 0.65, app/risk/tiers.py:10-11) route it to autonomous, confirm, or full review. Deterministic safety floors sit above that score and can only escalate the tier — proven by an assert in app/risk/floors.py:97-100. Adaptive calibration runs in shadow mode: bounded ±0.10, minimum 5 decisions, audited, never applied to routing in this deployment (app/calibration.py:1-33; README L-C).",
 "It's a FastAPI service (10 endpoints, app/main.py) backed by Postgres. Each /v1/actions/evaluate call scores the action, calls a pinned OpenAI model (gpt-5.6-luna, live-verified T-03) for one confidence signal, applies the floors, and writes an append-only, SHA-256 hash-chained record (app/audit.py:16,30-61) to Postgres. Failures fail closed — an LLM safety refusal is terminal and never retried (app/llm.py:159-173). /livez does no I/O; /readyz deep-checks the DB and LLM (app/main.py:144-162), matching the platform's ~2s health-check timeout.",
-"Live against Railway: 12 of 12 runs across the three canonical actions matched the expected tier (reports/evidence/final-demo-capture.json, commit a076248). 144 tests pass, 6 skipped, verified live this session. The bulk-delete case is the clearest proof the floors do real work: its weighted composite alone (0.642) only reaches CONFIRM — the irreversible_bulk floor is what forces FULL_REVIEW. Honest caveat: composite scores are not reproducible across process restarts because the in-process LLM confidence cache resets (README L-A) — the same payload scored 0.642 then 0.735 after a restart. Tiers stay stable wherever a floor applies, since floors read raw inputs, never the composite. Audit records reconstruct exactly, since raw inputs, weights_version, and llm_model are all persisted.",
-"Implemented and verified: real LLM provider, Postgres persistence with a hash-chained audit log, a working API, health checks, 144 passing tests, and two independent live deployments — Railway, proven by curl (reports/evidence/T-14-curl.txt), and AWS Lambda behind a public Function URL, proven by curl against /livez and a real evaluate call (isolated AWS clone, reports/evidence/T-15-live-verification.txt). Railway remains the deployment of record for the demo; AWS demonstrates the system is genuinely portable, not tied to one platform. Honest limitations: composite-score drift across restarts; adaptive calibration is shadow-only; calibration observations can inherit reviewer bias. Cost was not measured in this project — a billing alarm was planned but never confirmed active.",
+"Live against Railway: 12 of 12 runs across the three canonical actions matched the expected tier (governance/evidence/final-demo-capture.json, commit a076248). 144 tests pass, 6 skipped, verified live this session. The bulk-delete case is the clearest proof the floors do real work: its weighted composite alone (0.642) only reaches CONFIRM — the irreversible_bulk floor is what forces FULL_REVIEW. Honest caveat: composite scores are not reproducible across process restarts because the in-process LLM confidence cache resets (README L-A) — the same payload scored 0.642 then 0.735 after a restart. Tiers stay stable wherever a floor applies, since floors read raw inputs, never the composite. Audit records reconstruct exactly, since raw inputs, weights_version, and llm_model are all persisted.",
+"Implemented and verified: real LLM provider, Postgres persistence with a hash-chained audit log, a working API, health checks, 144 passing tests, and two independent live deployments — Railway, proven by curl (governance/evidence/T-14-curl.txt), and AWS Lambda behind a public Function URL, proven by curl against /livez and a real evaluate call (isolated AWS clone, governance/evidence/T-15-live-verification.txt). Railway remains the deployment of record for the demo; AWS demonstrates the system is genuinely portable, not tied to one platform. Honest limitations: composite-score drift across restarts; adaptive calibration is shadow-only; calibration observations can inherit reviewer bias. Cost was not measured in this project — a billing alarm was planned but never confirmed active.",
 "Three commands, three tiers, run live against the deployed Railway service (demo.sh, BASE_URL=aivartba-production.up.railway.app). Read-only auto-executes. A single update requires the CLI's interactive confirm prompt (cli.py:235, 'Confirm? [y/N]'). An irreversible bulk delete — 5,000 records — trips the irreversible_bulk safety floor straight to FULL_REVIEW, regardless of its weighted score. That's proportional oversight: a weighted estimate, with deterministic floors that can only make it stricter, and a calibration layer that's earning trust in shadow before it's ever allowed to steer."
 ];
 
@@ -666,20 +666,20 @@ const auditRows = [
 ["Risk weights 0.40 / 0.30 / 0.20 / 0.10","A","app/risk/scorer.py:50-56"],
 ["Thresholds 0.30 / 0.65","A","app/risk/tiers.py:10-11,29-33"],
 ["Safety floors escalate-only (never lower tier)","A","app/risk/floors.py:97-100 (assert)"],
-["D-14 fix: low_confidence gated on is_mutation","A","app/risk/floors.py:20-27; progress-log/03-errors-and-fixes.md:18"],
+["D-14 fix: low_confidence gated on is_mutation","A","app/risk/floors.py:20-27; governance/plan/03-errors-and-fixes.md:18"],
 ["Shadow-mode calibration, ±0.10, min. 5 decisions, not applied to routing","A","app/calibration.py:1-33; README.md:395-401"],
 ["LLM: pinned model gpt-5.6-luna, live-verified T-03","A","CLAUDE.md env table"],
 ["Fail-closed on LLM error; refusal terminal, never retried","A","app/llm.py:159-173"],
 ["Hash-chained audit log (SHA-256, GENESIS_HASH)","A","app/audit.py:16,30-61"],
 ["/livez no I/O; /readyz deep-checks DB + LLM","A","app/main.py:144-162"],
-["Railway live, curl-verified","A","reports/evidence/T-14-curl.txt:1-13"],
-["12/12 live demo runs matched gate","A","reports/evidence/final-demo-capture.json"],
+["Railway live, curl-verified","A","governance/evidence/T-14-curl.txt:1-13"],
+["12/12 live demo runs matched gate","A","governance/evidence/final-demo-capture.json"],
 ["144 passed, 6 skipped","A","live pytest run, this session"],
 ["Composite scores not reproducible across restarts","A","README.md:373-385 (L-A), observed directly"],
-["AWS Lambda + Function URL live, curl-verified (/livez, /v1/actions/evaluate)","A","isolated AWS clone: reports/evidence/T-15-live-verification.txt"],
+["AWS Lambda + Function URL live, curl-verified (/livez, /v1/actions/evaluate)","A","isolated AWS clone: governance/evidence/T-15-live-verification.txt"],
 ["D-13 fixed: negative affected_records now rejected at 422 (Field(ge=0))","A","app/schemas.py:32"],
-["Cost: not measured in this project","A","progress-log/01-implementation-plan.md:11"],
-["Concurrency ceiling: 502s at 12-way load","A","reports/evidence/final-demo-capture.json"],
+["Cost: not measured in this project","A","governance/plan/01-implementation-plan.md:11"],
+["Concurrency ceiling: 502s at 12-way load","A","governance/evidence/final-demo-capture.json"],
 ["No dashboard exists; CLI is the confirm interface","A","cli.py:235 — repo has no dashboard component"],
 ["NIST AI RMF — human oversight principle","B","NIST AI 100-1 (2023)"],
 ["LLMs poorly calibrated / overconfident","B","arXiv:2503.15850 (2025)"],
