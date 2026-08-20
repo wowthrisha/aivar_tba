@@ -145,9 +145,12 @@ reading closely rather than taking as pre-approved.
 The confidence dimension is expressed as uncertainty: all four
 dimensions run in the same direction, where higher means higher risk.
 An LLM confidence of 0.20 contributes an uncertainty of 0.80. The
-low-confidence floor operates independently on the raw LLM confidence
-(< 0.5 forces CONFIRM), so the continuous score and the safety floor
-are two separate mechanisms reading the same signal.
+low-confidence floor (`low_confidence_on_mutation`, D-14) operates
+independently on the raw LLM confidence, forcing CONFIRM when it is
+< 0.5 **and** the action is a mutation — reads are exempt, since a
+read carries no consequence to be wrong about. The continuous score
+and the safety floor are two separate mechanisms reading the same
+signal.
 
 ## 5. Override floors — why a pure weighted sum is insufficient
 
@@ -281,7 +284,7 @@ it — see the commit that added this table for the full command log):
 | Commits | 49 | `git rev-list --all --count` |
 | First commit | 2026-08-19 18:39:53 +0530 | `git log --reverse --format="%ci" \| head -1` |
 | Latest commit | 2026-08-20 16:22:15 +0530 | `git log -1 --format="%ci"` |
-| Defects logged | 13 (D-01–D-13) | `grep -cE "^\| D-[0-9]+" progress-log/03-errors-and-fixes.md` |
+| Defects logged | 14 (D-01–D-14) | `grep -cE "^\| D-[0-9]+" progress-log/03-errors-and-fixes.md` |
 | LEFT OUT entries | 23 | counted directly in `progress-log/03-errors-and-fixes.md`'s `## LEFT OUT` section |
 | Evidence files | 61 | `find reports/evidence -type f \| wc -l` |
 | Live concurrency p95 (T-19, 50 concurrent requests) | 29,796 ms – 29,796.1 ms across two runs | read from `reports/evidence/T-19-concurrency.txt`, not re-run |
@@ -454,7 +457,7 @@ artifacts — it isn't a new process being introduced.
   `reports/evidence/T-13-adversarial-review.txt`) found and classified
   real findings, including boundary brittleness (Finding 3) and
   prompt-injection surface (Finding 4a). The defect register
-  (`progress-log/03-errors-and-fixes.md`, D-01–D-13) records every other
+  (`progress-log/03-errors-and-fixes.md`, D-01–D-14) records every other
   defect's root cause the same way.
 - **Improve** — fixes approved only where they didn't touch the frozen
   list: broadening the `regulated_mutation` floor to cover `PII_GDPR`
