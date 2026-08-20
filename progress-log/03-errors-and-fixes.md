@@ -70,17 +70,26 @@ what was not done, never substitute silently.
   possibility. Calibration should stay advisory until its inputs are
   themselves statistically validated as trustworthy signal, not just
   until the formula is unit-tested.
-- **L-E** AWS: reporting actual state honestly, not aspirationally. An
-  ECR repository and a `linux/amd64` image were built; an IAM execution
-  role and policy were created. The Lambda function and its Function
-  URL were NOT completed within the available window. Railway
-  (`https://aivartba-production.up.railway.app`) is the deployed
-  environment of record for this entire submission. AWS App Runner was
+- **L-E** AWS: completed post-submission (2026-08-20, ~17:30 IST). The
+  ECR repository, `linux/amd64` image, IAM execution role and policy,
+  Lambda function (`ps91-t15`), and its Function URL are all live and
+  curl-verified — `/livez`, `/readyz`, and a full read-only
+  `POST /v1/actions/evaluate` round-trip (`reports/evidence/T-15-curl.txt`).
+  Railway (`https://aivartba-production.up.railway.app`) remains the
+  deployed environment of record for the original submission; AWS is
+  now a second, independently working deployment. AWS App Runner was
   never an option — closed to new customers since 30 Apr 2026 (a
   documented constraint from the start of this project, not a
-  late-discovered blocker). Do not describe AWS as deployed anywhere in
-  submission materials; it is scripted and partially provisioned, not
-  live.
+  late-discovered blocker). It is now accurate to describe AWS as
+  deployed in submission materials, dated after the original
+  submission.
+  **Security note**: verifying the Lambda config via
+  `aws lambda get-function` printed its environment variables
+  (`DATABASE_URL`, `OPENAI_API_KEY`) in plaintext into a terminal/chat
+  transcript — AWS's default behavior for that call, not a repo bug.
+  Disclosed immediately; user was asked to rotate both credentials.
+  Production follow-up: move these into Secrets Manager / SSM
+  Parameter Store instead of plain Lambda env vars.
 - **L-F** Reviewer metrics report `decisions_total` alongside every
   rate, so a small sample cannot be misread as an extreme signal.
   Confirmed both in code (`ReviewerMetrics.decisions_total: int`,

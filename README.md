@@ -26,7 +26,11 @@ log with a plain-English explanation of why that tier was chosen.
   — curl-verified against all three tiers plus `/livez` and `/v1/audit`;
   see `progress-log/02-action-log.md` (T-14 entry) and
   `reports/evidence/T-14-curl.txt`.
-- **AWS**: not yet deployed (T-15 is a separate, not-yet-started task).
+- **AWS Lambda + Function URL**: https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/
+  — curl-verified against `/livez`, `/readyz`, and a full read-only
+  `POST /v1/actions/evaluate` (routed AUTONOMOUS, composite 0.098); see
+  `reports/evidence/T-15-curl.txt`. App Runner was never an option —
+  closed to new customers since 30 Apr 2026.
 
 ## 2. Quickstart
 
@@ -403,11 +407,13 @@ it — see the commit that added this table for the full command log):
   behaviour may itself be biased — the automation-bias metrics
   (`app/oversight.py`) exist to surface that. Advisory until its inputs
   are themselves validated.
-- **L-E** AWS: an ECR repository and a `linux/amd64` image were built;
-  an IAM execution role and policy were created. The Lambda function and
-  Function URL were NOT completed. Railway is the deployed environment
-  of record for this entire submission. App Runner was never an option
-  — closed to new customers since 30 Apr 2026. AWS is not deployed.
+- **L-E** AWS: completed after initial submission. The ECR repository,
+  `linux/amd64` image, IAM execution role, Lambda function, and Function
+  URL are all live — curl-verified (`reports/evidence/T-15-curl.txt`).
+  Railway remains the deployment of record for the original submission;
+  AWS is a second, independently verified live deployment as of
+  2026-08-20. App Runner was never an option — closed to new customers
+  since 30 Apr 2026.
 - **L-F** Reviewer metrics report `decisions_total` alongside every
   rate, so a small sample cannot be misread as an extreme signal —
   confirmed both in code (`app/oversight.py`) and live via

@@ -1,0 +1,49 @@
+T-15 — AWS Lambda + Function URL deploy verification
+Run at: 2026-08-20 17:4x IST (post-submission completion)
+Function URL: https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/
+Function: ps91-t15 (us-east-1, account 870591755696), PackageType Image,
+State Active, LastUpdateStatus Successful. ECR repo ps91-t15, image tag
+t15-lambda. IAM execution role ps91-t15-lambda-execution-role.
+
+=== curl /livez ===
+$ curl -s -w "\nHTTP_STATUS:%{http_code}\n" --max-time 8 https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/livez
+{"status":"ok"}
+HTTP_STATUS:200
+
+=== curl /readyz ===
+$ curl -s -w "\nHTTP_STATUS:%{http_code}\n" --max-time 8 https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/readyz
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP_STATUS:200
+
+=== read-only scenario via cli.py (matches demo.sh read) — expect AUTONOMOUS ===
+$ python3 cli.py --base-url "https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws" \
+    --agent-id agent-07 --action-type read --resource customers/42 \
+    --reversibility read --affected-records 1 --regulatory none --params '{}'
+
+Evaluating action against https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws ...
+
+AUTONOMOUS
+READ · customers/42 · 1 records · agent-07
+SCORE  composite 0.098  (band: 0.0-0.30 autonomous / 0.30-0.65 confirm / 0.65-1.0 full review)
+NEXT   Executed. No human in the path.
+
+AUTONOMOUS tier - no confirmation needed, already executed.
+
+=== result ===
+All three checks (livez, readyz, full evaluate round-trip) returned
+correct results against the live AWS Lambda Function URL. AWS deploy
+is live, not just scripted/provisioned. Supersedes the "AWS is not
+deployed" / L-E language written earlier the same day, before the
+Lambda function and Function URL were finished.
+
+=== security note ===
+`aws lambda get-function --function-name ps91-t15` returns the
+function's environment variables in PLAINTEXT (DATABASE_URL,
+OPENAI_API_KEY) as part of its normal output — this is AWS's default
+behavior for env-var-configured Lambdas, not a bug in this repo. That
+command was run once during this verification and both secrets were
+printed to a terminal/chat transcript as a result. User was notified
+immediately and asked to rotate both the OpenAI API key and the Neon
+DB password. Production follow-up: move these into AWS Secrets Manager
+or SSM Parameter Store (SecureString) rather than plain Lambda env
+vars, so `get-function` can't expose them at all.

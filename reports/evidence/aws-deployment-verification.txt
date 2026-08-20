@@ -1,0 +1,101 @@
+AWS Lambda + Function URL — independent verification (not inherited from
+the other session's claim; run fresh, this session)
+
+Function URL: https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws
+Verified: 2026-08-20, ~18:0x IST
+
+=== GET /livez ===
+$ curl -s -w "\nHTTP_STATUS:%{http_code}\n" --max-time 60 <url>/livez
+{"status":"ok"}
+HTTP_STATUS:200
+
+=== POST /v1/actions/evaluate — read payload — expect AUTONOMOUS ===
+REQUEST: {"agent_id":"agent-07","action_type":"read","resource":"customers/42",
+          "params":{},"reversibility":"read","affected_records":1,"regulatory":"none"}
+RESPONSE (201):
+{"id":"5b0b98a7-354b-4f66-8262-921784efa763","agent_id":"agent-07","action_type":"read",
+ "resource":"customers/42","params":{},
+ "params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+ "state":"autonomous","composite":0.10200000000000001,"tier":"AUTONOMOUS",
+ "explanation":"0.10 -> AUTONOMOUS. No single dimension change would alter the tier.",
+ "created_at":"2026-08-20T12:31:07.251326Z"}
+RESULT: AUTONOMOUS - matches gate expectation.
+
+=== POST /v1/actions/evaluate — update payload — expect CONFIRM ===
+REQUEST: {"agent_id":"demo-agent","action_type":"update","resource":"orders/9981",
+          "params":{},"reversibility":"update_without_snapshot","affected_records":1,
+          "regulatory":"none"}
+RESPONSE (201):
+{"id":"4900907e-1737-4f21-8cb5-6ce92d36cf01","agent_id":"demo-agent","action_type":"update",
+ "resource":"orders/9981","params":{},
+ "params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+ "state":"confirm","composite":0.43999999999999995,"tier":"CONFIRM",
+ "explanation":"0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).",
+ "created_at":"2026-08-20T12:31:33.936987Z"}
+RESULT: CONFIRM - matches gate expectation.
+
+=== POST /v1/actions/evaluate — bulk-delete payload — expect FULL_REVIEW ===
+REQUEST: {"agent_id":"agent-07","action_type":"delete","resource":"customers",
+          "params":{"resource_id":999},"reversibility":"irreversible",
+          "affected_records":5000,"regulatory":"none"}
+RESPONSE (201):
+{"id":"f4a145d7-7d10-49e5-b814-71a51f02a44e","agent_id":"agent-07","action_type":"delete",
+ "resource":"customers","params":{"resource_id":999},
+ "params_hash":"8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+ "state":"full_review","composite":0.641,"tier":"FULL_REVIEW",
+ "explanation":"0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+ "created_at":"2026-08-20T12:32:00.301252Z"}
+RESULT: FULL_REVIEW - matches gate expectation.
+
+=== BLOCKING FINDING: AWS is running code that predates D-13 and D-14 ===
+
+1. Response schema evidence: none of the three responses above include
+   `floor_name`, `precedent`, `reversibility_score`, `data_scope_score`,
+   `regulatory_score`, `confidence_score`, or `calibration` - fields
+   present on every Railway response since commits fddaec7 (OD-1),
+   632ffbf (Feature B novelty), and daf3156 (calibration). Their absence
+   here means the deployed code predates all three.
+
+2. Direct version marker (D-13): negative affected_records.
+   REQUEST: {"agent_id":"version-check","action_type":"read","resource":"x",
+             "params":{},"reversibility":"read","affected_records":-5,
+             "regulatory":"none"}
+   RESPONSE: {"detail":"internal server error"}  HTTP_STATUS:500
+   Railway (post-D13, commit 7e11507) returns 422 for this exact input.
+   AWS returning 500 proves it predates 7e11507 - and therefore predates
+   8a3e3cf, 475629b, and a076248 (D-14) too, since all three come later
+   in the commit graph.
+
+3. AWS Lambda function metadata (safe call, no secrets):
+   $ aws lambda get-function-url-config --function-name ps91-t15 --region us-east-1
+   CreationTime / LastModifiedTime: 2026-08-20T09:31:52Z (= 15:01 IST) - identical,
+   meaning the function has never been updated since creation.
+   $ aws lambda get-function ... --query 'Configuration.[LastModified,CodeSha256]'
+   LastModified: 2026-08-20T09:31:09.077+0000 (= 15:01 IST)
+   D-13 was committed at 15:45:26 IST, D-14 at 16:22:15 IST - both AFTER
+   the Lambda's code timestamp. The image was built earlier the same day
+   (likely around the original ECR/image-build work referenced in L-E's
+   pre-edit text) and the Function/Function URL were wired up later
+   without rebuilding from current master.
+
+CONSEQUENCE: the exact bug D-14 fixed (low_confidence firing on
+zero-blast-radius reads, unconditionally) is LIVE on AWS right now. The
+three-scenario gate above happened to pass because the live LLM's
+self-reported confidence stayed >= 0.5 on this run's read calls (3
+additional read attempts, all AUTONOMOUS, composite 0.078-0.09) - this
+is NOT a structural guarantee on AWS the way it now is on Railway. A
+future read call to this exact Function URL could still land on CONFIRM
+via the pre-D14 unconditional low_confidence floor.
+
+=== Database ===
+$ curl AWS /v1/audit/verify -> {"valid":true,"records_checked":469,"first_invalid_id":null}
+$ curl Railway /v1/audit/verify -> {"valid":true,"records_checked":469,"first_invalid_id":null}
+Identical record count, taken minutes apart, including the audit entries
+this AWS verification run itself just created (visible from both sides
+in the same count) - AWS and Railway share the SAME Neon database.
+
+=== NOT independently re-verified this pass ===
+GET /readyz on AWS was inherited from the other session's evidence
+(200, llm:ok, db:ok) - not re-run fresh in this verification, since it
+carries no version information beyond what /livez + the evaluate calls
+above already establish more precisely.

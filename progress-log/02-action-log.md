@@ -1346,3 +1346,41 @@ Evidence: `reports/evidence/bonus-calibration/A-full-suite.txt`,
 `B-D-safety-checks.txt`, `EFGHI-verification.txt`,
 `EFGHI-verification.json`.
 Not pushed, not deployed, per explicit instruction.
+
+### [2026-08-20 17:47 IST] [T-15] [post-submission]
+
+Action: Verified AWS Lambda + Function URL deploy (T-15), previously
+"Not started" at submission time. User reported it as done; found the
+resources already live in the account (`aws sts get-caller-identity`
+confirmed account 870591755696) rather than deploying anything new this
+session — function `ps91-t15`, ECR repo `ps91-t15`, IAM role
+`ps91-t15-lambda-execution-role`, Function URL created 2026-08-20
+09:31 UTC (~15:01 IST), well before this verification.
+
+Verified live, not just "State: Active": `GET /livez` -> 200
+`{"status":"ok"}`; `GET /readyz` -> 200
+`{"status":"ok","checks":{"llm":"ok","db":"ok"}}`; then the full
+read-only scenario via `cli.py` (same inputs as `demo.sh read`) against
+the Function URL -> AUTONOMOUS, composite 0.098 - confirms the actual
+governance logic works end-to-end on Lambda, not only the health
+endpoints. Evidence: `reports/evidence/T-15-curl.txt`.
+
+**Security incident (mid-task)**: `aws lambda get-function
+--function-name ps91-t15` was run to inspect the function's config and
+returned its environment variables in plaintext as part of the normal
+response - `DATABASE_URL` (with the Neon Postgres password) and
+`OPENAI_API_KEY` were both printed into the terminal/chat transcript.
+This is AWS's default behavior for that API call, not a script or repo
+bug, but it's a real exposure regardless. Disclosed to the user
+immediately in the same turn; user was asked to rotate both the OpenAI
+key and the Neon DB password. No further `get-function` calls were made
+for the rest of this task - `get-function-url-config` and curl were
+used instead, neither of which return secrets.
+
+Synced documentation to match verified reality (this was previously
+inconsistent - the repo said "AWS is not deployed" while AWS was
+actually live): `README.md` (Live URLs section + L-E),
+`progress-log/03-errors-and-fixes.md` (L-E), `progress-log/01-implementation-plan.md`
+(T-15 status Not started -> Done). Not yet committed - append-to-log-
+before-commit (L-6) done first, per this project's own operating
+contract.
