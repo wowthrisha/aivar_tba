@@ -993,3 +993,69 @@ Zero code changed - `git diff --name-only` shows only `README.md`;
 `app/risk/` and `tests/test_routing.py` (T-08) confirmed zero-diff.
 
 Evidence: reports/evidence/Item0-verification.txt.
+
+### [2026-08-20 10:09 IST] [Feature A - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
+
+Implemented `GET /v1/oversight/reviewers` per the exact Feature A prompt
+in `PS-9-1-Novelty-Addons-v1.0.md` (lines 76-115).
+
+**Design decision, documented not silent**: the spec says "aggregated
+over the approvals table", but `approvals` only ever holds
+`decision="approve"` rows - `app/main.py`'s `decision()` handler never
+calls `store.set_approval()` for a reject. Aggregating strictly over
+`approvals` alone would make `approval_rate` trivially 1.0 for any
+reviewer who ever approved anything, silently hiding every reject -
+exactly the kind of silent approximation E-6 forbids. Used the audit
+log's `event_type="decision"` records instead (already written for
+every decision, approve or reject, by the same handler) as the single
+source for `decisions_total`/`approval_rate`/latency, cross-joined
+against each action's `created_at` (proposal time) and current `state`
+(for reversal_rate). No schema change, no migration, no new dependency
+- `app/oversight.py`'s module docstring documents this choice in full.
+
+**Files**: new `app/oversight.py` (pure aggregation, no I/O - matches
+`app/risk/scorer.py`'s pattern), new `OversightResponse`/`ReviewerMetrics`
+Pydantic models (kept with the logic module, matching
+`RiskAssessmentResult`'s precedent rather than `app/schemas.py`), new
+`GET /v1/oversight/reviewers` route in `app/main.py`, new
+`tests/test_oversight.py`.
+
+**Real finding from reading the code, not assumed**: `app/state_machine.py`'s
+`VALID_TRANSITIONS` shows `APPROVED -> {EXECUTED, EXPIRED}` only - an
+approved action can never reach `REJECTED` afterward (structurally
+unreachable). So `reversal_rate`'s "REJECTED or EXPIRED" wording is
+correct as written (defensive for a state the current state machine
+happens not to produce), but only EXPIRED can genuinely occur today -
+noted in case this surfaces oddly in review.
+
+**Empty-reviewer semantics**: 0 decisions -> `approval_rate`,
+`median_decision_latency`, `p90_decision_latency` = `null` (genuinely
+undefined, 0/0) but `reversal_rate` = `0.0` (the spec's own explicit
+fallback for that one metric, not null) and `automation_bias_flag` =
+`false` (well-defined regardless, since `decisions_total >= 5` fails).
+
+Tests: the three required
+(`test_oversight_metrics_computes_approval_rate`,
+`test_automation_bias_flag_fires_on_rubber_stamping` - seeded exactly
+6 decisions/6 approvals/2s latency per the spec, flag confirmed True -,
+`test_oversight_metrics_empty_reviewer_returns_nulls_not_zeros`) plus 4
+additional edge cases (sub-5-decisions no-flag, slow-review no-flag,
+reversal-rate counting, reversal-rate-zero-with-no-approvals). 7/7 pass.
+Full suite: 116 passed, 6 skipped (unchanged real-DB skip count).
+`tests/test_routing.py` (T-08) re-verified zero-diff against `a573663`.
+`app/risk/` untouched (empty `git diff --stat`). Frozen weights/
+thresholds re-grepped and confirmed unchanged.
+
+Endpoint run locally (TestClient, not yet deployed anywhere) against
+representative seeded data: reviewer "careful-carla" (3 decisions, 2
+approve/1 reject, latency ~1-2ms since scripted) correctly shows
+`approval_rate=0.67`, `automation_bias_flag=false`; reviewer
+"rubber-stamp-rick" (6 rapid approvals) correctly shows
+`approval_rate=1.0`, `automation_bias_flag=true` - the rubber-stamping
+signature fires as designed. `review_queue_depth=1` for one pending
+action, `oldest_pending_age_seconds` correctly populated.
+
+No defects found this task - first-attempt implementation, all tests
+green on first run.
+
+Evidence: reports/evidence/FeatureA-verification.txt.

@@ -13,6 +13,7 @@ from app.db import make_app_engine
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
 from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.logging_config import configure_logging, request_id_var
+from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.router import route_action
 from app.risk.scorer import score_action
@@ -407,4 +408,50 @@ async def audit_verify(audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_
     result = await audit.verify()
     return AuditVerifyResponse(
         valid=result.valid, records_checked=result.records_checked, first_invalid_id=result.first_invalid_id
+    )
+
+
+@app.get("/v1/oversight/reviewers", response_model=OversightResponse)
+async def oversight_reviewers(
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+    audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_log),
+):
+    # No default limit=50 trap here (T-19's lesson) - every "decision"
+    # event is needed for a correct aggregation.
+    decision_records = await audit.list_records(event_type="decision", limit=1_000_000)
+
+    by_reviewer: dict[str, list[DecisionEvent]] = {}
+    action_cache: dict[str, object] = {}
+    for rec in decision_records:
+        action_id = rec.payload.get("action_id")
+        decision = rec.payload.get("decision")
+        if action_id is None or decision is None:
+            continue
+        if action_id not in action_cache:
+            action = await store.get_action(action_id)
+            if action is None:
+                continue
+            action_cache[action_id] = action
+        action = action_cache[action_id]
+        by_reviewer.setdefault(rec.actor, []).append(
+            DecisionEvent(
+                action_id=action_id,
+                decision=decision,
+                decided_at=rec.created_at,
+                proposed_at=action.created_at,
+                action_current_state=action.state.value,
+            )
+        )
+
+    reviewers = {reviewer_id: compute_reviewer_metrics(events) for reviewer_id, events in by_reviewer.items()}
+
+    queue = await store.list_review_queue()
+    oldest_pending_age_seconds = (
+        (datetime.now(timezone.utc) - queue[0].created_at).total_seconds() if queue else None
+    )
+
+    return OversightResponse(
+        reviewers=reviewers,
+        review_queue_depth=len(queue),
+        oldest_pending_age_seconds=oldest_pending_age_seconds,
     )
