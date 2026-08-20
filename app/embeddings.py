@@ -118,7 +118,9 @@ def novelty_floor_should_escalate(max_sim: float, prior_count: int) -> bool:
 def escalate_one_tier(tier: Tier) -> Tier:
     """Escalates exactly one tier, capped at FULL_REVIEW - never sets a
     tier absolutely, matching the spec's own invariant."""
-    return Tier(min(tier.value + 1, Tier.FULL_REVIEW.value))
+    result = Tier(min(tier.value + 1, Tier.FULL_REVIEW.value))
+    assert result >= tier  # structural invariant: novelty escalation only escalates
+    return result
 
 
 def novelty_reason(prior_count: int) -> str:
