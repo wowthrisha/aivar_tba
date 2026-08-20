@@ -60,6 +60,15 @@ class ActionResponse(BaseModel):
     # persisted, so every other endpoint that reuses this model leaves
     # it null.
     precedent: PrecedentInfo | None = None
+    # OD-1 (CLI output redesign): additive passthrough of values already
+    # computed in app/risk/ and persisted in risk_assessments - these were
+    # simply never returned before. None only when no risk assessment has
+    # been saved yet (should not happen post-evaluate).
+    reversibility_score: float | None = None
+    data_scope_score: float | None = None
+    regulatory_score: float | None = None
+    confidence_score: float | None = None
+    floor_name: str | None = None
 
 
 class ConfirmRequest(BaseModel):

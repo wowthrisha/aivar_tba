@@ -127,6 +127,42 @@ def test_evaluate_read_only_routes_autonomous(client):
     assert resp.json()["state"] == "autonomous"
 
 
+def test_evaluate_response_includes_factor_scores_matching_persisted_assessment(client):
+    """OD-1: reversibility_score/data_scope_score/regulatory_score/
+    confidence_score/floor_name are additive passthrough of values
+    app/risk/ already computes and app/db_store.py already persists to
+    risk_assessments - never a CLI-side recomputation. This proves the
+    evaluate response equals what the real scorer/router produce for the
+    same inputs, and that GET round-trips the same persisted values."""
+    from app.risk.confidence import structural_completeness, two_signal_confidence
+    from app.risk.router import route_action
+    from app.risk.scorer import Regulatory, Reversibility, score_action
+
+    resp = _evaluate(client)  # irreversible, 500 records, none -> full_review via floor
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+
+    # client fixture uses _FakeProvider(0.95); _evaluate's default body is
+    # action_type=delete, params={"resource_id": 42}.
+    structural = structural_completeness("delete", {"resource_id": 42})
+    confidence = two_signal_confidence(0.95, structural)
+    expected = score_action(Reversibility.IRREVERSIBLE, 500, Regulatory.NONE, confidence)
+    expected_routing = route_action(Reversibility.IRREVERSIBLE, 500, Regulatory.NONE, confidence)
+
+    assert body["reversibility_score"] == expected.reversibility
+    assert body["data_scope_score"] == expected.data_scope
+    assert body["regulatory_score"] == expected.regulatory
+    assert body["confidence_score"] == expected.confidence
+    assert body["floor_name"] == expected_routing.floor_name
+
+    fetched = client.get(f"/v1/actions/{body['id']}").json()
+    assert fetched["reversibility_score"] == body["reversibility_score"]
+    assert fetched["data_scope_score"] == body["data_scope_score"]
+    assert fetched["regulatory_score"] == body["regulatory_score"]
+    assert fetched["confidence_score"] == body["confidence_score"]
+    assert fetched["floor_name"] == body["floor_name"]
+
+
 def test_get_action_returns_current_state(client):
     created = _evaluate(client).json()
     resp = client.get(f"/v1/actions/{created['id']}")

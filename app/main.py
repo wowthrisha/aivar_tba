@@ -169,6 +169,11 @@ def _to_action_response(record, precedent=None) -> ActionResponse:
         explanation=record.explanation,
         created_at=record.created_at,
         precedent=precedent,
+        reversibility_score=record.reversibility,
+        data_scope_score=record.data_scope,
+        regulatory_score=record.regulatory,
+        confidence_score=record.confidence,
+        floor_name=record.floor_name,
     )
 
 

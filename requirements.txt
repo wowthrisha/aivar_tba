@@ -33,6 +33,10 @@ openai==2.49.0
 # dependency (same class of gap as greenlet, T-14/D-effectively) -
 # pinned explicitly so Railway's clean container build has it.
 numpy==2.2.6
+# OD-1: cli.py's rendering uses rich. Same class of gap as numpy/greenlet
+# above - present locally only as some other package's transitive
+# dependency - pinned explicitly so a clean `pip install` has it too.
+rich==14.2.0
 python-dotenv
 pytest
 pytest-asyncio

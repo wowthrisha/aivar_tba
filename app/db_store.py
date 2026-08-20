@@ -66,6 +66,10 @@ class SQLAlchemyStore:
             record.tier = ra.tier
             record.explanation = ra.rendered_explanation
             record.floor_name = ra.floor_fired
+            record.reversibility = ra.reversibility_score
+            record.data_scope = ra.data_scope_score
+            record.regulatory = ra.regulatory_score
+            record.confidence = ra.confidence_score
         return record
 
     async def get_or_create_action(
@@ -251,6 +255,10 @@ class SQLAlchemyStore:
             record.tier = tier
             record.explanation = rendered_explanation
             record.floor_name = floor_fired
+            record.reversibility = reversibility_score
+            record.data_scope = data_scope_score
+            record.regulatory = regulatory_score
+            record.confidence = confidence_score
             return record
 
 

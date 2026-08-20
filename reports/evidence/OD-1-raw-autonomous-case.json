@@ -1,0 +1,14 @@
+{
+    "id": "52a022cf-d7f7-4aa1-9aad-6a81c2215741",
+    "agent_id": "agent-07",
+    "action_type": "read",
+    "resource": "customers/read-od1-demo",
+    "params": {},
+    "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "state": "full_review",
+    "composite": 0.16,
+    "tier": "FULL_REVIEW",
+    "explanation": "0.16 -> CONFIRM (floor: LLM confidence 0.00 below 0.5). Escalated to FULL_REVIEW (novel action: no close precedent in 24 prior actions).",
+    "created_at": "2026-08-20T08:12:44.460541Z",
+    "precedent": null
+}

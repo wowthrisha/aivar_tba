@@ -1201,3 +1201,54 @@ submission-v1`.
 
 Evidence: this action-log entry (raw command output pasted directly in
 conversation at each step, not summarized after the fact).
+
+### [2026-08-20 13:44 IST] [OD-1] [delivery engineer]
+Action: CLI output redesign per `PS-9-1-Output-Design-v1.0.md` item 1,
+presentation-only, on master. Found during exploration that the four
+per-dimension risk scores (`reversibility`/`data_scope`/`regulatory`/
+`confidence`) and `floor_name` are computed in `app/risk/` and persisted
+to `risk_assessments`, but were never returned by `ActionResponse` -
+`app/store.py`'s own docstring flagged this as a known gap. This
+conflicted with the task's hard-constraint list ("do not modify
+app/main.py") vs its FACTOR-DATA RULE (which anticipates exactly this
+case and asks for an additive-only fix). Stopped and asked the user via
+AskUserQuestion rather than guess; approved to proceed with an
+additive-only edit.
+Changes: `app/schemas.py` (+5 optional `ActionResponse` fields, nothing
+existing touched), `app/store.py`/`app/db_store.py` (populate + read
+back those 5 values, already computed/passed in, previously dropped),
+`app/main.py` (single touch: `_to_action_response()` now passes the 5
+new fields through - no other line changed), `requirements.txt` (pinned
+`rich==14.2.0`, present locally only as a transitive dependency - same
+class of gap as `numpy`/`greenlet`, documented inline), `cli.py`
+(rewrote the rendering path only - verdict banner colored by tier, WHY
+block when a floor fired, a score axis using the real `THRESHOLD_CONFIRM`/
+`THRESHOLD_FULL_REVIEW` constants, per-factor bars using the real
+`WEIGHTS` dict, IF... counterfactual when the API provides one, tier-
+dependent NEXT line). Arg parsing, HTTP calls, and the confirm/full-review
+control flow in `main()` are unchanged.
+Tests added: `tests/test_cli.py` (`test_cli_renders_all_three_tiers_without_error`,
+`test_cli_output_contains_composite_and_tier`, built from the real
+`score_action`/`route_action` outputs, not hand-picked numbers) and
+`tests/test_api.py::test_evaluate_response_includes_factor_scores_matching_persisted_assessment`
+(proves the 5 new response fields equal what `score_action`/`route_action`
+actually compute for the request, and that `GET` round-trips the same
+persisted values).
+Result: `pytest tests/test_cli.py tests/test_api.py -q` green; full suite
+125 passed, 6 skipped (pre-existing skips, unrelated to this change), 0
+failures. Safety checks before commit: `git diff a573663 --
+tests/test_routing.py` empty; `app/risk/` and `app/llm.py` diff empty;
+weights still 0.40/0.30/0.20/0.10, thresholds still 0.30/0.65
+(unedited). Ran the CLI against the then-current live URL for a
+read-only case first - genuinely surfaced a FULL_REVIEW-tier, composite
+0.16 result (low-confidence floor + Feature B's novelty-escalation
+floor both fired), which the redesigned banner rendered correctly
+without me mistaking it for a bug (verified against raw `GET
+/v1/actions/{id}` JSON before trusting the render - E-1). The FACTORS
+block was legitimately empty against that pre-deploy backend, since the
+old schema doesn't carry the new fields yet - correct degrade-clean
+behavior, not a defect.
+Evidence: `reports/evidence/OD-1-full-suite.txt`,
+`reports/evidence/OD-1-test-routing-diff.txt` (empty file = proof),
+`reports/evidence/OD-1-raw-autonomous-case.json`,
+`reports/evidence/OD-1-cli-autonomous.txt`.

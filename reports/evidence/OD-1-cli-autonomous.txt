@@ -1,0 +1,17 @@
+Evaluating action against https://aivartba-production.up.railway.app ...
+
+╭─ 🔴 FULL REVIEW ─────────────────────────────────────────────────────────────╮
+│ READ · customers/read-od1-demo · 1 records · agent-07                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+  SCORE     0.0          0.30           0.65         1.0
+            ───────●─────┼──────────────┼───────────────  0.16
+              autonomous     confirm      full review   
+
+  FACTORS
+                                              composite  0.160
+
+  NEXT      Senior review required · queued as 
+#52a022cf-d7f7-4aa1-9aad-6a81c2215741
+
+This action requires FULL_REVIEW - a separate reviewer_id must decide via POST /v1/review-queue/{id}/decision (S-6: an agent cannot approve its own action, so this single-user CLI session does not attempt that step).

@@ -39,6 +39,11 @@ class ActionRecord:
     explanation: str | None = None
     floor_name: str | None = None
     embedding: list[float] | None = None
+    # OD-1: per-dimension scores, additive passthrough (see ActionResponse).
+    reversibility: float | None = None
+    data_scope: float | None = None
+    regulatory: float | None = None
+    confidence: float | None = None
 
 
 @dataclass
@@ -167,11 +172,12 @@ class InMemoryStore:
     ) -> ActionRecord:
         """Atomically records the risk assessment and transitions the
         action's state (mirrors SQLAlchemyStore, which does both writes in
-        one DB transaction). The per-dimension scores / llm_model /
-        llm_latency_ms / degraded are accepted for interface parity with
-        the DB-backed store's risk_assessments table but have no field on
-        ActionRecord/ActionResponse to hold them in-memory - they're
-        simply not persisted here, only in Postgres."""
+        one DB transaction). llm_model / llm_latency_ms / degraded are
+        accepted for interface parity with the DB-backed store's
+        risk_assessments table but have no field on ActionRecord to hold
+        them in-memory - they're simply not persisted here, only in
+        Postgres. The four per-dimension scores ARE held on ActionRecord
+        (OD-1) since ActionResponse now passes them through."""
         with self._lock:
             record = self._actions[action_id]
             record.state = new_state
@@ -179,4 +185,8 @@ class InMemoryStore:
             record.tier = tier
             record.explanation = rendered_explanation
             record.floor_name = floor_fired
+            record.reversibility = reversibility_score
+            record.data_scope = data_scope_score
+            record.regulatory = regulatory_score
+            record.confidence = confidence_score
             return record
