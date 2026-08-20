@@ -1,0 +1,12 @@
+[project]
+name = "aivar-tba"
+version = "0.1.0"
+description = "PS-9.1 — Graduated Autonomy Engine: scores AI-agent actions for risk, routes them to autonomous/confirm/full-review, and writes a plain-English-explained audit log."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
