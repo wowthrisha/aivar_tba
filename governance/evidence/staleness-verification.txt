@@ -1,0 +1,112 @@
+Staleness verification — Railway and AWS, three axes verified independently
+Verified: 2026-08-20, ~23:29-23:30 IST
+Principle: code / dependencies / credentials are independent axes. Passing
+one says nothing about the others.
+
+URLs:
+  Railway: https://aivartba-production.up.railway.app
+  AWS:     https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws
+
+Seeded resources used throughout (from demo.sh / final-demo-capture.json),
+per D-27: fresh resource names trigger novelty escalation and look like a
+false regression. Only the seeded read scenario (customers/42) was needed
+for F2/F3/F4; F1 uses the same seeded resource with an invalid
+affected_records to isolate the validation-layer check.
+
+=== AXIS 1 — CODE VERSION (behavioural fingerprints) ===
+
+--- RAILWAY ---
+
+GET /readyz
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP:200
+
+F1 — POST /v1/actions/evaluate, affected_records=-5 (proves D-13 present)
+REQUEST: {"agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"reversibility":"read","affected_records":-5,"regulatory":"none"}
+RESPONSE: {"detail":[{"type":"greater_than_equal","loc":["body","affected_records"],"msg":"Input should be greater than or equal to 0","input":-5,"ctx":{"ge":0}}]}
+HTTP:422
+RESULT: PASS
+
+F2 — POST /v1/actions/evaluate, seeded read-only (proves D-14 present)
+REQUEST: {"agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"reversibility":"read","affected_records":1,"regulatory":"none"}
+RESPONSE: {"id":"7694e839-4ca4-4f5f-b862-91c97d95539b","agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.064,"tier":"AUTONOMOUS","explanation":"0.06 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-20T17:59:41.787101Z","precedent":{"k":3,"matches":[{"action_id":"ae569993-f10f-461d-a8c5-7187fd87eae4","similarity":1.0,"outcome":"executed"},{"action_id":"92de9c48-07f4-4db5-8db2-ffac838041cc","similarity":1.0,"outcome":"executed"},{"action_id":"27ab8077-116b-4499-8714-6f9503540d32","similarity":1.0,"outcome":"executed"}],"summary":"Similar to 3 prior actions; 0 were rejected."},"reversibility_score":0.0,"data_scope_score":0.2,"regulatory_score":0.0,"confidence_score":0.040000000000000036,"floor_name":null,"calibration":{"mode":"shadow","adjustment":0.0,"base_composite":0.064,"effective_composite":0.064,"sample_size":0,"clean_confirmations":0,"modifications_rejections":0,"applied":false,"degraded":false}}
+HTTP:201
+RESULT: PASS — floor_name is null, not "low_confidence"
+
+F3 — same response as F2: contains precedent, calibration, and all four
+sub-scores (reversibility_score, data_scope_score, regulatory_score,
+confidence_score)
+RESULT: PASS
+
+F4 — same response as F2: floors_fired key
+RESULT: FAIL — key absent. Expected: floors_fired does not exist in the
+codebase yet (grep -rn "floors_fired" across all .py files and all
+governance docs returns nothing; D-24 not present anywhere in git
+history either). Not shipped anywhere, not a staleness signal — this is
+the finding Step 3 of the next task fixes.
+
+GET /v1/audit/verify
+{"valid":true,"records_checked":505,"first_invalid_id":null}
+HTTP:200
+
+--- AWS ---
+
+GET /readyz
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+HTTP:200
+
+F1 — POST /v1/actions/evaluate, affected_records=-5
+REQUEST: {"agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"reversibility":"read","affected_records":-5,"regulatory":"none"}
+RESPONSE: {"detail":[{"type":"greater_than_equal","loc":["body","affected_records"],"msg":"Input should be greater than or equal to 0","input":-5,"ctx":{"ge":0}}]}
+HTTP:422
+RESULT: PASS
+
+F2 — POST /v1/actions/evaluate, seeded read-only
+REQUEST: {"agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"reversibility":"read","affected_records":1,"regulatory":"none"}
+RESPONSE: {"id":"33c8a2f5-afe7-4136-86f7-798bc15a707c","agent_id":"agent-07","action_type":"read","resource":"customers/42","params":{},"params_hash":"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","state":"autonomous","composite":0.098,"tier":"AUTONOMOUS","explanation":"0.10 -> AUTONOMOUS. No single dimension change would alter the tier.","created_at":"2026-08-20T18:00:35.288458Z","precedent":{"k":3,"matches":[{"action_id":"ae569993-f10f-461d-a8c5-7187fd87eae4","similarity":1.0,"outcome":"executed"},{"action_id":"92de9c48-07f4-4db5-8db2-ffac838041cc","similarity":1.0,"outcome":"executed"},{"action_id":"27ab8077-116b-4499-8714-6f9503540d32","similarity":1.0,"outcome":"executed"}],"summary":"Similar to 3 prior actions; 0 were rejected."},"reversibility_score":0.0,"data_scope_score":0.2,"regulatory_score":0.0,"confidence_score":0.38,"floor_name":null,"calibration":{"mode":"shadow","adjustment":0.0,"base_composite":0.098,"effective_composite":0.098,"sample_size":0,"clean_confirmations":0,"modifications_rejections":0,"applied":false,"degraded":false}}
+HTTP:201
+RESULT: PASS — floor_name is null
+
+F3 — same response as F2: all four sub-scores + precedent + calibration
+present
+RESULT: PASS
+
+F4 — same response as F2: floors_fired key
+RESULT: FAIL — absent, same as Railway. Not shipped anywhere yet.
+
+GET /v1/audit/verify
+{"valid":true,"records_checked":506,"first_invalid_id":null}
+HTTP:200
+
+=== AXIS 1 SUMMARY TABLE ===
+
+deployment | F1  | F2   | F3   | F4   | readyz          | records_checked | git SHA
+Railway    | PASS| PASS | PASS | FAIL | db:ok, llm:ok   | 505              | not verifiable via API (no version endpoint at time of this check); last known push 475122c
+AWS        | PASS| PASS | PASS | FAIL | db:ok, llm:ok   | 506              | not verifiable via API; last recorded deploy SHA 2a60896 (deployment-sync-verified.txt) — predates 475122c (Dockerfile+D-26/D-27, zero app/ diff)
+
+Verdict: Railway CURRENT. AWS CURRENT on behaviour, behind on git tree by
+a Dockerfile-and-docs-only commit (zero diff under app/, so no
+behavioural gap). F4 fails identically on both — expected, not a
+divergence between deployments.
+
+=== AXIS 2 — DEPENDENCIES ===
+
+Could not be verified. No version or dependency-reporting endpoint
+exists in the live API on either deployment as of this check — every
+route in app/main.py was enumerated (/livez, /readyz, and the 9 business
+endpoints only). Not inferring installed versions from requirements.txt
+per instruction; this gap is what GET /v1/version (added next) closes.
+
+=== AXIS 3 — CREDENTIALS ===
+
+Both deployments: GET /readyz -> {"status":"ok","checks":{"llm":"ok","db":"ok"}}
+Both the rotated OPENAI_API_KEY (llm:ok) and DATABASE_URL (db:ok) are live
+and working on both deployments.
+
+=== AXIS 4 — SHARED STATE ===
+
+Railway records_checked=505, AWS records_checked=506, AWS check run
+immediately after Railway's. Reconciliation: the +1 is fully accounted
+for by the single AWS-side F2 call made between the two /v1/audit/verify
+checks (F1 is a 422 that never reaches persistence). 505 + 1 = 506,
+exact. Same Neon database, confirmed — no divergence.
