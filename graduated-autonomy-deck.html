@@ -1,0 +1,784 @@
+<title>Graduated Autonomy Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#1e1e1e;
+  --bg-tab-inactive:#2a2a2b;
+  --bg-tab-active:#1e1e1e;
+  --bg-panel:#181818;
+  --bg-card:#242426;
+  --bg-card-2:#28282a;
+  --border:#37373a;
+  --border-soft:#2c2c2e;
+  --text:#d4d4d4;
+  --text-dim:#8a8a8d;
+  --text-faint:#5a5a5d;
+  --accent:#4fc1b0;
+  --accent-dim:#3a8f83;
+  --accent-blue:#5b9fd6;
+  --tier-auto:#8fd19e;
+  --tier-confirm:#e0bd6b;
+  --tier-review:#e06c65;
+  --code-str:#ce9b78;
+  --shadow: 0 8px 28px rgba(0,0,0,0.45);
+  --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:28px 16px;
+}
+
+.app{
+  width:100%;
+  max-width:1180px;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+}
+
+/* ---------- title bar ---------- */
+.titlebar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:9px 14px;
+  background:#232324;
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--text-faint);
+}
+.dots{display:flex;gap:6px;margin-right:6px;}
+.dot{width:10px;height:10px;border-radius:50%;background:#3a3a3c;}
+.titlebar .path{color:var(--text-dim);}
+.titlebar .path b{color:var(--text);font-weight:500;}
+
+/* ---------- tab strip ---------- */
+.tabstrip{
+  display:flex;
+  overflow-x:auto;
+  background:#242425;
+  border-bottom:1px solid var(--border);
+  scrollbar-width:thin;
+}
+.tabstrip::-webkit-scrollbar{height:4px;}
+.tab{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:9px 16px;
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--text-dim);
+  background:var(--bg-tab-inactive);
+  border-right:1px solid var(--border-soft);
+  border-top:2px solid transparent;
+  cursor:pointer;
+  white-space:nowrap;
+  user-select:none;
+  transition:background .12s ease,color .12s ease;
+}
+.tab:hover{color:var(--text);}
+.tab.active{
+  background:var(--bg-tab-active);
+  color:var(--text);
+  border-top:2px solid var(--accent);
+}
+.tab .dotstate{width:6px;height:6px;border-radius:50%;background:var(--text-faint);flex:0 0 auto;}
+.tab.active .dotstate{background:var(--accent);}
+
+/* ---------- editor / slide canvas ---------- */
+.editor{
+  position:relative;
+  background:var(--bg);
+  min-height:min(62vh,560px);
+  aspect-ratio:16/9.1;
+  display:flex;
+  overflow:hidden;
+}
+.gutter{
+  flex:0 0 34px;
+  background:#1a1a1a;
+  border-right:1px solid var(--border-soft);
+  font-family:var(--mono);
+  font-size:10px;
+  color:#3f3f42;
+  text-align:right;
+  padding:18px 8px 0 0;
+  line-height:22px;
+  user-select:none;
+}
+.slide{
+  flex:1;
+  display:none;
+  flex-direction:column;
+  padding:34px 46px 30px;
+  overflow-y:auto;
+}
+.slide.active{display:flex;}
+
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.08em;
+  color:var(--accent);
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+h1.slide-title{
+  font-family:var(--sans);
+  font-weight:700;
+  font-size:clamp(20px,3vw,30px);
+  letter-spacing:-0.01em;
+  margin:0 0 20px;
+  color:#f0f0f0;
+  text-wrap:balance;
+}
+
+/* ---------- generic bits ---------- */
+.mono{font-family:var(--mono);}
+.tier-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;
+  padding:3px 9px;border-radius:3px;letter-spacing:.02em;
+  border:1px solid transparent;
+}
+.tier-auto{color:var(--tier-auto);background:rgba(143,209,158,0.09);border-color:rgba(143,209,158,0.28);}
+.tier-confirm{color:var(--tier-confirm);background:rgba(224,189,107,0.09);border-color:rgba(224,189,107,0.28);}
+.tier-review{color:var(--tier-review);background:rgba(224,108,101,0.09);border-color:rgba(224,108,101,0.28);}
+.tier-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+svg text{font-family:var(--mono);fill:var(--text);}
+svg .lbl{font-size:11.5px;}
+svg .lbl-dim{font-size:10.5px;fill:var(--text-dim);}
+svg line, svg path.arrow{stroke:var(--text-faint);}
+figure{margin:0;}
+figcaption{
+  font-family:var(--mono);font-size:10.5px;color:var(--text-faint);
+  margin-top:8px;
+}
+
+/* slide 1 */
+.tension{display:flex;gap:22px;align-items:stretch;margin:6px 0 18px;}
+.tension .box{
+  flex:1;border:1px solid var(--border);background:var(--bg-card);
+  border-radius:6px;padding:18px 16px;text-align:center;
+}
+.tension .box .k{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:.03em;color:#eee;}
+.tension .box .v{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);margin-top:6px;}
+.tension .box.risk{border-top:2px solid var(--tier-review);}
+.tension .box.bottleneck{border-top:2px solid var(--accent-blue);}
+.tension .arrows{
+  flex:0 0 34px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--text-faint);font-size:18px;
+}
+.thesis{
+  font-family:var(--sans);font-size:17px;font-weight:500;color:#f0f0f0;
+  border-left:2px solid var(--accent);padding-left:14px;margin-top:auto;
+}
+
+/* slide 2 table */
+.gaptable{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;}
+.gaptable th{
+  text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  color:var(--text-faint);text-transform:uppercase;padding:0 10px 8px;font-weight:500;
+  border-bottom:1px solid var(--border);
+}
+.gaptable td{padding:10px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+.gaptable tr td:first-child{font-weight:600;color:#e8e8e8;width:38%;}
+.gaptable td .cite{color:var(--accent);font-family:var(--mono);font-size:11px;}
+.gapstatement{
+  margin-top:auto;font-size:16px;font-weight:500;color:#f0f0f0;
+  font-family:var(--sans);
+}
+.gapstatement .q{color:var(--accent);}
+
+/* slide 3 */
+.dims{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:12.5px;margin:2px 0 4px;}
+.dims .row{display:flex;justify-content:space-between;padding:5px 10px;background:var(--bg-card);border:1px solid var(--border-soft);border-radius:4px;}
+.dims .row .w{color:var(--accent);font-weight:600;}
+.floor-banner{
+  margin-top:12px;border:1px solid var(--border);background:var(--bg-card-2);
+  border-radius:6px;padding:12px 14px;
+}
+.floor-banner .line{font-family:var(--mono);font-size:12px;color:#e8e8e8;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.floor-banner .plus{color:var(--text-faint);}
+.floor-banner .cap{font-size:11px;color:var(--text-dim);margin-top:6px;}
+.shadow-tag{
+  margin-top:10px;display:flex;gap:9px;align-items:flex-start;
+  border:1px dashed var(--border);border-radius:6px;padding:9px 12px;
+  background:rgba(79,193,176,0.05);
+}
+.shadow-tag .badge{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--accent);
+  border:1px solid var(--accent-dim);border-radius:3px;padding:2px 6px;flex:0 0 auto;
+}
+.shadow-tag .txt{font-size:11.5px;color:var(--text-dim);line-height:1.5;}
+
+/* slide 4 architecture */
+.archwrap{flex:1;display:flex;flex-direction:column;justify-content:center;}
+.arch-labels{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.arch-labels span{
+  font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+  border:1px solid var(--border-soft);border-radius:3px;padding:3px 8px;background:var(--bg-card);
+}
+
+/* slide 5 evidence cards */
+.evcards{display:flex;gap:14px;margin-bottom:14px;}
+.evcard{flex:1;border:1px solid var(--border);background:var(--bg-card);border-radius:6px;padding:14px 14px 12px;}
+.evcard .action{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);}
+.evcard .arrow{color:var(--text-faint);margin:6px 0;font-size:13px;}
+.evcard .detail{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:8px;line-height:1.5;}
+.evstrip{display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:#dcdcdc;margin-top:2px;}
+.evstrip .item{border-left:2px solid var(--accent);padding-left:9px;}
+.evstrip .num{color:var(--accent);font-weight:700;}
+.caveat{
+  margin-top:auto;padding-top:12px;border-top:1px solid var(--border-soft);
+  font-size:11px;color:var(--text-dim);line-height:1.55;
+}
+.caveat b{color:var(--text);}
+
+/* slide 6 readiness */
+.readywrap{display:flex;gap:22px;flex:1;min-height:0;}
+.readycol{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
+.readycol h3{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-faint);margin:0 0 4px;font-weight:500;
+}
+.check-item{display:flex;gap:8px;font-size:12.5px;color:#dedede;line-height:1.4;}
+.check-item .m{color:var(--tier-auto);flex:0 0 auto;font-family:var(--mono);}
+.check-item .m.warn{color:var(--tier-confirm);}
+.limit-item{font-size:12px;color:#cfcfcf;line-height:1.45;padding:6px 0;border-bottom:1px solid var(--border-soft);}
+.limit-item:last-child{border-bottom:none;}
+.limit-item .n{font-family:var(--mono);color:var(--accent);margin-right:6px;}
+.costbar{
+  margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);
+  display:flex;gap:26px;flex-wrap:wrap;font-size:11px;color:var(--text-dim);
+}
+.costbar b{color:var(--text);font-family:var(--mono);font-weight:600;}
+
+/* slide 7 demo */
+.demolegend{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
+.demolegend .row{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12.5px;color:#e6e6e6;}
+.demolegend .row .cmd{color:var(--text-dim);}
+.terminal{
+  background:#161617;border:1px solid var(--border);border-radius:6px;
+  padding:14px 16px;font-family:var(--mono);font-size:11.5px;line-height:1.75;
+  flex:1;overflow-y:auto;
+}
+.terminal .prompt{color:var(--accent);}
+.terminal .cmdtxt{color:#eee;}
+.terminal .out{color:var(--text-dim);}
+.terminal .ok{color:var(--tier-auto);}
+.terminal .warn{color:var(--tier-confirm);}
+.terminal .bad{color:var(--tier-review);}
+
+/* ---------- footer / status bar ---------- */
+.statusbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:7px 14px;background:#232324;border-top:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;color:var(--text-dim);
+}
+.statusbar .left{display:flex;align-items:center;gap:14px;min-width:0;}
+.statusbar .left .proj{color:var(--accent);white-space:nowrap;}
+.statusbar .left .cur{color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.statusbar .right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}
+.navbtn{
+  background:transparent;border:1px solid var(--border);color:var(--text-dim);
+  font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:3px;cursor:pointer;
+}
+.navbtn:hover{color:var(--text);border-color:var(--accent-dim);}
+.navbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.panelbtn{
+  background:transparent;border:1px solid var(--border);color:var(--accent);
+  font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:3px;cursor:pointer;
+}
+.panelbtn:hover{background:rgba(79,193,176,0.08);}
+.panelbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+/* ---------- bottom drawer ---------- */
+.drawer{
+  max-height:0;overflow:hidden;background:var(--bg-panel);border-top:0 solid var(--border);
+  transition:max-height .22s ease;
+}
+.drawer.open{max-height:360px;border-top:1px solid var(--border);}
+.drawer-tabs{display:flex;gap:2px;padding:8px 14px 0;}
+.drawer-tab{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-faint);background:transparent;border:none;border-bottom:2px solid transparent;
+  padding:7px 10px;cursor:pointer;
+}
+.drawer-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.drawer-tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.drawer-body{padding:14px 20px 18px;overflow-y:auto;max-height:300px;}
+.drawer-pane{display:none;}
+.drawer-pane.active{display:block;}
+
+.notes-slidehead{font-family:var(--mono);font-size:10.5px;color:var(--accent);margin-bottom:6px;letter-spacing:.03em;}
+.notes-text{font-size:13.5px;line-height:1.65;color:#dedede;max-width:74ch;}
+
+.script-line{display:flex;gap:14px;padding:8px 0;border-bottom:1px solid var(--border-soft);}
+.script-line:last-child{border-bottom:none;}
+.script-line .t{font-family:var(--mono);font-size:10.5px;color:var(--accent);flex:0 0 78px;padding-top:2px;}
+.script-line .s{font-size:12.5px;line-height:1.6;color:#dbdbdb;}
+.script-line .s .tag{font-family:var(--mono);font-size:9.5px;color:var(--text-faint);display:block;margin-bottom:2px;letter-spacing:.05em;text-transform:uppercase;}
+
+.reflist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
+.reflist li{font-size:12.5px;line-height:1.55;color:#dbdbdb;padding-left:26px;position:relative;}
+.reflist li .n{position:absolute;left:0;color:var(--accent);font-family:var(--mono);}
+.reflist li .src{color:var(--text-faint);font-family:var(--mono);font-size:11px;display:block;margin-top:2px;}
+
+.audittable{width:100%;border-collapse:collapse;font-size:11.5px;}
+.audittable th{
+  text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-faint);padding:0 8px 7px;border-bottom:1px solid var(--border);font-weight:500;
+}
+.audittable td{padding:7px 8px;border-bottom:1px solid var(--border-soft);vertical-align:top;color:#d6d6d6;}
+.audittable td.cls{font-family:var(--mono);font-weight:700;text-align:center;width:34px;}
+.audittable td.cls.a{color:var(--tier-auto);}
+.audittable td.cls.b{color:var(--accent-blue);}
+.audittable td.src{font-family:var(--mono);font-size:10px;color:var(--text-faint);}
+
+.hint{font-size:10.5px;color:var(--text-faint);margin-top:12px;}
+
+@media (max-width:760px){
+  .tension,.evcards,.readywrap{flex-direction:column;}
+  .gutter{display:none;}
+  .slide{padding:24px 22px;}
+  .script-line{flex-direction:column;gap:2px;}
+  .script-line .t{flex:none;}
+}
+</style>
+
+<div class="app">
+
+  <div class="titlebar">
+    <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <span class="path"><b>ps-9.1</b> / graduated-autonomy-engine — final review deck</span>
+  </div>
+
+  <div class="tabstrip" id="tabstrip" role="tablist" aria-label="Slides"></div>
+
+  <div class="editor">
+    <div class="gutter" id="gutter" aria-hidden="true"></div>
+    <div id="slides"></div>
+  </div>
+
+  <div class="statusbar">
+    <div class="left">
+      <span class="proj">●&nbsp;PS-9.1</span>
+      <span class="cur" id="statusCur">01 / 07 — AI agents have a control problem</span>
+    </div>
+    <div class="right">
+      <button class="navbtn" id="prevBtn" aria-label="Previous slide">&larr; prev</button>
+      <button class="navbtn" id="nextBtn" aria-label="Next slide">next &rarr;</button>
+      <button class="panelbtn" id="drawerToggle" aria-expanded="false">▤ speaker package</button>
+    </div>
+  </div>
+
+  <div class="drawer" id="drawer">
+    <div class="drawer-tabs" role="tablist" aria-label="Speaker package">
+      <button class="drawer-tab active" data-pane="notes">Speaker Notes</button>
+      <button class="drawer-tab" data-pane="script">Full Script</button>
+      <button class="drawer-tab" data-pane="refs">References</button>
+      <button class="drawer-tab" data-pane="audit">Claim Audit</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-pane active" id="pane-notes">
+        <div class="notes-slidehead" id="notesHead">01 / 07 — AI AGENTS HAVE A CONTROL PROBLEM</div>
+        <div class="notes-text" id="notesText"></div>
+      </div>
+      <div class="drawer-pane" id="pane-script"></div>
+      <div class="drawer-pane" id="pane-refs"></div>
+      <div class="drawer-pane" id="pane-audit"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============ SLIDE CONTENT ============ */
+const slideTabs = [
+  "01_problem.md","02_gap.md","03_solution.md","04_architecture.md",
+  "05_evidence.md","06_readiness.md","07_demo.sh"
+];
+
+const slideTitles = [
+  "AI agents have a control problem",
+  "Where existing control approaches stop",
+  "Graduated Autonomy Engine",
+  "Implemented system architecture",
+  "Three actions — three oversight levels",
+  "From prototype to deployed system",
+  "Live governance decision"
+];
+
+const notes = [
+"AI agents now take real actions — updates, deletes, calls to other systems. Full autonomy under-oversees the consequential ones; full gating bottlenecks the trivial ones. The right question isn't autonomous-or-not — it's how much oversight each action deserves. (Problem framing: reports/00-project-charter.md:5-8, README.md:16-21.)",
+"Prior work sits at the extremes, or gates on fixed, predefined rules. NIST's AI Risk Management Framework calls for human oversight but leaves the mechanism open, and the signal you'd calibrate oversight to — model confidence — is itself known to be poorly calibrated. That's the open gap: proportional oversight.",
+"Every proposed action gets a weighted composite across four dimensions — reversibility weighted highest at 0.40, verified in app/risk/scorer.py:50-56. Two thresholds (0.30 / 0.65, app/risk/tiers.py:10-11) route it to autonomous, confirm, or full review. Deterministic safety floors sit above that score and can only escalate the tier — proven by an assert in app/risk/floors.py:97-100. Adaptive calibration runs in shadow mode: bounded ±0.10, minimum 5 decisions, audited, never applied to routing in this deployment (app/calibration.py:1-33; README L-C).",
+"It's a FastAPI service (10 endpoints, app/main.py) backed by Postgres. Each /v1/actions/evaluate call scores the action, calls a pinned OpenAI model (gpt-5.6-luna, live-verified T-03) for one confidence signal, applies the floors, and writes an append-only, SHA-256 hash-chained record (app/audit.py:16,30-61) to Postgres. Failures fail closed — an LLM safety refusal is terminal and never retried (app/llm.py:159-173). /livez does no I/O; /readyz deep-checks the DB and LLM (app/main.py:144-162), matching the platform's ~2s health-check timeout.",
+"Live against Railway: 12 of 12 runs across the three canonical actions matched the expected tier (reports/evidence/final-demo-capture.json, commit a076248). 144 tests pass, 6 skipped, verified live this session. The bulk-delete case is the clearest proof the floors do real work: its weighted composite alone (0.642) only reaches CONFIRM — the irreversible_bulk floor is what forces FULL_REVIEW. Honest caveat: composite scores are not reproducible across process restarts because the in-process LLM confidence cache resets (README L-A) — the same payload scored 0.642 then 0.735 after a restart. Tiers stay stable wherever a floor applies, since floors read raw inputs, never the composite. Audit records reconstruct exactly, since raw inputs, weights_version, and llm_model are all persisted.",
+"Implemented and verified: real LLM provider, Postgres persistence with a hash-chained audit log, a working API, health checks, 144 passing tests, and two independent live deployments — Railway, proven by curl (reports/evidence/T-14-curl.txt), and AWS Lambda behind a public Function URL, proven by curl against /livez and a real evaluate call (isolated AWS clone, reports/evidence/T-15-live-verification.txt). Railway remains the deployment of record for the demo; AWS demonstrates the system is genuinely portable, not tied to one platform. Honest limitations: composite-score drift across restarts; adaptive calibration is shadow-only; calibration observations can inherit reviewer bias. Cost was not measured in this project — a billing alarm was planned but never confirmed active.",
+"Three commands, three tiers, run live against the deployed Railway service (demo.sh, BASE_URL=aivartba-production.up.railway.app). Read-only auto-executes. A single update requires the CLI's interactive confirm prompt (cli.py:235, 'Confirm? [y/N]'). An irreversible bulk delete — 5,000 records — trips the irreversible_bulk safety floor straight to FULL_REVIEW, regardless of its weighted score. That's proportional oversight: a weighted estimate, with deterministic floors that can only make it stricter, and a calibration layer that's earning trust in shadow before it's ever allowed to steer."
+];
+
+/* condensed spoken script, timestamped, ~295 words total */
+const script = [
+  ["0:00–0:20","PROBLEM","AI agents now take real actions — updates, deletes, calls to other systems. Full autonomy under-oversees the consequential ones. Full gating bottlenecks the trivial ones. The right question isn't autonomous or not — it's how much oversight each action deserves."],
+  ["0:20–0:40","GAP","Existing approaches sit at the extremes, or gate on fixed rules. NIST's AI Risk Management Framework calls for human oversight but leaves the mechanism open, and the signal you'd calibrate to — model confidence — is itself known to be poorly calibrated. That's the open gap."],
+  ["0:40–1:00","SOLUTION","My engine scores every proposed action across four weighted dimensions — reversibility, data scope, regulatory category, and model confidence — and routes it to autonomous, confirm, or full review. Deterministic safety floors sit above that score and can only escalate the tier, never suppress it. Adaptive calibration runs in shadow mode — audited, not yet driving routing."],
+  ["1:00–1:25","ARCHITECTURE","It's a FastAPI service backed by Postgres. Each evaluation calls a pinned OpenAI model for one confidence signal, applies the floors, and writes an append-only, hash-chained audit record. Failures fail closed — a safety refusal is terminal, never retried."],
+  ["1:25–1:45","EVIDENCE","Live against Railway, twelve of twelve runs across three canonical actions matched the expected tier — a hundred and forty-four tests pass. The bulk-delete case proves the floors matter: its weighted score alone only reaches confirm; the irreversible-bulk floor is what forces full review."],
+  ["1:45–2:10","LIMIT + AWS","One honest limitation: composite scores drift across restarts, though tiers stay stable wherever a floor applies. The engine also runs on AWS Lambda behind a public Function URL, independently of Railway — proving the design isn't tied to one platform."],
+  ["2:10–2:30","LIVE DEMO + CLOSE","[run ./demo.sh read / update / bulk-delete] Read is autonomous. Update needs confirmation. Bulk delete trips the irreversible floor into full review — proportional oversight, enforced deterministically."]
+];
+
+/* ============ SLIDE MARKUP ============ */
+const slideHTML = [
+
+// 1 — PROBLEM
+`<div class="eyebrow">01 / 07 — problem</div>
+<h1 class="slide-title">AI agents have a control problem</h1>
+<div class="tension">
+  <div class="box risk">
+    <div class="k">AUTONOMOUS</div>
+    <div class="v">too much risk</div>
+  </div>
+  <div class="arrows">&#8596;</div>
+  <div class="box bottleneck">
+    <div class="k">FULLY GATED</div>
+    <div class="v">too much human bottleneck</div>
+  </div>
+</div>
+<div class="thesis">Agent actions need oversight proportional to their risk — not one fixed setting.</div>`,
+
+// 2 — GAP
+`<div class="eyebrow">02 / 07 — research gap</div>
+<h1 class="slide-title">Where existing control approaches stop</h1>
+<table class="gaptable">
+  <tr><th>Approach</th><th>Limitation</th></tr>
+  <tr><td>Full autonomy</td><td>weak oversight</td></tr>
+  <tr><td>Full human gating</td><td>poor scalability <span class="cite">[3]</span></td></tr>
+  <tr><td>Rule / policy controls</td><td>fixed, predefined decisions <span class="cite">[4]</span></td></tr>
+  <tr><td>HITL approaches</td><td>oversight quality depends on policy design <span class="cite">[1][2]</span></td></tr>
+</table>
+<div class="gapstatement"><span class="q">Open question —</span> how can oversight be made proportional to action risk?</div>`,
+
+// 3 — SOLUTION
+`<div class="eyebrow">03 / 07 — engineering contribution</div>
+<h1 class="slide-title">Graduated Autonomy Engine</h1>
+<figure>
+<svg viewBox="0 0 900 150" role="img" aria-label="Proposed action flows through a four-dimension risk score, then branches to autonomous, confirm, or full review.">
+  <defs>
+    <marker id="ar1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="currentColor"/></marker>
+  </defs>
+  <g style="color:var(--text-faint)">
+  <rect x="10" y="18" width="150" height="34" rx="4" fill="none" stroke="currentColor"/>
+  <text x="85" y="39" text-anchor="middle" class="lbl">PROPOSED ACTION</text>
+  <line x1="160" y1="35" x2="240" y2="35" stroke="currentColor" marker-end="url(#ar1)"/>
+  <rect x="242" y="12" width="190" height="46" rx="4" fill="none" stroke="var(--accent)" style="color:var(--accent)"/>
+  <text x="337" y="31" text-anchor="middle" class="lbl" style="fill:var(--accent)">4-DIMENSION</text>
+  <text x="337" y="46" text-anchor="middle" class="lbl" style="fill:var(--accent)">RISK SCORE</text>
+  <line x1="432" y1="35" x2="500" y2="35" stroke="currentColor" marker-end="url(#ar1)"/>
+  <line x1="500" y1="35" x2="500" y2="70" stroke="currentColor"/>
+  <line x1="330" y1="70" x2="670" y2="70" stroke="currentColor"/>
+  <line x1="330" y1="70" x2="330" y2="90" stroke="currentColor" marker-end="url(#ar1)"/>
+  <line x1="500" y1="70" x2="500" y2="90" stroke="currentColor" marker-end="url(#ar1)"/>
+  <line x1="670" y1="70" x2="670" y2="90" stroke="currentColor" marker-end="url(#ar1)"/>
+  </g>
+  <rect x="250" y="92" width="160" height="40" rx="4" fill="rgba(143,209,158,0.08)" stroke="var(--tier-auto)"/>
+  <text x="330" y="117" text-anchor="middle" class="lbl" style="fill:var(--tier-auto);font-weight:600">AUTONOMOUS</text>
+  <rect x="420" y="92" width="160" height="40" rx="4" fill="rgba(224,189,107,0.08)" stroke="var(--tier-confirm)"/>
+  <text x="500" y="117" text-anchor="middle" class="lbl" style="fill:var(--tier-confirm);font-weight:600">CONFIRM</text>
+  <rect x="590" y="92" width="160" height="40" rx="4" fill="rgba(224,108,101,0.08)" stroke="var(--tier-review)"/>
+  <text x="670" y="117" text-anchor="middle" class="lbl" style="fill:var(--tier-review);font-weight:600">FULL REVIEW</text>
+</svg>
+<figcaption>Weighted composite routes to one of three tiers via two thresholds (0.30 / 0.65).</figcaption>
+</figure>
+<div class="dims">
+  <div class="row"><span>reversibility</span><span class="w">0.40</span></div>
+  <div class="row"><span>data_scope</span><span class="w">0.30</span></div>
+  <div class="row"><span>regulatory</span><span class="w">0.20</span></div>
+  <div class="row"><span>confidence</span><span class="w">0.10</span></div>
+</div>
+<div class="floor-banner">
+  <div class="line"><span>WEIGHTED SCORE</span><span class="plus">+</span><span>DETERMINISTIC SAFETY FLOORS</span><span class="plus">&rarr;</span><span style="color:var(--accent)">FINAL ENFORCED TIER</span></div>
+  <div class="cap">Floors only escalate the routed tier — never lower it.</div>
+</div>
+<div class="shadow-tag">
+  <span class="badge">SHADOW MODE</span>
+  <span class="txt">Adaptive calibration is computed and audited, but not applied to production routing — bounded to &plusmn;0.10, minimum 5 decisions of evidence.</span>
+</div>`,
+
+// 4 — ARCHITECTURE
+`<div class="eyebrow">04 / 07 — implementation</div>
+<h1 class="slide-title">Implemented system architecture</h1>
+<div class="archwrap">
+<figure>
+<svg viewBox="0 0 900 200" role="img" aria-label="Agent client calls the FastAPI evaluate endpoint, which computes risk dimensions, a weighted score, applies safety floors and routing, produces an autonomy decision, and writes to PostgreSQL audit persistence before returning a CLI or API response.">
+  <defs>
+    <marker id="ar2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><polygon points="0,0 7,3 0,6" fill="currentColor"/></marker>
+  </defs>
+  <g style="color:var(--text-faint)">
+  <rect x="8" y="70" width="110" height="40" rx="4" fill="none" stroke="currentColor"/>
+  <text x="63" y="94" text-anchor="middle" class="lbl">CLIENT / CLI</text>
+  <line x1="118" y1="90" x2="168" y2="90" stroke="currentColor" marker-end="url(#ar2)"/>
+  <rect x="170" y="64" width="160" height="52" rx="4" fill="none" stroke="var(--accent-blue)" style="color:var(--accent-blue)"/>
+  <text x="250" y="86" text-anchor="middle" class="lbl" style="fill:var(--accent-blue)">FastAPI</text>
+  <text x="250" y="102" text-anchor="middle" class="lbl-dim">POST /v1/actions/evaluate</text>
+  <line x1="330" y1="90" x2="380" y2="90" stroke="currentColor" marker-end="url(#ar2)"/>
+  <rect x="382" y="64" width="150" height="52" rx="4" fill="none" stroke="currentColor"/>
+  <text x="457" y="86" text-anchor="middle" class="lbl">Weighted scorer</text>
+  <text x="457" y="102" text-anchor="middle" class="lbl-dim">+ pinned LLM call</text>
+  <line x1="532" y1="90" x2="582" y2="90" stroke="currentColor" marker-end="url(#ar2)"/>
+  <rect x="584" y="64" width="150" height="52" rx="4" fill="none" stroke="currentColor"/>
+  <text x="659" y="86" text-anchor="middle" class="lbl">Safety floors</text>
+  <text x="659" y="102" text-anchor="middle" class="lbl-dim">escalate-only routing</text>
+  <line x1="734" y1="90" x2="784" y2="90" stroke="currentColor" marker-end="url(#ar2)"/>
+  </g>
+  <rect x="786" y="60" width="106" height="60" rx="4" fill="rgba(79,193,176,0.07)" stroke="var(--accent)"/>
+  <text x="839" y="84" text-anchor="middle" class="lbl" style="fill:var(--accent)">DECISION</text>
+  <text x="839" y="98" text-anchor="middle" class="lbl-dim">auto / confirm /</text>
+  <text x="839" y="110" text-anchor="middle" class="lbl-dim">full_review</text>
+  <line x1="457" y1="116" x2="457" y2="150" stroke="var(--text-faint)" marker-end="url(#ar2)"/>
+  <rect x="330" y="150" width="254" height="42" rx="4" fill="none" stroke="var(--text-faint)"/>
+  <text x="457" y="169" text-anchor="middle" class="lbl" style="fill:var(--text)">PostgreSQL</text>
+  <text x="457" y="184" text-anchor="middle" class="lbl-dim">hash-chained audit log (SHA-256)</text>
+</svg>
+<figcaption>Every evaluate call: score &rarr; LLM confidence &rarr; floors &rarr; decision &rarr; persisted, hash-chained audit record.</figcaption>
+</figure>
+<div class="arch-labels">
+  <span>persistence: Postgres</span>
+  <span>audit: SHA-256 hash chain</span>
+  <span>LLM: OpenAI, pinned model, fail-closed</span>
+  <span>/livez: no I/O</span>
+  <span>/readyz: DB + LLM deep check</span>
+  <span>CLI: interactive confirm</span>
+</div>
+</div>`,
+
+// 5 — EVIDENCE
+`<div class="eyebrow">05 / 07 — evidence</div>
+<h1 class="slide-title">Three actions — three oversight levels</h1>
+<div class="evcards">
+  <div class="evcard">
+    <div class="action">READ-ONLY</div>
+    <div class="arrow">&darr;</div>
+    <span class="tier-pill tier-auto"><span class="tier-dot"></span>AUTONOMOUS</span>
+    <div class="detail">composite 0.067–0.088</div>
+  </div>
+  <div class="evcard">
+    <div class="action">SINGLE UPDATE</div>
+    <div class="arrow">&darr;</div>
+    <span class="tier-pill tier-confirm"><span class="tier-dot"></span>CONFIRM</span>
+    <div class="detail">composite 0.44<br>floor: low_confidence_on_mutation</div>
+  </div>
+  <div class="evcard">
+    <div class="action">IRREVERSIBLE BULK DELETE</div>
+    <div class="arrow">&darr;</div>
+    <span class="tier-pill tier-review"><span class="tier-dot"></span>FULL REVIEW</span>
+    <div class="detail">composite 0.642<br>floor: irreversible_bulk</div>
+  </div>
+</div>
+<div class="evstrip">
+  <div class="item"><span class="num">12/12</span> live Railway runs matched gate (commit a076248)</div>
+  <div class="item"><span class="num">144</span> passed, <span class="num">6</span> skipped — pytest, verified live</div>
+</div>
+<div class="caveat"><b>Honest limitation:</b> composite scores are not reproducible across process restarts (the LLM confidence cache resets) — the bulk-delete payload scored 0.642, then 0.735 after a restart. Tiers stay stable wherever a floor applies; audit records reconstruct exactly from persisted inputs.</div>`,
+
+// 6 — READINESS
+`<div class="eyebrow">06 / 07 — production readiness</div>
+<h1 class="slide-title">From prototype to deployed system</h1>
+<div class="readywrap">
+  <div class="readycol">
+    <h3>Implemented &amp; verified</h3>
+    <div class="check-item"><span class="m">&#10003;</span>Real LLM provider — pinned model, fail-closed</div>
+    <div class="check-item"><span class="m">&#10003;</span>PostgreSQL + hash-chained audit log</div>
+    <div class="check-item"><span class="m">&#10003;</span>FastAPI, 10 endpoints, health checks</div>
+    <div class="check-item"><span class="m">&#10003;</span>144 automated tests passing</div>
+    <div class="check-item"><span class="m">&#10003;</span>Railway — live, curl-verified</div>
+    <div class="check-item"><span class="m">&#10003;</span>CLI interactive confirm flow</div>
+    <div class="check-item"><span class="m">&#10003;</span>AWS — Lambda + Function URL live, curl-verified (public HTTPS endpoint, ECR + IAM execution role; App Runner intentionally avoided — closed to new customers 30 Apr 2026)</div>
+  </div>
+  <div class="readycol">
+    <h3>Limitations / next research</h3>
+    <div class="limit-item"><span class="n">1</span>Composite scores drift across restarts; tiers stay stable via floors</div>
+    <div class="limit-item"><span class="n">2</span>Adaptive calibration is shadow-only, not yet driving routing</div>
+    <div class="limit-item"><span class="n">3</span>Calibration observations can inherit reviewer bias</div>
+  </div>
+</div>
+<div class="costbar">
+  <span><b>Cost:</b> not measured in this project</span>
+  <span><b>Known ceiling:</b> 502s at 12-way concurrent load; sequential retries succeeded</span>
+</div>`,
+
+// 7 — DEMO
+`<div class="eyebrow">07 / 07 — live demo</div>
+<h1 class="slide-title">Live governance decision</h1>
+<div class="demolegend">
+  <div class="row"><span class="cmd">read</span> &rarr; <span class="tier-pill tier-auto"><span class="tier-dot"></span>AUTONOMOUS</span></div>
+  <div class="row"><span class="cmd">update</span> &rarr; <span class="tier-pill tier-confirm"><span class="tier-dot"></span>CONFIRM</span></div>
+  <div class="row"><span class="cmd">bulk-delete</span> &rarr; <span class="tier-pill tier-review"><span class="tier-dot"></span>FULL REVIEW</span></div>
+</div>
+<div class="terminal">
+<div><span class="prompt">$</span> <span class="cmdtxt">./demo.sh read</span></div>
+<div class="out">&rarr; tier: <span class="ok">AUTONOMOUS</span> · executed</div>
+<div>&nbsp;</div>
+<div><span class="prompt">$</span> <span class="cmdtxt">./demo.sh update</span></div>
+<div class="out">&rarr; tier: <span class="warn">CONFIRM</span> · Confirm? [y/N] y &rarr; approved</div>
+<div>&nbsp;</div>
+<div><span class="prompt">$</span> <span class="cmdtxt">./demo.sh bulk-delete</span></div>
+<div class="out">&rarr; tier: <span class="bad">FULL_REVIEW</span> · floor: irreversible_bulk</div>
+</div>`
+];
+
+/* ============ REFERENCES ============ */
+const refsHTML = `<ul class="reflist">
+  <li><span class="n">[1]</span>NIST. <i>AI Risk Management Framework (AI RMF 1.0)</i>, NIST AI 100-1, 2023 — GOVERN/MAP/MEASURE/MANAGE functions; human oversight as a listed principle, implementation left open.<span class="src">nist.gov — NIST AI 100-1</span></li>
+  <li><span class="n">[2]</span>Survey. <i>Uncertainty Quantification and Confidence Calibration in Large Language Models: A Survey</i>, 2025.<span class="src">arXiv:2503.15850</span></li>
+  <li><span class="n">[3]</span>Author(s). <i>A Decoupled Human-in-the-Loop System for Controlled Autonomy in Agentic Workflows</i>, 2026 — HITL embedded in individual workflows limits reuse and doesn't scale in multi-agent settings.<span class="src">arXiv:2604.23049</span></li>
+  <li><span class="n">[4]</span>Author(s). <i>Beyond Automation Levels: A Framework for Human-Autonomy and Manned-Unmanned Teaming</i>, MDPI Robotics/journal.<span class="src">MDPI 7(4):105</span></li>
+  <li><span class="n">[5]</span>Chow, C.K. (1970); El-Yaniv &amp; Wiener (selective classification); Madras et al. (2018) <i>Learning to Defer</i> — theoretical grounding cited by this project's own README for its cost-sensitive deferral framing. Honest limitation self-noted there: confidence-based deferral ignores the downstream human's competence — this engine defers on action risk, not modelled human competence.<span class="src">README.md:516-561</span></li>
+  <li><span class="n">[6]</span>EU AI Act, Regulation (EU) 2024/1689, Article 14 ("Human oversight") — mapped feature-by-feature against this implementation.<span class="src">README.md:216-222</span></li>
+</ul>`;
+
+/* ============ CLAIM AUDIT ============ */
+const auditRows = [
+["Risk weights 0.40 / 0.30 / 0.20 / 0.10","A","app/risk/scorer.py:50-56"],
+["Thresholds 0.30 / 0.65","A","app/risk/tiers.py:10-11,29-33"],
+["Safety floors escalate-only (never lower tier)","A","app/risk/floors.py:97-100 (assert)"],
+["D-14 fix: low_confidence gated on is_mutation","A","app/risk/floors.py:20-27; progress-log/03-errors-and-fixes.md:18"],
+["Shadow-mode calibration, ±0.10, min. 5 decisions, not applied to routing","A","app/calibration.py:1-33; README.md:395-401"],
+["LLM: pinned model gpt-5.6-luna, live-verified T-03","A","CLAUDE.md env table"],
+["Fail-closed on LLM error; refusal terminal, never retried","A","app/llm.py:159-173"],
+["Hash-chained audit log (SHA-256, GENESIS_HASH)","A","app/audit.py:16,30-61"],
+["/livez no I/O; /readyz deep-checks DB + LLM","A","app/main.py:144-162"],
+["Railway live, curl-verified","A","reports/evidence/T-14-curl.txt:1-13"],
+["12/12 live demo runs matched gate","A","reports/evidence/final-demo-capture.json"],
+["144 passed, 6 skipped","A","live pytest run, this session"],
+["Composite scores not reproducible across restarts","A","README.md:373-385 (L-A), observed directly"],
+["AWS Lambda + Function URL live, curl-verified (/livez, /v1/actions/evaluate)","A","isolated AWS clone: reports/evidence/T-15-live-verification.txt"],
+["D-13 fixed: negative affected_records now rejected at 422 (Field(ge=0))","A","app/schemas.py:32"],
+["Cost: not measured in this project","A","progress-log/01-implementation-plan.md:11"],
+["Concurrency ceiling: 502s at 12-way load","A","reports/evidence/final-demo-capture.json"],
+["No dashboard exists; CLI is the confirm interface","A","cli.py:235 — repo has no dashboard component"],
+["NIST AI RMF — human oversight principle","B","NIST AI 100-1 (2023)"],
+["LLMs poorly calibrated / overconfident","B","arXiv:2503.15850 (2025)"],
+["HITL embedded in workflows doesn't scale","B","arXiv:2604.23049 (2026)"],
+["Fixed autonomy levels overwhelm/reduce engagement","B","MDPI 7(4):105"],
+];
+
+/* ============ RENDER ============ */
+const tabstrip = document.getElementById('tabstrip');
+const slidesEl = document.getElementById('slides');
+const gutter = document.getElementById('gutter');
+
+slideTabs.forEach((name,i)=>{
+  const t = document.createElement('div');
+  t.className='tab'+(i===0?' active':'');
+  t.setAttribute('role','tab');
+  t.setAttribute('tabindex','0');
+  t.innerHTML = `<span class="dotstate"></span>${name}`;
+  t.addEventListener('click',()=>goTo(i));
+  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goTo(i);}});
+  tabstrip.appendChild(t);
+});
+
+slideHTML.forEach((html,i)=>{
+  const s = document.createElement('div');
+  s.className='slide'+(i===0?' active':'');
+  s.innerHTML = html;
+  slidesEl.appendChild(s);
+});
+
+let gutterStr='';
+for(let i=1;i<=26;i++){gutterStr+=i+'<br>';}
+gutter.innerHTML = gutterStr;
+
+/* ============ NAV ============ */
+let cur = 0;
+const N = slideHTML.length;
+const statusCur = document.getElementById('statusCur');
+const notesHead = document.getElementById('notesHead');
+const notesText = document.getElementById('notesText');
+
+function pad(n){return String(n+1).padStart(2,'0');}
+
+function goTo(i){
+  cur = (i+N)%N;
+  document.querySelectorAll('.tab').forEach((t,idx)=>t.classList.toggle('active',idx===cur));
+  document.querySelectorAll('.slide').forEach((s,idx)=>s.classList.toggle('active',idx===cur));
+  statusCur.textContent = `${pad(cur)} / ${String(N).padStart(2,'0')} — ${slideTitles[cur]}`;
+  notesHead.textContent = `${pad(cur)} / ${String(N).padStart(2,'0')} — ${slideTitles[cur].toUpperCase()}`;
+  notesText.textContent = notes[cur];
+}
+
+document.getElementById('prevBtn').addEventListener('click',()=>goTo(cur-1));
+document.getElementById('nextBtn').addEventListener('click',()=>goTo(cur+1));
+
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='ArrowRight'){goTo(cur+1);}
+  else if(e.key==='ArrowLeft'){goTo(cur-1);}
+  else if(/^[1-7]$/.test(e.key)){goTo(parseInt(e.key,10)-1);}
+});
+
+/* ============ DRAWER ============ */
+const drawer = document.getElementById('drawer');
+const drawerToggle = document.getElementById('drawerToggle');
+let drawerOpen = false;
+drawerToggle.addEventListener('click',()=>{
+  drawerOpen = !drawerOpen;
+  drawer.classList.toggle('open',drawerOpen);
+  drawerToggle.setAttribute('aria-expanded',String(drawerOpen));
+});
+
+document.querySelectorAll('.drawer-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.drawer-tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.drawer-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-'+btn.dataset.pane).classList.add('active');
+    if(!drawerOpen){drawerOpen=true;drawer.classList.add('open');drawerToggle.setAttribute('aria-expanded','true');}
+  });
+});
+
+/* fill script pane */
+const scriptPane = document.getElementById('pane-script');
+let scriptHTML = '';
+let wordCount = 0;
+script.forEach(([t,tag,txt])=>{
+  wordCount += txt.split(/\s+/).length;
+  scriptHTML += `<div class="script-line"><div class="t">${t}</div><div class="s"><span class="tag">${tag}</span>${txt}</div></div>`;
+});
+scriptPane.innerHTML = scriptHTML + `<div class="hint">~${wordCount} spoken words · target 250–300 · total runtime 2:00–2:30 incl. live demo</div>`;
+
+document.getElementById('pane-refs').innerHTML = refsHTML;
+
+let auditHTML = `<div style="overflow-x:auto"><table class="audittable"><tr><th>Claim</th><th>Class</th><th>Source</th></tr>`;
+auditRows.forEach(([claim,cls,src])=>{
+  auditHTML += `<tr><td>${claim}</td><td class="cls ${cls.toLowerCase()}">[${cls}]</td><td class="src">${src}</td></tr>`;
+});
+auditHTML += `</table></div><div class="hint">[A] directly verified in repo/evidence &nbsp;·&nbsp; [B] externally researched, cited &nbsp;·&nbsp; no [D] (unsupported) claims remain</div>`;
+document.getElementById('pane-audit').innerHTML = auditHTML;
+
+goTo(0);
+</script>
