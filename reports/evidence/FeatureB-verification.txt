@@ -1,0 +1,152 @@
+Feature B — Precedent Retrieval + Novelty Escalation — verification
+Run at: 2026-08-20 12:31 IST
+Branch: feature/novelty-addons
+
+=== 1. Four required tests ===
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collected 4 items
+
+tests/test_novelty.py ....                                               [100%]
+
+============================== 4 passed in 0.39s ===============================
+
+=== 2. Full suite (hermetic) ===
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+testpaths: tests
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collected 126 items
+
+tests/test_adversarial_fixes.py .................                        [ 13%]
+tests/test_api.py ..................                                     [ 27%]
+tests/test_confidence.py ......                                          [ 32%]
+tests/test_db_store.py ssssss                                            [ 37%]
+tests/test_floors.py .........                                           [ 44%]
+tests/test_llm.py ......                                                 [ 49%]
+tests/test_novelty.py ....                                               [ 52%]
+tests/test_observability.py ...                                          [ 54%]
+tests/test_oversight.py .......                                          [ 60%]
+tests/test_routing.py ....                                               [ 63%]
+tests/test_scoring.py ..........................                         [ 84%]
+tests/test_security.py ........                                          [ 90%]
+tests/test_tiers.py ............                                         [100%]
+
+======================== 120 passed, 6 skipped in 0.88s ========================
+
+=== 3. Real-DB tests (embedding column doesn't break existing persistence) ===
+
+tests/test_db_store.py ......                                            [100%]
+
+======================== 6 passed in 144.27s (0:02:24) =========================
+
+[exited with code 0]
+
+=== 4. T-08 zero-diff ===
+exit: 0
+
+=== 5. app/risk/ zero-diff (novelty floor lives in app/embeddings.py, not app/risk/) ===
+
+=== 6. Frozen weights/thresholds unchanged ===
+51:    "reversibility": 0.40,
+52:    "data_scope": 0.30,
+53:    "regulatory": 0.20,
+54:    "confidence": 0.10,
+10:THRESHOLD_CONFIRM = 0.30
+11:THRESHOLD_FULL_REVIEW = 0.65
+
+=== 7. Migration verification (additive, nullable, applied to Neon) ===
+Migration file: migrations/versions/5517c3ad655b_add_embedding_to_actions.py
+Column verified: {'column_name': 'embedding', 'data_type': 'jsonb', 'is_nullable': 'YES'}
+
+=== 8. End-to-end demo (TestClient, controllable fake embeddings) ===
+Novel action evaluate response:
+{
+  "id": "5f89803c-80a2-4573-9c7f-9d75f303518f",
+  "agent_id": "agent-1",
+  "action_type": "read",
+  "resource": "novel-item-1",
+  "params": {
+    "x": 1
+  },
+  "params_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+  "state": "confirm",
+  "composite": 0.065,
+  "tier": "CONFIRM",
+  "explanation": "0.07 -> AUTONOMOUS. No single dimension change would alter the tier. Escalated to CONFIRM (novel action: no close precedent in 25 prior actions).",
+  "created_at": "2026-08-20T07:01:41.807326Z",
+  "precedent": {
+    "k": 3,
+    "matches": [
+      {
+        "action_id": "c0f3d5e3-d5de-4dc4-b6bf-97df27c23a3e",
+        "similarity": 0.0,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "6657442c-b43d-4d6b-8f3d-8e5d6e323bbd",
+        "similarity": 0.0,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "8d46b314-adf9-4334-a4d4-e07869020363",
+        "similarity": 0.0,
+        "outcome": "executed"
+      }
+    ],
+    "summary": "Similar to 3 prior actions; 0 were rejected."
+  }
+}
+
+Control (familiar) action evaluate response:
+{
+  "id": "ca966bce-22f6-4f9f-882f-2c31bcd772ce",
+  "agent_id": "agent-1",
+  "action_type": "read",
+  "resource": "cluster-item-control",
+  "params": {
+    "i": 999
+  },
+  "params_hash": "408878b4c2a707f4ef188eb8920647541d709cf1e67c6809d2f67512817fc001",
+  "state": "autonomous",
+  "composite": 0.065,
+  "tier": "AUTONOMOUS",
+  "explanation": "0.07 -> AUTONOMOUS. No single dimension change would alter the tier.",
+  "created_at": "2026-08-20T07:01:41.809674Z",
+  "precedent": {
+    "k": 3,
+    "matches": [
+      {
+        "action_id": "c0f3d5e3-d5de-4dc4-b6bf-97df27c23a3e",
+        "similarity": 1.0,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "6657442c-b43d-4d6b-8f3d-8e5d6e323bbd",
+        "similarity": 1.0,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "8d46b314-adf9-4334-a4d4-e07869020363",
+        "similarity": 1.0,
+        "outcome": "executed"
+      }
+    ],
+    "summary": "Similar to 3 prior actions; 0 were rejected."
+  }
+}

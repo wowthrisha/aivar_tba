@@ -32,6 +32,10 @@ class ActionORM(Base):
     # Not in T-11's original column list - gap found during the pre-T-14
     # persistence review (no state machine state was ever persisted).
     state: Mapped[str] = mapped_column(String, nullable=False)
+    # Feature B (novelty add-on): additive, nullable - a JSONB float
+    # array from OpenAI text-embedding-3-small. Null when embedding was
+    # never attempted or failed (fail-soft, embedding_degraded=true).
+    embedding: Mapped[list[float] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (Index("ix_actions_agent_id_created_at", "agent_id", "created_at"),)
 

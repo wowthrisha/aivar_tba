@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, model_validator
 
+from app.embeddings import PrecedentInfo
 from app.risk.scorer import Regulatory, Reversibility
 from app.state_machine import ActionState
 
@@ -55,6 +56,10 @@ class ActionResponse(BaseModel):
     tier: str | None
     explanation: str | None
     created_at: datetime
+    # Feature B (novelty add-on): only populated by evaluate() - not
+    # persisted, so every other endpoint that reuses this model leaves
+    # it null.
+    precedent: PrecedentInfo | None = None
 
 
 class ConfirmRequest(BaseModel):

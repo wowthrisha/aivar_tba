@@ -28,6 +28,11 @@ alembic==1.14.0
 # any code. Deploying a different version without re-verifying would
 # reintroduce guessed behavior.
 openai==2.49.0
+# Feature B (novelty add-on): cosine similarity for precedent retrieval.
+# Was present locally only as some other package's transitive
+# dependency (same class of gap as greenlet, T-14/D-effectively) -
+# pinned explicitly so Railway's clean container build has it.
+numpy==2.2.6
 python-dotenv
 pytest
 pytest-asyncio

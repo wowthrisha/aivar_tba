@@ -11,8 +11,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.audit import AuditLog
 from app.db import make_app_engine
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
+from app.embeddings import (
+    EmbeddingProvider,
+    OpenAIEmbeddingProvider,
+    PRECEDENT_WINDOW,
+    canonical_action_string,
+    escalate_one_tier,
+    max_similarity,
+    novelty_floor_should_escalate,
+    novelty_reason,
+    retrieve_precedent,
+)
 from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.logging_config import configure_logging, request_id_var
+from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.router import route_action
 from app.risk.scorer import score_action
@@ -78,6 +90,20 @@ def get_confidence_provider() -> ConfidenceProvider:
     return _real_provider
 
 
+_real_embedding_provider: EmbeddingProvider | None = None
+
+
+def get_embedding_provider() -> EmbeddingProvider:
+    # Feature B: EMBEDDING_MODEL is the spec's own pinned model
+    # (text-embedding-3-small), not OPENAI_MODEL - a separate, unrelated
+    # model string.
+    global _real_embedding_provider
+    if _real_embedding_provider is None:
+        client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        _real_embedding_provider = OpenAIEmbeddingProvider(client)
+    return _real_embedding_provider
+
+
 def get_app_engine() -> AsyncEngine:
     global _app_engine
     if _app_engine is None:
@@ -129,7 +155,7 @@ async def readyz(
     return {"status": "ok" if (llm_ok and db_ok) else "degraded", "checks": checks}
 
 
-def _to_action_response(record) -> ActionResponse:
+def _to_action_response(record, precedent=None) -> ActionResponse:
     return ActionResponse(
         id=record.id,
         agent_id=record.agent_id,
@@ -142,6 +168,7 @@ def _to_action_response(record) -> ActionResponse:
         tier=record.tier,
         explanation=record.explanation,
         created_at=record.created_at,
+        precedent=precedent,
     )
 
 
@@ -149,6 +176,7 @@ def _to_action_response(record) -> ActionResponse:
 async def evaluate(
     body: EvaluateRequest,
     provider: ConfidenceProvider = Depends(get_confidence_provider),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
     store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
     audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_log),
 ):
@@ -173,11 +201,37 @@ async def evaluate(
     weighted = score_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
     routing = route_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
 
+    # Feature B (novelty add-on): a separate step AFTER route_action(),
+    # not a change to app/risk/*.py - see app/embeddings.py's module
+    # docstring. Fail-soft: embedding failure skips precedent/novelty
+    # entirely rather than failing the request.
+    final_tier = routing.tier
+    final_explanation = routing.explanation
+    final_floor_name = routing.floor_name
+    precedent_info = None
+    embedding = await embedding_provider.embed(
+        canonical_action_string(body.action_type, body.resource, body.params)
+    )
+    if embedding is None:
+        logger.info(f"embedding_degraded=true for evaluate {action_id}")
+    else:
+        candidates = await store.list_recent_embedded_terminal_actions(
+            exclude_action_id=action_id, limit=PRECEDENT_WINDOW
+        )
+        precedent_info = retrieve_precedent(embedding, candidates)
+        prior_count = len(candidates)
+        if novelty_floor_should_escalate(max_similarity(embedding, candidates), prior_count):
+            escalated = escalate_one_tier(routing.tier)
+            if escalated != routing.tier:
+                final_tier = escalated
+                final_floor_name = "novelty_unprecedented"
+                final_explanation = f"{routing.explanation} Escalated to {escalated.name} ({novelty_reason(prior_count)})."
+
     target = {
         "AUTONOMOUS": ActionState.AUTONOMOUS,
         "CONFIRM": ActionState.CONFIRM,
         "FULL_REVIEW": ActionState.FULL_REVIEW,
-    }[routing.tier.name]
+    }[final_tier.name]
     transition(ActionState.EVALUATED, target)  # validates the edge exists (PROPOSED->EVALUATED->target)
 
     record = await store.save_risk_assessment(
@@ -188,29 +242,33 @@ async def evaluate(
         confidence_score=weighted.confidence,
         weights_version=weighted.weights_version,
         composite=routing.composite,
-        floor_fired=routing.floor_name,
-        tier=routing.tier.name,
+        floor_fired=final_floor_name,
+        tier=final_tier.name,
         llm_model=os.environ.get("OPENAI_MODEL"),
         llm_latency_ms=llm_result.latency_ms,
         degraded=llm_result.degraded,
-        rendered_explanation=routing.explanation,
+        rendered_explanation=final_explanation,
         new_state=target,
     )
+
+    if embedding is not None:
+        await store.set_embedding(action_id, embedding)
 
     await audit.append(
         event_type="evaluated",
         actor=body.agent_id,
         payload={
             "action_id": action_id,
-            "tier": routing.tier.name,
+            "tier": final_tier.name,
             "composite": routing.composite,
-            "floor_name": routing.floor_name,
-            "explanation": routing.explanation,
+            "floor_name": final_floor_name,
+            "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
+            "embedding_degraded": embedding is None,
         },
     )
 
-    return _to_action_response(record)
+    return _to_action_response(record, precedent=precedent_info)
 
 
 @app.get("/v1/actions/{action_id}", response_model=ActionResponse)
@@ -407,4 +465,50 @@ async def audit_verify(audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_
     result = await audit.verify()
     return AuditVerifyResponse(
         valid=result.valid, records_checked=result.records_checked, first_invalid_id=result.first_invalid_id
+    )
+
+
+@app.get("/v1/oversight/reviewers", response_model=OversightResponse)
+async def oversight_reviewers(
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+    audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_log),
+):
+    # No default limit=50 trap here (T-19's lesson) - every "decision"
+    # event is needed for a correct aggregation.
+    decision_records = await audit.list_records(event_type="decision", limit=1_000_000)
+
+    by_reviewer: dict[str, list[DecisionEvent]] = {}
+    action_cache: dict[str, object] = {}
+    for rec in decision_records:
+        action_id = rec.payload.get("action_id")
+        decision = rec.payload.get("decision")
+        if action_id is None or decision is None:
+            continue
+        if action_id not in action_cache:
+            action = await store.get_action(action_id)
+            if action is None:
+                continue
+            action_cache[action_id] = action
+        action = action_cache[action_id]
+        by_reviewer.setdefault(rec.actor, []).append(
+            DecisionEvent(
+                action_id=action_id,
+                decision=decision,
+                decided_at=rec.created_at,
+                proposed_at=action.created_at,
+                action_current_state=action.state.value,
+            )
+        )
+
+    reviewers = {reviewer_id: compute_reviewer_metrics(events) for reviewer_id, events in by_reviewer.items()}
+
+    queue = await store.list_review_queue()
+    oldest_pending_age_seconds = (
+        (datetime.now(timezone.utc) - queue[0].created_at).total_seconds() if queue else None
+    )
+
+    return OversightResponse(
+        reviewers=reviewers,
+        review_queue_depth=len(queue),
+        oldest_pending_age_seconds=oldest_pending_age_seconds,
     )

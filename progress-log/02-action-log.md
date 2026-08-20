@@ -969,3 +969,174 @@ recording p95, not a specific bound - reporting this transparently
 rather than characterizing it as fast.
 
 Evidence: reports/evidence/T-19-concurrency.txt.
+
+### [2026-08-20 10:02 IST] [Item 0 - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
+
+Added the "Theoretical grounding" README section (`## 13.`) and a video
+script line, per `PS-9-1-Novelty-Addons-v1.0.md` ("ITEM 0 - The
+reframing"). The user's message referenced this file with a "(1)"
+suffix that does not exist - found the real, unsuffixed file
+(`PS-9-1-Novelty-Addons-v1.0.md`, repo root) via a broad filesystem
+search before treating any content as authoritative, same discipline
+applied earlier this session to the "(2)"-suffixed prompt pack.
+
+Content pasted matches the source's "Paste into README, new section:
+'Theoretical grounding'" block (lines 40-52) exactly, converted from
+the source's own blockquote-as-paste-target convention to plain README
+prose - not literal `>` blockquote markup, to avoid reintroducing D-12's
+line-wrap blockquote bug (checked: 0 lines start with `>` after the
+edit). The video line (lines 56-60) went into a new
+`reports/video-script.md`, since no video-script file/convention
+existed yet in this project.
+
+Zero code changed - `git diff --name-only` shows only `README.md`;
+`app/risk/` and `tests/test_routing.py` (T-08) confirmed zero-diff.
+
+Evidence: reports/evidence/Item0-verification.txt.
+
+### [2026-08-20 10:09 IST] [Feature A - novelty add-on] [autonomous 60-min batch - delivery engineer] [branch: feature/novelty-addons]
+
+Implemented `GET /v1/oversight/reviewers` per the exact Feature A prompt
+in `PS-9-1-Novelty-Addons-v1.0.md` (lines 76-115).
+
+**Design decision, documented not silent**: the spec says "aggregated
+over the approvals table", but `approvals` only ever holds
+`decision="approve"` rows - `app/main.py`'s `decision()` handler never
+calls `store.set_approval()` for a reject. Aggregating strictly over
+`approvals` alone would make `approval_rate` trivially 1.0 for any
+reviewer who ever approved anything, silently hiding every reject -
+exactly the kind of silent approximation E-6 forbids. Used the audit
+log's `event_type="decision"` records instead (already written for
+every decision, approve or reject, by the same handler) as the single
+source for `decisions_total`/`approval_rate`/latency, cross-joined
+against each action's `created_at` (proposal time) and current `state`
+(for reversal_rate). No schema change, no migration, no new dependency
+- `app/oversight.py`'s module docstring documents this choice in full.
+
+**Files**: new `app/oversight.py` (pure aggregation, no I/O - matches
+`app/risk/scorer.py`'s pattern), new `OversightResponse`/`ReviewerMetrics`
+Pydantic models (kept with the logic module, matching
+`RiskAssessmentResult`'s precedent rather than `app/schemas.py`), new
+`GET /v1/oversight/reviewers` route in `app/main.py`, new
+`tests/test_oversight.py`.
+
+**Real finding from reading the code, not assumed**: `app/state_machine.py`'s
+`VALID_TRANSITIONS` shows `APPROVED -> {EXECUTED, EXPIRED}` only - an
+approved action can never reach `REJECTED` afterward (structurally
+unreachable). So `reversal_rate`'s "REJECTED or EXPIRED" wording is
+correct as written (defensive for a state the current state machine
+happens not to produce), but only EXPIRED can genuinely occur today -
+noted in case this surfaces oddly in review.
+
+**Empty-reviewer semantics**: 0 decisions -> `approval_rate`,
+`median_decision_latency`, `p90_decision_latency` = `null` (genuinely
+undefined, 0/0) but `reversal_rate` = `0.0` (the spec's own explicit
+fallback for that one metric, not null) and `automation_bias_flag` =
+`false` (well-defined regardless, since `decisions_total >= 5` fails).
+
+Tests: the three required
+(`test_oversight_metrics_computes_approval_rate`,
+`test_automation_bias_flag_fires_on_rubber_stamping` - seeded exactly
+6 decisions/6 approvals/2s latency per the spec, flag confirmed True -,
+`test_oversight_metrics_empty_reviewer_returns_nulls_not_zeros`) plus 4
+additional edge cases (sub-5-decisions no-flag, slow-review no-flag,
+reversal-rate counting, reversal-rate-zero-with-no-approvals). 7/7 pass.
+Full suite: 116 passed, 6 skipped (unchanged real-DB skip count).
+`tests/test_routing.py` (T-08) re-verified zero-diff against `a573663`.
+`app/risk/` untouched (empty `git diff --stat`). Frozen weights/
+thresholds re-grepped and confirmed unchanged.
+
+Endpoint run locally (TestClient, not yet deployed anywhere) against
+representative seeded data: reviewer "careful-carla" (3 decisions, 2
+approve/1 reject, latency ~1-2ms since scripted) correctly shows
+`approval_rate=0.67`, `automation_bias_flag=false`; reviewer
+"rubber-stamp-rick" (6 rapid approvals) correctly shows
+`approval_rate=1.0`, `automation_bias_flag=true` - the rubber-stamping
+signature fires as designed. `review_queue_depth=1` for one pending
+action, `oldest_pending_age_seconds` correctly populated.
+
+No defects found this task - first-attempt implementation, all tests
+green on first run.
+
+Evidence: reports/evidence/FeatureA-verification.txt.
+
+### [2026-08-20 12:31 IST] [Feature B - novelty add-on] [autonomous pre-video batch - delivery engineer] [branch: feature/novelty-addons]
+
+Implemented precedent retrieval + novelty escalation per the exact
+Feature B prompt in `PS-9-1-Novelty-Addons-v1.0.md` (lines 142-192).
+Tests-first: wrote and ran `tests/test_novelty.py`'s 4 required tests
+against the pure logic before any DB/endpoint wiring existed.
+
+**Architecture, deliberately isolated from app/risk/**: the novelty
+floor is implemented in a new `app/embeddings.py`, applied by
+`app/main.py`'s `evaluate()` handler as a step AFTER
+`route_action()` returns - `app/risk/floors.py`/`router.py`/`scorer.py`/
+`tiers.py` are all byte-identical (confirmed, `git diff --stat --
+app/risk/` empty). T-08 (`tests/test_routing.py`) untouched and
+re-verified zero-diff. This means `route_action()`'s signature never
+changed, so nothing about how T-08 calls it could ever be affected,
+regardless of what the novelty layer does.
+
+**Migration**: `migrations/versions/5517c3ad655b_add_embedding_to_actions.py`
+- single `op.add_column('actions', ..., nullable=True)`, correct
+`downgrade()`. Verified additive-only (no drops, no type changes)
+BEFORE applying. Applied to the real Neon DB (the same one Railway/
+master reads) via `alembic upgrade head` - safe because it's a new
+nullable column no other branch's code reads or writes; re-ran the 6
+real-DB tests afterward to confirm existing persistence paths are
+unaffected (6/6 pass, ~144s). `numpy==2.2.6` pinned explicitly in
+`requirements.txt` (was only a transitive dependency locally - same gap
+class as T-14's `greenlet` finding, D-caught before it could repeat).
+
+**Design decisions**:
+- `precedent` added as an optional field on the existing
+  `ActionResponse` (default `None`), populated only by `evaluate()` -
+  not persisted, so every other endpoint reusing that model stays null.
+- Existing hermetic test fixtures (`tests/test_api.py`,
+  `test_adversarial_fixes.py`, `test_security.py`) needed a
+  `get_embedding_provider` override added, or they'd try to construct a
+  real `AsyncOpenAI` client during hermetic runs. Added a
+  `_FakeEmbeddingProvider` to each, matching the existing per-file fake
+  pattern. Not a business-logic change - required for the new
+  dependency to not break existing tests.
+- Escalation explanation is appended to the existing routing
+  explanation (`"{original} Escalated to {tier} (novel action: ...)."`)
+  rather than replacing it, so the original weighted/floor reasoning
+  stays visible alongside the novelty escalation - both are true and
+  both matter for an audit.
+
+Tests: 4 required
+(`test_precedent_returns_similar_actions_with_outcomes`,
+`test_novelty_floor_escalates_unprecedented_action`,
+`test_novelty_floor_inactive_below_20_prior_actions`,
+`test_escalate_only_invariant_holds_with_novelty_floor` - the last one
+sweeps `Reversibility x affected_records x Regulatory x confidence x`
+4 novelty-similarity/prior-count cases, proving the SAME escalate-only
+guarantee tests/test_floors.py::test_escalate_only_sweep proves for the
+original floors, but for this new layer stacked on top). 4/4 pass.
+Full suite: 120 passed, 6 skipped (hermetic) + 6/6 real-DB tests passed
+separately. T-08 zero-diff. Frozen weights/thresholds re-grepped,
+unchanged.
+
+**End-to-end demo** (TestClient, controllable fake embeddings, not
+real OpenAI calls): seeded 25 executed (genuinely terminal) actions in
+one embedding cluster, then evaluated a read-only action with an
+orthogonal embedding - correctly escalated `AUTONOMOUS -> CONFIRM`
+with explanation `"... Escalated to CONFIRM (novel action: no close
+precedent in 25 prior actions)."` and `precedent.matches` showing 3
+same-cluster matches at `similarity: 0.0`. A control action still
+inside the familiar cluster correctly stayed AUTONOMOUS
+(`similarity: 1.0` on its 3 matches). One real bug caught in my own
+demo script during this process (not the implementation): the first
+draft never called `/execute` on the seeded actions, so they sat at
+`state=autonomous` - not itself terminal - and 0 candidates were found;
+fixed the demo, not the code, since "have embeddings AND a terminal
+outcome" is exactly what the spec asks for.
+
+No defects in the implementation itself this task - first-attempt
+green on all 4 required tests and the full suite.
+
+Elapsed: ~12 minutes (started ~12:19 IST after switching from the
+blocked AWS task, well under the 50-minute box).
+
+Evidence: reports/evidence/FeatureB-verification.txt.

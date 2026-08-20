@@ -1,0 +1,85 @@
+Feature A — Reviewer Oversight Metrics — verification
+Run at: 2026-08-20 10:08 IST
+Branch: feature/novelty-addons
+
+=== 1. Three required tests + additional coverage ===
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collected 7 items
+
+tests/test_oversight.py .......                                          [100%]
+
+============================== 7 passed in 0.03s ===============================
+
+=== 2. Full suite ===
+/Users/thrisha/miniconda3/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-8.3.0, pluggy-1.5.0
+rootdir: /Users/thrisha/aivar_tba
+configfile: pytest.ini
+testpaths: tests
+plugins: asyncio-0.24.0, playwright-0.7.2, langsmith-0.10.9, Faker-38.2.0, base-url-2.1.0, anyio-4.7.0
+asyncio: mode=Mode.AUTO, default_loop_scope=None
+collected 122 items
+
+tests/test_adversarial_fixes.py .................                        [ 13%]
+tests/test_api.py ..................                                     [ 28%]
+tests/test_confidence.py ......                                          [ 33%]
+tests/test_db_store.py ssssss                                            [ 38%]
+tests/test_floors.py .........                                           [ 45%]
+tests/test_llm.py ......                                                 [ 50%]
+tests/test_observability.py ...                                          [ 53%]
+tests/test_oversight.py .......                                          [ 59%]
+tests/test_routing.py ....                                               [ 62%]
+tests/test_scoring.py ..........................                         [ 83%]
+tests/test_security.py ........                                          [ 90%]
+tests/test_tiers.py ............                                         [100%]
+
+======================== 116 passed, 6 skipped in 0.87s ========================
+
+=== 4. T-08 zero-diff ===
+exit: 0
+
+=== 5. Frozen values unchanged ===
+51:    "reversibility": 0.40,
+52:    "data_scope": 0.30,
+53:    "regulatory": 0.20,
+54:    "confidence": 0.10,
+10:THRESHOLD_CONFIRM = 0.30
+11:THRESHOLD_FULL_REVIEW = 0.65
+
+=== 6. Endpoint run locally against representative data ===
+GET /v1/oversight/reviewers -> 200
+{
+  "reviewers": {
+    "careful-carla": {
+      "decisions_total": 3,
+      "approval_rate": 0.6666666666666666,
+      "median_decision_latency": 0.001153,
+      "p90_decision_latency": 0.001891,
+      "reversal_rate": 0.0,
+      "automation_bias_flag": false
+    },
+    "rubber-stamp-rick": {
+      "decisions_total": 6,
+      "approval_rate": 1.0,
+      "median_decision_latency": 0.001105,
+      "p90_decision_latency": 0.001412,
+      "reversal_rate": 0.0,
+      "automation_bias_flag": true
+    }
+  },
+  "review_queue_depth": 1,
+  "oldest_pending_age_seconds": 0.001189
+}

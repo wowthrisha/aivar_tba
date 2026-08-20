@@ -1,0 +1,19 @@
+Item 0 — Theoretical reframing — verification
+Run at: 2026-08-20 10:02 IST
+Branch: feature/novelty-addons
+
+=== 1. README contains the new 'Theoretical grounding' section ===
+375:## 13. Theoretical grounding
+
+=== 2. README remains valid markdown (no line-wrap blockquote hazard, D-12 lesson) ===
+exit: 1 (want 1 = no matches)
+
+=== 3/4. git status + git diff --stat (only intended doc files touched) ===
+ M README.md
+?? PS-9-1-Novelty-Addons-v1.0.md
+?? PS-9-1-Prompt-Pack-v1.0.md
+?? reports/evidence/Item0-verification.txt
+?? reports/video-script.md
+---
+ README.md | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)

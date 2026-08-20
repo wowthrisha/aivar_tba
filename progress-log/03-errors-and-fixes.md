@@ -96,3 +96,10 @@ what was not done, never substitute silently.
   code edit + redeploy, not a config change. Production approach: move
   to env vars (`CONFIRM_TTL_MINUTES`, `FULL_REVIEW_TTL_HOURS`) with the
   same defaults, read once at startup.
+- Post-Feature-B, route_action() returns the BASE tier; the enforced
+  tier is composed in app/main.py after the novelty check. The audit
+  record correctly reflects the enforced tier and reason (verified),
+  but the risk module is no longer the single source of truth for the
+  tier. Found in self-review, not from a failing test. Production
+  approach: compose the novelty signal inside app/risk/ so
+  route_action() returns the enforced tier, restoring one authority.
