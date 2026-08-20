@@ -1,17 +1,20 @@
 Evaluating action against https://aivartba-production.up.railway.app ...
 
-╭─ 🔴 FULL REVIEW ─────────────────────────────────────────────────────────────╮
-│ READ · customers/read-od1-demo · 1 records · agent-07                        │
+╭─ 🟢 AUTONOMOUS ──────────────────────────────────────────────────────────────╮
+│ READ · customers/42 · 1 records · agent-07                                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
   SCORE     0.0          0.30           0.65         1.0
-            ───────●─────┼──────────────┼───────────────  0.16
+            ────●────────┼──────────────┼───────────────  0.09
               autonomous     confirm      full review   
 
   FACTORS
-                                              composite  0.160
+            reversibility  0.00  ░░░░░░░░░░░░  x0.40 -> 0.000
+            data scope     0.20  ██░░░░░░░░░░  x0.30 -> 0.060
+            regulatory     0.00  ░░░░░░░░░░░░  x0.20 -> 0.000
+            confidence     0.32  ████░░░░░░░░  x0.10 -> 0.032
+                                              composite  0.092
 
-  NEXT      Senior review required · queued as 
-#52a022cf-d7f7-4aa1-9aad-6a81c2215741
+  NEXT      Executed. No human in the path.
 
-This action requires FULL_REVIEW - a separate reviewer_id must decide via POST /v1/review-queue/{id}/decision (S-6: an agent cannot approve its own action, so this single-user CLI session does not attempt that step).
+AUTONOMOUS tier - no confirmation needed, already executed.

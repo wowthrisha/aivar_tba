@@ -1,0 +1,25 @@
+Evaluating action against https://aivartba-production.up.railway.app ...
+
+╭─ 🔴 FULL REVIEW ─────────────────────────────────────────────────────────────╮
+│ DELETE · customers · 5,000 records · agent-07                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+  WHY       0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 
+records (>= 100)).
+            └─ safety floor overrode the weighted score
+
+  SCORE     0.0          0.30           0.65         1.0
+            ─────────────┼──────────────●───────────────  0.64
+              autonomous     confirm      full review   
+
+  FACTORS
+            reversibility  1.00  ████████████  x0.40 -> 0.400
+            data scope     0.80  ██████████░░  x0.30 -> 0.240
+            regulatory     0.00  ░░░░░░░░░░░░  x0.20 -> 0.000
+            confidence     0.02  ░░░░░░░░░░░░  x0.10 -> 0.002
+                                              composite  0.642
+
+  NEXT      Senior review required · queued as 
+#9a2b3135-aabe-4b1b-8324-117d01b88da6
+
+This action requires FULL_REVIEW - a separate reviewer_id must decide via POST /v1/review-queue/{id}/decision.

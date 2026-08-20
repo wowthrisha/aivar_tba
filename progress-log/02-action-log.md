@@ -1252,3 +1252,33 @@ Evidence: `reports/evidence/OD-1-full-suite.txt`,
 `reports/evidence/OD-1-test-routing-diff.txt` (empty file = proof),
 `reports/evidence/OD-1-raw-autonomous-case.json`,
 `reports/evidence/OD-1-cli-autonomous.txt`.
+
+### [2026-08-20 13:50 IST] [OD-1] [delivery engineer]
+Action: Committed (`fddaec7`) and pushed to `origin/master`, which
+triggered Railway's connected auto-deploy. `/livez` never distinguishes
+versions (no I/O by design, T-15), so verified the new fields were
+actually live by POSTing a real evaluate call rather than trusting the
+healthcheck alone. Then ran all three canonical scenarios against the
+live URL, capturing raw API JSON and the CLI rendering from the exact
+same call each time (not two separate calls, since the live LLM call
+makes composite non-deterministic across calls) - one per tier:
+read-only -> AUTONOMOUS, single update -> CONFIRM (novelty-escalated
+from AUTONOMOUS, Feature B), bulk irreversible delete -> FULL_REVIEW
+(irreversible_bulk floor).
+Result: Numerical reconciliation exact (not just within tolerance) on
+all three: for every one of the 4 factors on all 3 actions,
+displayed_contribution == raw_score * WEIGHTS[key] to full float
+precision, and sum(contributions) == API composite exactly (diff
+0.000000 in all 3 cases). WHY block correctly shown only when
+floor_name is non-null, using the real persisted explanation string
+verbatim (no parsing/derivation). NO_COLOR=1 run against the
+FULL_REVIEW case verified byte-for-byte free of ANSI escape codes
+(checked programmatically, not by eye) and remained fully readable.
+Full suite re-run green after all live calls (125 passed, 6 skipped,
+same as before deploy - the deploy didn't regress anything).
+Evidence: `reports/evidence/OD-1-raw-{autonomous,confirm,full-review}-case.json`,
+`reports/evidence/OD-1-cli-{autonomous,confirm,full-review}.txt`,
+`reports/evidence/OD-1-cli-no-color.txt`,
+`reports/evidence/OD-1-numerical-reconciliation.txt`.
+Commit: `fddaec7`. `git log --oneline -1 origin/master` == `fddaec7`
+after push (HEAD == origin/master).

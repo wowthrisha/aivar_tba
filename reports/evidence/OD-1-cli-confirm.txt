@@ -1,0 +1,24 @@
+Evaluating action against https://aivartba-production.up.railway.app ...
+
+╭─ 🟡 CONFIRM ─────────────────────────────────────────────────────────────────╮
+│ UPDATE · orders/9981 · 1 records · agent-07                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+  WHY       0.26 -> AUTONOMOUS. No single dimension change would alter the tier.
+Escalated to CONFIRM (novel action: no close precedent in 24 prior actions).
+            └─ safety floor overrode the weighted score
+
+  SCORE     0.0          0.30           0.65         1.0
+            ───────────●─┼──────────────┼───────────────  0.26
+              autonomous     confirm      full review   
+
+  FACTORS
+            reversibility  0.40  █████░░░░░░░  x0.40 -> 0.160
+            data scope     0.20  ██░░░░░░░░░░  x0.30 -> 0.060
+            regulatory     0.00  ░░░░░░░░░░░░  x0.20 -> 0.000
+            confidence     0.42  █████░░░░░░░  x0.10 -> 0.042
+                                              composite  0.262
+
+  NEXT      User confirmation required.
+
+This action requires confirmation. Confirm? [y/N]  (not sent - captured render only)

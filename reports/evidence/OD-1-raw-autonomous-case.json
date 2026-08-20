@@ -1,14 +1,39 @@
 {
-    "id": "52a022cf-d7f7-4aa1-9aad-6a81c2215741",
-    "agent_id": "agent-07",
-    "action_type": "read",
-    "resource": "customers/read-od1-demo",
-    "params": {},
-    "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-    "state": "full_review",
-    "composite": 0.16,
-    "tier": "FULL_REVIEW",
-    "explanation": "0.16 -> CONFIRM (floor: LLM confidence 0.00 below 0.5). Escalated to FULL_REVIEW (novel action: no close precedent in 24 prior actions).",
-    "created_at": "2026-08-20T08:12:44.460541Z",
-    "precedent": null
+  "id": "4639e32a-8126-42ca-b832-46e0a7fbc398",
+  "agent_id": "agent-07",
+  "action_type": "read",
+  "resource": "customers/42",
+  "params": {},
+  "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "state": "autonomous",
+  "composite": 0.092,
+  "tier": "AUTONOMOUS",
+  "explanation": "0.09 -> AUTONOMOUS. No single dimension change would alter the tier.",
+  "created_at": "2026-08-20T08:22:20.123034Z",
+  "precedent": {
+    "k": 3,
+    "matches": [
+      {
+        "action_id": "f69e6a1b-bbcc-4005-9bd2-3d082d2ca873",
+        "similarity": 0.8229,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "56cc869d-be4d-48eb-9ca1-993d08497016",
+        "similarity": 0.8121,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "1e12e9d4-da0e-4b85-9c50-0aa5db3f85ca",
+        "similarity": 0.8013,
+        "outcome": "executed"
+      }
+    ],
+    "summary": "Similar to 3 prior actions; 0 were rejected."
+  },
+  "reversibility_score": 0.0,
+  "data_scope_score": 0.2,
+  "regulatory_score": 0.0,
+  "confidence_score": 0.31999999999999995,
+  "floor_name": null
 }

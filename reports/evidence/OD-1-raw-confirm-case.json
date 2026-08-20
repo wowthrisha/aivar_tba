@@ -1,0 +1,44 @@
+{
+  "id": "e52be755-b596-4e34-b165-55e444d121cc",
+  "agent_id": "agent-07",
+  "action_type": "update",
+  "resource": "orders/9981",
+  "params": {
+    "fields": {
+      "status": "shipped"
+    },
+    "resource_id": 9981
+  },
+  "params_hash": "b41ea2b2aa49992358acda58ef25997d619d6c644670dc619c92d8aacf251400",
+  "state": "confirm",
+  "composite": 0.262,
+  "tier": "CONFIRM",
+  "explanation": "0.26 -> AUTONOMOUS. No single dimension change would alter the tier. Escalated to CONFIRM (novel action: no close precedent in 24 prior actions).",
+  "created_at": "2026-08-20T08:22:41.281830Z",
+  "precedent": {
+    "k": 3,
+    "matches": [
+      {
+        "action_id": "3738f667-cd2f-41ec-864b-03c5ff42f3b0",
+        "similarity": 0.5087,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "5e2ddcb2-30b1-40e4-9a37-07ffb8d59b00",
+        "similarity": 0.5078,
+        "outcome": "executed"
+      },
+      {
+        "action_id": "203bf401-10cb-4e3d-92fe-2a6bf2691f39",
+        "similarity": 0.5068,
+        "outcome": "executed"
+      }
+    ],
+    "summary": "Similar to 3 prior actions; 0 were rejected."
+  },
+  "reversibility_score": 0.4,
+  "data_scope_score": 0.2,
+  "regulatory_score": 0.0,
+  "confidence_score": 0.42000000000000004,
+  "floor_name": "novelty_unprecedented"
+}

@@ -1,0 +1,29 @@
+Frozen constants used for reconciliation: WEIGHTS={'reversibility': 0.4, 'data_scope': 0.3, 'regulatory': 0.2, 'confidence': 0.1}, THRESHOLD_CONFIRM=0.3, THRESHOLD_FULL_REVIEW=0.65
+
+=== autonomous (id=4639e32a-8126-42ca-b832-46e0a7fbc398) ===
+  tier=AUTONOMOUS  composite=0.092  floor_name=None
+    reversibility  raw=0.0000  weight=0.4  contribution=0.000000  (matches raw*weight: True)
+    data_scope     raw=0.2000  weight=0.3  contribution=0.060000  (matches raw*weight: True)
+    regulatory     raw=0.0000  weight=0.2  contribution=0.000000  (matches raw*weight: True)
+    confidence     raw=0.3200  weight=0.1  contribution=0.032000  (matches raw*weight: True)
+  sum(raw*weight) = 0.092000  vs API composite = 0.092  diff=0.000000  OK (within float rounding)
+  No floor fired -> WHY block correctly omitted
+
+=== confirm (id=e52be755-b596-4e34-b165-55e444d121cc) ===
+  tier=CONFIRM  composite=0.262  floor_name=novelty_unprecedented
+    reversibility  raw=0.4000  weight=0.4  contribution=0.160000  (matches raw*weight: True)
+    data_scope     raw=0.2000  weight=0.3  contribution=0.060000  (matches raw*weight: True)
+    regulatory     raw=0.0000  weight=0.2  contribution=0.000000  (matches raw*weight: True)
+    confidence     raw=0.4200  weight=0.1  contribution=0.042000  (matches raw*weight: True)
+  sum(raw*weight) = 0.262000  vs API composite = 0.262  diff=0.000000  OK (within float rounding)
+  WHY block source (verbatim explanation): '0.26 -> AUTONOMOUS. No single dimension change would alter the tier. Escalated to CONFIRM (novel action: no close precedent in 24 prior actions).'
+
+=== full-review (id=9a2b3135-aabe-4b1b-8324-117d01b88da6) ===
+  tier=FULL_REVIEW  composite=0.642  floor_name=irreversible_bulk
+    reversibility  raw=1.0000  weight=0.4  contribution=0.400000  (matches raw*weight: True)
+    data_scope     raw=0.8000  weight=0.3  contribution=0.240000  (matches raw*weight: True)
+    regulatory     raw=0.0000  weight=0.2  contribution=0.000000  (matches raw*weight: True)
+    confidence     raw=0.0200  weight=0.1  contribution=0.002000  (matches raw*weight: True)
+  sum(raw*weight) = 0.642000  vs API composite = 0.642  diff=0.000000  OK (within float rounding)
+  WHY block source (verbatim explanation): '0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).'
+
