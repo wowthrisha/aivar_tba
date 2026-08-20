@@ -32,15 +32,59 @@ def test_regulated_mutation_floor_does_not_fire_on_read():
 
 
 def test_low_confidence_floor_fires_below_0_5():
-    result = evaluate_floors(Reversibility.READ, 0, Regulatory.NONE, 0.49)
+    # D-14: the floor only applies to mutations - a read has no blast
+    # radius, so a mutating reversibility is required to exercise it.
+    result = evaluate_floors(Reversibility.UPDATE_WITH_SNAPSHOT, 0, Regulatory.NONE, 0.49)
     assert result.tier == Tier.CONFIRM
-    assert result.floor_name == "low_confidence"
+    assert result.floor_name == "low_confidence_on_mutation"
     assert result.reason is not None
 
 
 def test_low_confidence_floor_does_not_fire_at_exactly_0_5():
-    result = evaluate_floors(Reversibility.READ, 0, Regulatory.NONE, 0.5)
-    assert result.floor_name != "low_confidence"
+    result = evaluate_floors(Reversibility.UPDATE_WITH_SNAPSHOT, 0, Regulatory.NONE, 0.5)
+    assert result.floor_name != "low_confidence_on_mutation"
+
+
+def test_low_confidence_floor_does_not_fire_on_read_only():
+    # D-14: model uncertainty about a fully-reversible, zero-blast-radius
+    # action does not justify consuming human oversight.
+    result = evaluate_floors(Reversibility.READ, 0, Regulatory.NONE, 0.0)
+    assert result.floor_name != "low_confidence_on_mutation"
+    assert result.tier == Tier.AUTONOMOUS
+
+
+def test_low_confidence_floor_still_fires_on_mutation():
+    result = evaluate_floors(Reversibility.UPDATE_WITH_SNAPSHOT, 0, Regulatory.NONE, 0.0)
+    assert result.tier == Tier.CONFIRM
+    assert result.floor_name == "low_confidence_on_mutation"
+
+
+def test_read_only_is_autonomous_across_full_confidence_range():
+    # D-14: proves the read-only criterion is now variance-immune to the
+    # live LLM's self-reported confidence.
+    confidence = 0.0
+    while confidence <= 1.0:
+        result = evaluate_floors(Reversibility.READ, 1, Regulatory.NONE, confidence)
+        assert result.tier == Tier.AUTONOMOUS, f"failed at llm_confidence={confidence}"
+        confidence = round(confidence + 0.05, 2)
+
+
+def test_single_update_is_confirm_across_full_confidence_range():
+    confidence = 0.0
+    while confidence <= 1.0:
+        result = evaluate_floors(
+            Reversibility.UPDATE_WITHOUT_SNAPSHOT, 1, Regulatory.NONE, confidence
+        )
+        assert result.tier == Tier.CONFIRM, f"failed at llm_confidence={confidence}"
+        confidence = round(confidence + 0.05, 2)
+
+
+def test_bulk_delete_is_full_review_across_full_confidence_range():
+    confidence = 0.0
+    while confidence <= 1.0:
+        result = evaluate_floors(Reversibility.IRREVERSIBLE, 5000, Regulatory.NONE, confidence)
+        assert result.tier == Tier.FULL_REVIEW, f"failed at llm_confidence={confidence}"
+        confidence = round(confidence + 0.05, 2)
 
 
 def test_no_floor_fires_when_nothing_matches():
