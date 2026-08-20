@@ -88,6 +88,38 @@ what was not done, never substitute silently.
   returned `decisions_total` for every reviewer in the response
   (`reviewer-9: 4`, `seed-reviewer: 8`, `pre-record-reviewer: 1`, ...)
   during this hardening pass. The claim holds.
+- **L-G** Semantic duplication of the confidence signal. `floors.py`
+  uses raw `llm_confidence` (< 0.5 forces CONFIRM); `scorer.py` and the
+  `confidence_score` column hold `1 - llm_confidence`, an uncertainty.
+  Both correct, and the CLI now labels the displayed value
+  "uncertainty" (this session's earlier step), but one signal exists
+  under one name in two orientations. A future edit reaching for
+  "confidence" would silently get the inverse. Found by semantic audit,
+  not a failing test — every value assertion passes. Production
+  approach: rename to `uncertainty_score`, persist raw `llm_confidence`
+  separately, add a per-dimension direction-contract test. Deferred:
+  needs a migration and a redeploy of a verified system.
+- **L-H** `params_hash` is not Unicode-normalised. Key order,
+  whitespace, and nesting canonicalise correctly; NFC and NFD forms of
+  one string hash differently because `json.dumps` does not normalise.
+  FAILS CLOSED — a mismatch returns 409 and cannot authorise anything;
+  the impact is rejecting a legitimate confirmation, not admitting an
+  illegitimate one. Production approach:
+  `unicodedata.normalize("NFC", ...)` on both the compute and compare
+  paths. One line, deferred because it changes hashing semantics
+  (every existing persisted hash would need reconciling against it).
+- **L-I** Cross-layer reconciliation (API / `risk_assessments` / audit
+  / CLI) was verified manually during hardening — repeatedly, across
+  OD-1, the bonus calibration feature, and this session's live
+  captures — not by a standing automated test. Production approach:
+  one test asserting pairwise equality across all four layers for a
+  single evaluate call.
+- **L-J** Audit provenance. A late semantic audit reported shipped
+  features as absent; it had run in the `gae-aws` clone on
+  `aws-deploy`, a pre-merge tree. Correct for that tree, wrong for the
+  system actually running on Railway. Every gate check in this log
+  records its branch and commit; this entry records why that matters —
+  a finding is only as good as the tree it was run against.
 - No application logic in T-04 (scaffold only, per task spec).
 - `requirements.txt` dependency versions left unpinned — pinning exact
   versions now would be guessing; to be finalized when feature code lands
