@@ -22,15 +22,25 @@ log with a plain-English explanation of why that tier was chosen.
 
 ## 1. Live URLs
 
+Both deployments run the same commit (`2a60896`) and share the same
+Neon database — curl-verified together, side by side, after a
+credential rotation on both sides; see
+`reports/evidence/deployment-sync-verified.txt` for the full output and
+parity table.
+
 - **Railway (production)**: https://aivartba-production.up.railway.app
-  — curl-verified against all three tiers plus `/livez` and `/v1/audit`;
-  see `progress-log/02-action-log.md` (T-14 entry) and
-  `reports/evidence/T-14-curl.txt`.
+  — curl-verified against all three tiers (AUTONOMOUS / CONFIRM /
+  FULL_REVIEW), `/livez`, `/readyz` (rotated credentials confirmed
+  working), and `/v1/audit/verify`.
 - **AWS Lambda + Function URL**: https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/
-  — curl-verified against `/livez`, `/readyz`, and a full read-only
-  `POST /v1/actions/evaluate` (routed AUTONOMOUS, composite 0.098); see
-  `reports/evidence/T-15-curl.txt`. App Runner was never an option —
-  closed to new customers since 30 Apr 2026.
+  — curl-verified against the same three tiers, `/livez`, `/readyz`, and
+  `/v1/audit/verify`. Deploy path: `infra/aws/deploy-lambda.sh` builds
+  from a throwaway sibling clone (`../gae-aws`) and pushes to ECR; see
+  D-21–D-23 in `progress-log/03-errors-and-fixes.md` for real failure
+  modes hit getting this working (image manifest format, updates that
+  silently didn't apply, IAM permissions that covered creation but not
+  later operations). App Runner was never an option — closed to new
+  customers since 30 Apr 2026.
 
 ## 2. Quickstart
 
@@ -407,13 +417,18 @@ it — see the commit that added this table for the full command log):
   behaviour may itself be biased — the automation-bias metrics
   (`app/oversight.py`) exist to surface that. Advisory until its inputs
   are themselves validated.
-- **L-E** AWS: completed after initial submission. The ECR repository,
-  `linux/amd64` image, IAM execution role, Lambda function, and Function
-  URL are all live — curl-verified (`reports/evidence/T-15-curl.txt`).
-  Railway remains the deployment of record for the original submission;
-  AWS is a second, independently verified live deployment as of
-  2026-08-20. App Runner was never an option — closed to new customers
-  since 30 Apr 2026.
+- **L-E** AWS: completed after initial submission, and since kept in
+  sync with Railway. Both deployments run the same commit and share the
+  same Neon database, credential rotation applied to both, all three
+  canonical scenarios curl-verified with matching tiers on each
+  (`reports/evidence/deployment-sync-verified.txt`). Railway remains the
+  deployment of record for the original submission; AWS is a second,
+  independently verified live deployment. App Runner was never an
+  option — closed to new customers since 30 Apr 2026. Getting the Lambda
+  path working surfaced real infrastructure defects, not just app bugs —
+  see D-21 (image manifest format), D-22 (an update that silently didn't
+  apply), and D-23 (IAM permissions scoped to creation but not later
+  operations) below.
 - **L-F** Reviewer metrics report `decisions_total` alongside every
   rate, so a small sample cannot be misread as an extreme signal —
   confirmed both in code (`app/oversight.py`) and live via

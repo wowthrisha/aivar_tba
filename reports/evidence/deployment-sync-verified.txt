@@ -1,0 +1,104 @@
+Deployment sync — post key rotation, both environments to current master
+Verified: 2026-08-20, ~19:10 IST
+
+Git SHA both deployments now run: 2a60896
+  (docs: record T-15 AWS deploy (other session) + independent AWS verification)
+
+URLs:
+  Railway: https://aivartba-production.up.railway.app
+  AWS:     https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws
+
+AWS image digest (deployed, as reported/confirmed): sha256:685c5dfd...
+  (my own build+push earlier in this task produced sha256:4c58eabd...,
+  which lacked the D-21 fix - buildx's default provenance/SBOM
+  attestations turn the push into an OCI image index, which
+  update-function-code cannot apply. That gap is exactly what D-21/D-22
+  record. I do not have lambda:GetFunctionConfiguration to independently
+  confirm the digest AWS is now running - the behavioral verification
+  below is the independent proof instead.)
+
+=== STEP 1 — AWS verification (fresh, this task) ===
+
+GET /livez -> 200 {"status":"ok"}
+GET /readyz -> 200 {"status":"ok","checks":{"llm":"ok","db":"ok"}}
+  (proves the rotated OPENAI_API_KEY and DATABASE_URL both work)
+
+POST /v1/actions/evaluate - read:
+  {"id":"1c047080-...","tier":"AUTONOMOUS","composite":0.072,
+   "floor_name":null,"confidence_score":0.12,
+   "precedent":{...},"calibration":{"mode":"shadow","applied":false,...},
+   "reversibility_score":0.0,"data_scope_score":0.2,"regulatory_score":0.0}
+  HTTP 201
+
+POST /v1/actions/evaluate - update:
+  {"id":"e298034a-...","tier":"CONFIRM","composite":0.43999999999999995,
+   "floor_name":"low_confidence_on_mutation","confidence_score":1.0,
+   "explanation":"0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5
+   on a mutating action).","calibration":{"applied":false,...}}
+  HTTP 201
+
+POST /v1/actions/evaluate - bulk-delete:
+  {"id":"d70f9743-...","tier":"FULL_REVIEW","composite":0.641,
+   "floor_name":"irreversible_bulk","confidence_score":0.010000000000000009,
+   "calibration":{"applied":false,...}}
+  HTTP 201
+
+GET /v1/audit/verify -> {"valid":true,"records_checked":476,"first_invalid_id":null}
+
+D-16 staleness markers - all three cleared:
+  1. Response schema includes precedent, calibration, and all four
+     sub-scores on every response above. CLEARED.
+  2. affected_records=-5 -> 422 (confirmed by the user prior to this
+     verification pass; not re-run here to avoid a redundant call).
+     CLEARED.
+  3. read-only floor_name is null, not "low_confidence" - and the
+     update case's floor is explicitly named
+     "low_confidence_on_mutation" (the D-14 rename, verbatim, live).
+     CLEARED.
+
+=== STEP 2 — PARITY (Railway, same three scenarios, run immediately after) ===
+
+POST /v1/actions/evaluate - read:
+  {"id":"722e3a98-...","tier":"AUTONOMOUS","composite":0.113,
+   "floor_name":null,"confidence_score":0.53}
+
+POST /v1/actions/evaluate - update:
+  {"id":"7b6be1b3-...","tier":"CONFIRM","composite":0.43999999999999995,
+   "floor_name":"low_confidence_on_mutation","confidence_score":1.0}
+
+POST /v1/actions/evaluate - bulk-delete:
+  {"id":"0ead3d22-...","tier":"FULL_REVIEW","composite":0.641,
+   "floor_name":"irreversible_bulk","confidence_score":0.010000000000000009}
+
+GET /v1/audit/verify -> {"valid":true,"records_checked":479,"first_invalid_id":null}
+
+=== PARITY TABLE ===
+
+scenario     tier         composite  floor_name                   llm_confidence  deployment
+read         AUTONOMOUS   0.072      None                         0.88            AWS
+read         AUTONOMOUS   0.113      None                         0.47            Railway
+update       CONFIRM      0.440      low_confidence_on_mutation   0.00            AWS
+update       CONFIRM      0.440      low_confidence_on_mutation   0.00            Railway
+bulk-delete  FULL_REVIEW  0.641      irreversible_bulk            0.99            AWS
+bulk-delete  FULL_REVIEW  0.641      irreversible_bulk            0.99            Railway
+
+TIERS MATCH on all three scenarios across both deployments. Composites
+differ only on read (0.072 vs 0.113, from independent live LLM confidence
+draws in separate processes/caches) - expected, not reconciled, per
+instruction. update and bulk-delete happened to land on identical
+composites this run; not a guarantee, just what these two calls drew.
+
+Database: AWS records_checked=476, Railway records_checked=479 (taken
+~90 seconds later, after 3 additional Railway-only calls in this same
+verification - 476 + 3 = 479 exactly). Same Neon database, confirmed.
+
+=== Credentials ===
+
+Both deployments' rotated OPENAI_API_KEY and DATABASE_URL confirmed
+working via /readyz (llm:ok, db:ok) on both. Railway's three variables
+(OPENAI_API_KEY, DATABASE_URL, DATABASE_URL_DIRECT) confirmed PRESENT
+with correct pooled/direct assignment via scoped `railway variables --kv
+| grep <NAME>` reads (values never printed in full). Lambda's
+DATABASE_URL confirmed to contain "-pooler" via a JMESPath contains()
+boolean query (value never printed); DATABASE_URL_DIRECT correctly
+absent from Lambda's environment (migrations do not run there).
