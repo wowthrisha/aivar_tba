@@ -1,0 +1,11 @@
+governance/
+tests/
+.github/
+.claude/
+scripts/
+*.md
+!README.md
+.git
+__pycache__
+*.pyc
+graduated-autonomy-deck.html
