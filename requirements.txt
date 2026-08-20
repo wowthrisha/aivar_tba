@@ -1,9 +1,17 @@
-# Unpinned: no version-specific behavior has been relied on for these yet
-# (E-3/E-5 — pinning without a reason would be guessing). Pinned entries
-# below carry the reason inline.
-fastapi
-uvicorn
-pydantic
+# Pinned (Phase 2 consolidation): every package below was previously
+# unpinned on the theory that "no version-specific behavior has been
+# relied on yet" - that theory has already been disproven three times
+# in this project (openai 2.49.0->3.3.0 drift, greenlet and numpy/rich
+# missing as undeclared transitive deps on a clean container build).
+# pydantic first: this codebase is v2-only syntax throughout
+# (Field(ge=0) in app/schemas.py, model_validator(mode="after")) - an
+# unpinned resolve to a v1 build on a clean container would break the
+# entire schema layer with no local warning, since v1 and v2 share no
+# API compatibility. Versions below are `pip show <pkg>`'s actual
+# installed Version, not guessed.
+pydantic==2.12.3
+fastapi==0.115.0
+uvicorn==0.32.0
 # Pinned (T-11): app/db.py and migrations/env.py rely on SQLAlchemy's
 # asyncpg dialect handling `prepared_statement_cache_size` as a DBAPI
 # query-string argument (not the raw asyncpg `statement_cache_size`
@@ -37,6 +45,6 @@ numpy==2.2.6
 # above - present locally only as some other package's transitive
 # dependency - pinned explicitly so a clean `pip install` has it too.
 rich==14.2.0
-python-dotenv
-pytest
-pytest-asyncio
+python-dotenv==1.2.2
+pytest==8.3.0
+pytest-asyncio==0.24.0
