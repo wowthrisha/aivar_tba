@@ -38,6 +38,7 @@ class ActionRecord:
     tier: str | None = None
     explanation: str | None = None
     floor_name: str | None = None
+    embedding: list[float] | None = None
 
 
 @dataclass
@@ -97,6 +98,28 @@ class InMemoryStore:
     async def list_review_queue(self) -> list[ActionRecord]:
         pending = [a for a in self._actions.values() if a.state == ActionState.FULL_REVIEW]
         return sorted(pending, key=lambda a: a.created_at)
+
+    async def set_embedding(self, action_id: str, embedding: list[float]) -> None:
+        record = self._actions.get(action_id)
+        if record is not None:
+            record.embedding = embedding
+
+    async def list_recent_embedded_terminal_actions(
+        self, exclude_action_id: str, limit: int = 200
+    ) -> list["Candidate"]:
+        from app.embeddings import Candidate
+
+        terminal = (ActionState.EXECUTED, ActionState.REJECTED, ActionState.EXPIRED)
+        candidates = [
+            a
+            for a in self._actions.values()
+            if a.id != exclude_action_id and a.embedding is not None and a.state in terminal
+        ]
+        candidates.sort(key=lambda a: a.created_at, reverse=True)
+        return [
+            Candidate(action_id=a.id, embedding=a.embedding, outcome=a.state.value)
+            for a in candidates[:limit]
+        ]
 
     async def set_approval(self, approval: ApprovalRecord) -> None:
         self._approvals[approval.action_id] = approval

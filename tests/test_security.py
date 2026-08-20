@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.audit import AuditLog
 from app.llm import ConfidenceResult
-from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_store
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_embedding_provider, get_store
 from app.store import InMemoryStore, canonical_params_hash
 
 
@@ -26,6 +26,11 @@ class _FakeProvider:
 
     async def health_check(self) -> bool:
         return True
+
+
+class _FakeEmbeddingProvider:
+    async def embed(self, text: str) -> list[float] | None:
+        return [1.0, 0.0, 0.0]
 
 
 class _FakeConnection:
@@ -57,6 +62,7 @@ def audit_log():
 @pytest.fixture
 def client(store, audit_log):
     app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider()
+    app.dependency_overrides[get_embedding_provider] = lambda: _FakeEmbeddingProvider()
     app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[get_audit_log] = lambda: audit_log

@@ -1059,3 +1059,84 @@ No defects found this task - first-attempt implementation, all tests
 green on first run.
 
 Evidence: reports/evidence/FeatureA-verification.txt.
+
+### [2026-08-20 12:31 IST] [Feature B - novelty add-on] [autonomous pre-video batch - delivery engineer] [branch: feature/novelty-addons]
+
+Implemented precedent retrieval + novelty escalation per the exact
+Feature B prompt in `PS-9-1-Novelty-Addons-v1.0.md` (lines 142-192).
+Tests-first: wrote and ran `tests/test_novelty.py`'s 4 required tests
+against the pure logic before any DB/endpoint wiring existed.
+
+**Architecture, deliberately isolated from app/risk/**: the novelty
+floor is implemented in a new `app/embeddings.py`, applied by
+`app/main.py`'s `evaluate()` handler as a step AFTER
+`route_action()` returns - `app/risk/floors.py`/`router.py`/`scorer.py`/
+`tiers.py` are all byte-identical (confirmed, `git diff --stat --
+app/risk/` empty). T-08 (`tests/test_routing.py`) untouched and
+re-verified zero-diff. This means `route_action()`'s signature never
+changed, so nothing about how T-08 calls it could ever be affected,
+regardless of what the novelty layer does.
+
+**Migration**: `migrations/versions/5517c3ad655b_add_embedding_to_actions.py`
+- single `op.add_column('actions', ..., nullable=True)`, correct
+`downgrade()`. Verified additive-only (no drops, no type changes)
+BEFORE applying. Applied to the real Neon DB (the same one Railway/
+master reads) via `alembic upgrade head` - safe because it's a new
+nullable column no other branch's code reads or writes; re-ran the 6
+real-DB tests afterward to confirm existing persistence paths are
+unaffected (6/6 pass, ~144s). `numpy==2.2.6` pinned explicitly in
+`requirements.txt` (was only a transitive dependency locally - same gap
+class as T-14's `greenlet` finding, D-caught before it could repeat).
+
+**Design decisions**:
+- `precedent` added as an optional field on the existing
+  `ActionResponse` (default `None`), populated only by `evaluate()` -
+  not persisted, so every other endpoint reusing that model stays null.
+- Existing hermetic test fixtures (`tests/test_api.py`,
+  `test_adversarial_fixes.py`, `test_security.py`) needed a
+  `get_embedding_provider` override added, or they'd try to construct a
+  real `AsyncOpenAI` client during hermetic runs. Added a
+  `_FakeEmbeddingProvider` to each, matching the existing per-file fake
+  pattern. Not a business-logic change - required for the new
+  dependency to not break existing tests.
+- Escalation explanation is appended to the existing routing
+  explanation (`"{original} Escalated to {tier} (novel action: ...)."`)
+  rather than replacing it, so the original weighted/floor reasoning
+  stays visible alongside the novelty escalation - both are true and
+  both matter for an audit.
+
+Tests: 4 required
+(`test_precedent_returns_similar_actions_with_outcomes`,
+`test_novelty_floor_escalates_unprecedented_action`,
+`test_novelty_floor_inactive_below_20_prior_actions`,
+`test_escalate_only_invariant_holds_with_novelty_floor` - the last one
+sweeps `Reversibility x affected_records x Regulatory x confidence x`
+4 novelty-similarity/prior-count cases, proving the SAME escalate-only
+guarantee tests/test_floors.py::test_escalate_only_sweep proves for the
+original floors, but for this new layer stacked on top). 4/4 pass.
+Full suite: 120 passed, 6 skipped (hermetic) + 6/6 real-DB tests passed
+separately. T-08 zero-diff. Frozen weights/thresholds re-grepped,
+unchanged.
+
+**End-to-end demo** (TestClient, controllable fake embeddings, not
+real OpenAI calls): seeded 25 executed (genuinely terminal) actions in
+one embedding cluster, then evaluated a read-only action with an
+orthogonal embedding - correctly escalated `AUTONOMOUS -> CONFIRM`
+with explanation `"... Escalated to CONFIRM (novel action: no close
+precedent in 25 prior actions)."` and `precedent.matches` showing 3
+same-cluster matches at `similarity: 0.0`. A control action still
+inside the familiar cluster correctly stayed AUTONOMOUS
+(`similarity: 1.0` on its 3 matches). One real bug caught in my own
+demo script during this process (not the implementation): the first
+draft never called `/execute` on the seeded actions, so they sat at
+`state=autonomous` - not itself terminal - and 0 candidates were found;
+fixed the demo, not the code, since "have embeddings AND a terminal
+outcome" is exactly what the spec asks for.
+
+No defects in the implementation itself this task - first-attempt
+green on all 4 required tests and the full suite.
+
+Elapsed: ~12 minutes (started ~12:19 IST after switching from the
+blocked AWS task, well under the 50-minute box).
+
+Evidence: reports/evidence/FeatureB-verification.txt.

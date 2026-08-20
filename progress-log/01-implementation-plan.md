@@ -98,4 +98,4 @@ table's `T-B2 (Reviewer bias metrics)`, which remains untouched and
 |---|---|---|
 | Item 0 | Theoretical reframing (README + video line, no code) | Done |
 | Feature A | Reviewer oversight metrics (`GET /v1/oversight/reviewers`) | Done |
-| Feature B | Precedent retrieval + novelty escalation | Not started (out of scope for this batch) |
+| Feature B | Precedent retrieval + novelty escalation | Done |

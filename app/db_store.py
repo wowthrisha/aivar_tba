@@ -118,6 +118,29 @@ class SQLAlchemyStore:
             rows = result.scalars().all()
             return [await self._hydrate(session, row) for row in rows]
 
+    async def set_embedding(self, action_id: str, embedding: list[float]) -> None:
+        async with self._sessionmaker() as session:
+            await session.execute(update(ActionORM).where(ActionORM.id == action_id).values(embedding=embedding))
+            await session.commit()
+
+    async def list_recent_embedded_terminal_actions(self, exclude_action_id: str, limit: int = 200):
+        from app.embeddings import Candidate
+
+        terminal = (ActionState.EXECUTED.value, ActionState.REJECTED.value, ActionState.EXPIRED.value)
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                select(ActionORM.id, ActionORM.embedding, ActionORM.state)
+                .where(
+                    ActionORM.id != exclude_action_id,
+                    ActionORM.embedding.is_not(None),
+                    ActionORM.state.in_(terminal),
+                )
+                .order_by(ActionORM.created_at.desc())
+                .limit(limit)
+            )
+            rows = result.all()
+            return [Candidate(action_id=r.id, embedding=r.embedding, outcome=r.state) for r in rows]
+
     async def set_approval(self, approval: ApprovalRecord) -> None:
         async with self._sessionmaker() as session:
             row = ApprovalORM(
