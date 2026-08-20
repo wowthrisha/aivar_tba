@@ -1,0 +1,15 @@
+=== read_only ===
+  tiers across 4 calls: {'AUTONOMOUS'} -> IDENTICAL
+  composites across 4 calls: {0.104} -> IDENTICAL
+  floor_name across 4 calls: {None} -> IDENTICAL
+
+=== single_update ===
+  tiers across 4 calls: {'CONFIRM'} -> IDENTICAL
+  composites across 4 calls: {0.358} -> IDENTICAL
+  floor_name across 4 calls: {'unrecoverable_mutation_requires_confirm'} -> IDENTICAL
+
+=== bulk_delete ===
+  tiers across 4 calls: {'FULL_REVIEW'} -> IDENTICAL
+  composites across 4 calls: {0.642} -> IDENTICAL
+  floor_name across 4 calls: {'irreversible_bulk'} -> IDENTICAL
+

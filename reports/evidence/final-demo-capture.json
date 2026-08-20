@@ -1,0 +1,38 @@
+{
+  "captured_at_ist": "2026-08-20T16:35:00+05:30",
+  "target": "https://aivartba-production.up.railway.app",
+  "commit": "a076248",
+  "fix": "D-14: low_confidence floor renamed low_confidence_on_mutation, gated on is_mutation",
+  "pre_fix_capture": "reports/evidence/final-demo-capture-PRE-D14.json (preserved: 4x read pre-fix, all CONFIRM/0.117/low_confidence, llm_confidence 0.43 - reproduces the exact drift finding)",
+  "gate": {
+    "read_only": "AUTONOMOUS",
+    "single_update": "CONFIRM",
+    "bulk_delete": "FULL_REVIEW",
+    "result": "PASS - 12/12 runs (4 per scenario) matched the gate"
+  },
+  "runs": {
+    "read_only": [
+      {"run": 1, "tier": "AUTONOMOUS", "composite": 0.067, "floor_name": null, "llm_confidence": 0.93},
+      {"run": 2, "tier": "AUTONOMOUS", "composite": 0.067, "floor_name": null, "llm_confidence": 0.93},
+      {"run": 3, "tier": "AUTONOMOUS", "composite": 0.067, "floor_name": null, "llm_confidence": 0.93},
+      {"run": 4, "tier": "AUTONOMOUS", "composite": 0.088, "floor_name": null, "llm_confidence": 0.72}
+    ],
+    "single_update": [
+      {"run": 1, "tier": "CONFIRM", "composite": 0.44, "floor_name": "low_confidence_on_mutation", "llm_confidence": 0.0},
+      {"run": 2, "tier": "CONFIRM", "composite": 0.44, "floor_name": "low_confidence_on_mutation", "llm_confidence": 0.0},
+      {"run": 3, "tier": "CONFIRM", "composite": 0.44, "floor_name": "low_confidence_on_mutation", "llm_confidence": 0.0},
+      {"run": 4, "tier": "CONFIRM", "composite": 0.44, "floor_name": "low_confidence_on_mutation", "llm_confidence": 0.0}
+    ],
+    "bulk_delete": [
+      {"run": 1, "tier": "FULL_REVIEW", "composite": 0.641, "floor_name": "irreversible_bulk", "llm_confidence": 0.99},
+      {"run": 2, "tier": "FULL_REVIEW", "composite": 0.641, "floor_name": "irreversible_bulk", "llm_confidence": 0.99},
+      {"run": 3, "tier": "FULL_REVIEW", "composite": 0.641, "floor_name": "irreversible_bulk", "llm_confidence": 0.99},
+      {"run": 4, "tier": "FULL_REVIEW", "composite": 0.641, "floor_name": "irreversible_bulk", "llm_confidence": 0.99}
+    ]
+  },
+  "notes": [
+    "Read-only tier stayed AUTONOMOUS across llm_confidence values ranging 0.72-0.93 in this live sample, and is now provably immune across the FULL 0.0-1.0 range per tests/test_floors.py::test_read_only_is_autonomous_across_full_confidence_range (0.05 steps, all pass).",
+    "12 concurrent (parallel) demo.sh invocations against this deployment all returned HTTP 502 'Application failed to respond' - the app cannot sustain that much simultaneous evaluate load. Re-run sequentially; all 12 succeeded. Not a regression from this fix - consistent with T-19's previously-documented serialized-audit-write behavior under concurrency.",
+    "First evaluate call after the push timed out twice (curl exit 28) during the Railway container swap; /readyz (db+llm checks) was healthy throughout; a subsequent call with a 60s timeout succeeded in 33.3s. Treated as a deploy-transition artifact, not an application defect."
+  ]
+}

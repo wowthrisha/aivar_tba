@@ -1,0 +1,96 @@
+{
+  "read_only": [
+    {
+      "seed_call": 1,
+      "id": "e351832a-f1db-481d-a18e-c64e8b1699fb",
+      "tier": "AUTONOMOUS",
+      "composite": 0.104,
+      "floor_name": null,
+      "max_similarity": 0.8229,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 2,
+      "id": "4d9ab18b-3ca8-40b2-ae28-9d886e80e634",
+      "tier": "AUTONOMOUS",
+      "composite": 0.104,
+      "floor_name": null,
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 3,
+      "id": "27ab8077-116b-4499-8714-6f9503540d32",
+      "tier": "AUTONOMOUS",
+      "composite": 0.104,
+      "floor_name": null,
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 4,
+      "id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+      "tier": "AUTONOMOUS",
+      "composite": 0.104,
+      "floor_name": null,
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 5,
+      "id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+      "tier": "AUTONOMOUS",
+      "composite": 0.104,
+      "floor_name": null,
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    }
+  ],
+  "single_update": [
+    {
+      "seed_call": 1,
+      "id": "ac11f23f-2e78-42df-aa8a-72ac3aab8626",
+      "tier": "FULL_REVIEW",
+      "composite": 0.358,
+      "floor_name": "novelty_unprecedented",
+      "max_similarity": 0.5087,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 2,
+      "id": "7f845b7d-22b4-43fe-93d9-3ace1a931d25",
+      "tier": "CONFIRM",
+      "composite": 0.358,
+      "floor_name": "unrecoverable_mutation_requires_confirm",
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 3,
+      "id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+      "tier": "CONFIRM",
+      "composite": 0.358,
+      "floor_name": "unrecoverable_mutation_requires_confirm",
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 4,
+      "id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+      "tier": "CONFIRM",
+      "composite": 0.358,
+      "floor_name": "unrecoverable_mutation_requires_confirm",
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    },
+    {
+      "seed_call": 5,
+      "id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+      "tier": "CONFIRM",
+      "composite": 0.358,
+      "floor_name": "unrecoverable_mutation_requires_confirm",
+      "max_similarity": 1.0,
+      "final_state": "executed"
+    }
+  ]
+}

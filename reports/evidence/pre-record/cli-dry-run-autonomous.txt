@@ -1,0 +1,20 @@
+Evaluating action against https://aivartba-production.up.railway.app ...
+
+╭─ 🟢 AUTONOMOUS ──────────────────────────────────────────────────────────────╮
+│ READ · customers/42 · 1 records · agent-07                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+  SCORE     0.0          0.30           0.65         1.0
+            ────●────────┼──────────────┼───────────────  0.10
+              autonomous     confirm      full review   
+
+  FACTORS
+            reversibility  0.00  ░░░░░░░░░░░░  x0.40 -> 0.000
+            data scope     0.20  ██░░░░░░░░░░  x0.30 -> 0.060
+            regulatory     0.00  ░░░░░░░░░░░░  x0.20 -> 0.000
+            confidence     0.44  █████░░░░░░░  x0.10 -> 0.044
+                                              composite  0.104
+
+  NEXT      Executed. No human in the path.
+
+AUTONOMOUS tier - no confirmation needed, already executed.

@@ -13,3 +13,7 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Internal prompt-pack / task-spec docs — reference material for the
+# author, not part of the shipped submission.
+PS-9-1-*.md

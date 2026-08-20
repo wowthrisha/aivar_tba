@@ -1,0 +1,616 @@
+{
+  "read": [
+    {
+      "id": "10dea80d-ad0b-4fe6-8dd3-369542759cc5",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.117,
+      "tier": "CONFIRM",
+      "explanation": "0.12 -> CONFIRM (floor: LLM confidence 0.43 below 0.5).",
+      "created_at": "2026-08-20T10:36:11.960674Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "4d9ab18b-3ca8-40b2-ae28-9d886e80e634",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.5700000000000001,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.0,
+        "base_composite": 0.117,
+        "effective_composite": 0.117,
+        "sample_size": 0,
+        "clean_confirmations": 0,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "cef72da5-2eef-4b31-b0cc-4516d3cb717d",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.117,
+      "tier": "CONFIRM",
+      "explanation": "0.12 -> CONFIRM (floor: LLM confidence 0.43 below 0.5).",
+      "created_at": "2026-08-20T10:36:40.028240Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "27ab8077-116b-4499-8714-6f9503540d32",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.5700000000000001,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.0,
+        "base_composite": 0.117,
+        "effective_composite": 0.117,
+        "sample_size": 0,
+        "clean_confirmations": 0,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "749af305-8abf-4381-93a2-c390bb8f5ac3",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.117,
+      "tier": "CONFIRM",
+      "explanation": "0.12 -> CONFIRM (floor: LLM confidence 0.43 below 0.5).",
+      "created_at": "2026-08-20T10:37:03.526792Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "27ab8077-116b-4499-8714-6f9503540d32",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.5700000000000001,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.0,
+        "base_composite": 0.117,
+        "effective_composite": 0.117,
+        "sample_size": 0,
+        "clean_confirmations": 0,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "ace4b49b-618f-4961-9257-d171aa4de5df",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.117,
+      "tier": "CONFIRM",
+      "explanation": "0.12 -> CONFIRM (floor: LLM confidence 0.43 below 0.5).",
+      "created_at": "2026-08-20T10:37:27.310133Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "4d9ab18b-3ca8-40b2-ae28-9d886e80e634",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.5700000000000001,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.0,
+        "base_composite": 0.117,
+        "effective_composite": 0.117,
+        "sample_size": 0,
+        "clean_confirmations": 0,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    }
+  ],
+  "update": [
+    {
+      "id": "6328d958-c4a3-4d28-8a25-fbd3502af082",
+      "agent_id": "demo-agent",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.43999999999999995,
+      "tier": "CONFIRM",
+      "explanation": "0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).",
+      "created_at": "2026-08-20T10:37:51.525193Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 1.0,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": -0.1,
+        "base_composite": 0.43999999999999995,
+        "effective_composite": 0.33999999999999997,
+        "sample_size": 17,
+        "clean_confirmations": 17,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "eee97172-e314-47ab-8901-9735532ef9ec",
+      "agent_id": "demo-agent",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.43999999999999995,
+      "tier": "CONFIRM",
+      "explanation": "0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).",
+      "created_at": "2026-08-20T10:38:17.130436Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 1.0,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": -0.1,
+        "base_composite": 0.43999999999999995,
+        "effective_composite": 0.33999999999999997,
+        "sample_size": 17,
+        "clean_confirmations": 17,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "2a55c2e1-8d27-4410-987a-e0454137f517",
+      "agent_id": "demo-agent",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.43999999999999995,
+      "tier": "CONFIRM",
+      "explanation": "0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).",
+      "created_at": "2026-08-20T10:38:42.228294Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 1.0,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": -0.1,
+        "base_composite": 0.43999999999999995,
+        "effective_composite": 0.33999999999999997,
+        "sample_size": 17,
+        "clean_confirmations": 17,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "7316380d-cca9-40c3-94f9-ee6764341ee0",
+      "agent_id": "demo-agent",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "confirm",
+      "composite": 0.43999999999999995,
+      "tier": "CONFIRM",
+      "explanation": "0.44 -> CONFIRM (floor: LLM confidence 0.00 below 0.5).",
+      "created_at": "2026-08-20T10:39:07.447318Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 0.8065,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 1.0,
+      "floor_name": "low_confidence",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": -0.1,
+        "base_composite": 0.43999999999999995,
+        "effective_composite": 0.33999999999999997,
+        "sample_size": 17,
+        "clean_confirmations": 17,
+        "modifications_rejections": 0,
+        "applied": false,
+        "degraded": false
+      }
+    }
+  ],
+  "bulk-delete": [
+    {
+      "id": "c4a1eb08-23c5-4d08-9ceb-d644822b3467",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.737,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.74 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T10:39:31.209717Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.97,
+      "floor_name": "irreversible_bulk",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.016666666666666663,
+        "base_composite": 0.737,
+        "effective_composite": 0.7536666666666667,
+        "sample_size": 12,
+        "clean_confirmations": 5,
+        "modifications_rejections": 7,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "b5c3c30f-0a4d-4eb3-9de5-fc584f710ae0",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.737,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.74 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T10:39:58.445192Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.97,
+      "floor_name": "irreversible_bulk",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.016666666666666663,
+        "base_composite": 0.737,
+        "effective_composite": 0.7536666666666667,
+        "sample_size": 12,
+        "clean_confirmations": 5,
+        "modifications_rejections": 7,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "a6c72eee-880c-4844-9f91-3ce49dd6110a",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.737,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.74 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T10:40:23.279871Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.97,
+      "floor_name": "irreversible_bulk",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.016666666666666663,
+        "base_composite": 0.737,
+        "effective_composite": 0.7536666666666667,
+        "sample_size": 12,
+        "clean_confirmations": 5,
+        "modifications_rejections": 7,
+        "applied": false,
+        "degraded": false
+      }
+    },
+    {
+      "id": "83b44ec3-3b45-4901-a151-c590f148e22f",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.737,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.74 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T10:40:48.311666Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7239,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7202,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7196,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.97,
+      "floor_name": "irreversible_bulk",
+      "calibration": {
+        "mode": "shadow",
+        "adjustment": 0.016666666666666663,
+        "base_composite": 0.737,
+        "effective_composite": 0.7536666666666667,
+        "sample_size": 12,
+        "clean_confirmations": 5,
+        "modifications_rejections": 7,
+        "applied": false,
+        "degraded": false
+      }
+    }
+  ]
+}

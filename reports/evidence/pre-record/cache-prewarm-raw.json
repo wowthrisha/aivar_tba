@@ -1,0 +1,504 @@
+{
+  "read_only": [
+    {
+      "id": "059776ea-e028-46ae-b7e4-966a7cecbc1a",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "autonomous",
+      "composite": 0.104,
+      "tier": "AUTONOMOUS",
+      "explanation": "0.10 -> AUTONOMOUS. No single dimension change would alter the tier.",
+      "created_at": "2026-08-20T08:35:15.676812Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "27ab8077-116b-4499-8714-6f9503540d32",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.43999999999999995,
+      "floor_name": null
+    },
+    {
+      "id": "8bdec60f-c610-4ed5-9b4f-f44bf6f8b1b7",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "autonomous",
+      "composite": 0.104,
+      "tier": "AUTONOMOUS",
+      "explanation": "0.10 -> AUTONOMOUS. No single dimension change would alter the tier.",
+      "created_at": "2026-08-20T08:35:19.935380Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "27ab8077-116b-4499-8714-6f9503540d32",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.43999999999999995,
+      "floor_name": null
+    },
+    {
+      "id": "8c0af920-5868-4fdd-9f79-6ebbfd7edd7c",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "autonomous",
+      "composite": 0.104,
+      "tier": "AUTONOMOUS",
+      "explanation": "0.10 -> AUTONOMOUS. No single dimension change would alter the tier.",
+      "created_at": "2026-08-20T08:35:23.907552Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "4d9ab18b-3ca8-40b2-ae28-9d886e80e634",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.43999999999999995,
+      "floor_name": null
+    },
+    {
+      "id": "8e483117-2077-41bb-882b-eb6e361236be",
+      "agent_id": "agent-07",
+      "action_type": "read",
+      "resource": "customers/42",
+      "params": {},
+      "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "state": "autonomous",
+      "composite": 0.104,
+      "tier": "AUTONOMOUS",
+      "explanation": "0.10 -> AUTONOMOUS. No single dimension change would alter the tier.",
+      "created_at": "2026-08-20T08:35:27.970976Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "ae569993-f10f-461d-a8c5-7187fd87eae4",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "92de9c48-07f4-4db5-8db2-ffac838041cc",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "27ab8077-116b-4499-8714-6f9503540d32",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.0,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.43999999999999995,
+      "floor_name": null
+    }
+  ],
+  "single_update": [
+    {
+      "id": "3dd2633d-5a09-43c7-9221-dcf22d675cac",
+      "agent_id": "agent-07",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {
+        "fields": {
+          "status": "shipped"
+        },
+        "resource_id": 9981
+      },
+      "params_hash": "b41ea2b2aa49992358acda58ef25997d619d6c644670dc619c92d8aacf251400",
+      "state": "confirm",
+      "composite": 0.358,
+      "tier": "CONFIRM",
+      "explanation": "0.36 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).",
+      "created_at": "2026-08-20T08:35:31.967437Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.18000000000000005,
+      "floor_name": "unrecoverable_mutation_requires_confirm"
+    },
+    {
+      "id": "d0eb3de2-76f2-4b79-9ed8-bc0a63dbc570",
+      "agent_id": "agent-07",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {
+        "fields": {
+          "status": "shipped"
+        },
+        "resource_id": 9981
+      },
+      "params_hash": "b41ea2b2aa49992358acda58ef25997d619d6c644670dc619c92d8aacf251400",
+      "state": "confirm",
+      "composite": 0.358,
+      "tier": "CONFIRM",
+      "explanation": "0.36 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).",
+      "created_at": "2026-08-20T08:35:35.952296Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.18000000000000005,
+      "floor_name": "unrecoverable_mutation_requires_confirm"
+    },
+    {
+      "id": "89fa23dd-9149-4eec-bbc2-aaed533c8ab3",
+      "agent_id": "agent-07",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {
+        "fields": {
+          "status": "shipped"
+        },
+        "resource_id": 9981
+      },
+      "params_hash": "b41ea2b2aa49992358acda58ef25997d619d6c644670dc619c92d8aacf251400",
+      "state": "confirm",
+      "composite": 0.358,
+      "tier": "CONFIRM",
+      "explanation": "0.36 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).",
+      "created_at": "2026-08-20T08:35:39.988151Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.18000000000000005,
+      "floor_name": "unrecoverable_mutation_requires_confirm"
+    },
+    {
+      "id": "27e0d8cf-d444-44b8-b35a-7ea0dfec6f01",
+      "agent_id": "agent-07",
+      "action_type": "update",
+      "resource": "orders/9981",
+      "params": {
+        "fields": {
+          "status": "shipped"
+        },
+        "resource_id": 9981
+      },
+      "params_hash": "b41ea2b2aa49992358acda58ef25997d619d6c644670dc619c92d8aacf251400",
+      "state": "confirm",
+      "composite": 0.358,
+      "tier": "CONFIRM",
+      "explanation": "0.36 -> CONFIRM (floor: reversibility=update_without_snapshot has no rollback path; unrecoverable mutations may not execute autonomously).",
+      "created_at": "2026-08-20T08:35:44.559677Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d84a45bf-4293-415b-aa82-5746b5ad5d76",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "03dcb383-a891-428d-9c1b-46be41879e4d",
+            "similarity": 1.0,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "51efe81f-f9cf-4525-b798-d37629ef76cd",
+            "similarity": 1.0,
+            "outcome": "executed"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 0 were rejected."
+      },
+      "reversibility_score": 0.7,
+      "data_scope_score": 0.2,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.18000000000000005,
+      "floor_name": "unrecoverable_mutation_requires_confirm"
+    }
+  ],
+  "bulk_delete": [
+    {
+      "id": "0776d0d2-e22f-440b-9ad0-c06c1a67602c",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.642,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T08:35:48.921662Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.020000000000000018,
+      "floor_name": "irreversible_bulk"
+    },
+    {
+      "id": "8045262f-4a05-43ab-a275-44e76f62ba79",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.642,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T08:35:56.300175Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.020000000000000018,
+      "floor_name": "irreversible_bulk"
+    },
+    {
+      "id": "0eb624fa-1086-43a6-a800-c02d54978c78",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.642,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T08:36:00.535392Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.020000000000000018,
+      "floor_name": "irreversible_bulk"
+    },
+    {
+      "id": "9347c6e6-e95b-4c1e-b015-12e53668bdbb",
+      "agent_id": "agent-07",
+      "action_type": "delete",
+      "resource": "customers",
+      "params": {
+        "resource_id": 999
+      },
+      "params_hash": "8527a1808833f68c806e967a76b62d6a0cbcfe547ddb703dfc794650b04a7173",
+      "state": "full_review",
+      "composite": 0.642,
+      "tier": "FULL_REVIEW",
+      "explanation": "0.64 -> FULL_REVIEW (floor: irreversible action affecting 5000 records (>= 100)).",
+      "created_at": "2026-08-20T08:36:04.528300Z",
+      "precedent": {
+        "k": 3,
+        "matches": [
+          {
+            "action_id": "d08fa223-460c-4b01-bbdd-4bd8c5dd6d5f",
+            "similarity": 0.7238,
+            "outcome": "executed"
+          },
+          {
+            "action_id": "7528c643-232f-4acc-9c65-cfd801e26f01",
+            "similarity": 0.7201,
+            "outcome": "rejected"
+          },
+          {
+            "action_id": "8634848b-4b67-42dc-b1ee-ed4e856074da",
+            "similarity": 0.7195,
+            "outcome": "rejected"
+          }
+        ],
+        "summary": "Similar to 3 prior actions; 2 were rejected."
+      },
+      "reversibility_score": 1.0,
+      "data_scope_score": 0.8,
+      "regulatory_score": 0.0,
+      "confidence_score": 0.020000000000000018,
+      "floor_name": "irreversible_bulk"
+    }
+  ]
+}
