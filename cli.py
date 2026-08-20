@@ -162,6 +162,21 @@ def render_result(action: dict, affected_records: int) -> None:
             console.print()
             console.print(f"  [bold]IF...[/bold]     {explanation[idx:]}")
 
+    calibration = action.get("calibration")
+    if calibration is not None and calibration.get("adjustment", 0.0) != 0.0:
+        adj = calibration["adjustment"]
+        if calibration.get("mode") == "enforce":
+            clean = calibration["clean_confirmations"]
+            mod_rej = calibration["modifications_rejections"]
+            detail = (
+                f"{clean} clean confirmation{'s' if clean != 1 else ''}, "
+                f"{mod_rej} modification/rejection{'s' if mod_rej != 1 else ''}"
+            )
+        else:
+            detail = "shadow — computed, not applied"
+        console.print()
+        console.print(f"  [bold]CALIBRATION[/bold]  {adj:+.2f}  ({detail})")
+
     console.print()
     if tier == "FULL_REVIEW":
         next_text = f"Senior review required · queued as #{action['id']}"

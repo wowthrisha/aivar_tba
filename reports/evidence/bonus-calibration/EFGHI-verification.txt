@@ -1,0 +1,92 @@
+{"timestamp": "2026-08-20T09:13:09.525684+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate fe41c268-0aa0-4b81-bc25-7745ac11c202", "request_id": "f88f5d88-8a64-441d-bf4f-e6a45df42d74"}
+{"timestamp": "2026-08-20T09:13:09.526382+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "f88f5d88-8a64-441d-bf4f-e6a45df42d74"}
+{"timestamp": "2026-08-20T09:13:09.526791+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.527962+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 4174ced5-9ea1-42fa-be93-269d63e27e86", "request_id": "917de9e2-185e-44a6-b3c6-9483af6c03a4"}
+{"timestamp": "2026-08-20T09:13:09.528139+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "917de9e2-185e-44a6-b3c6-9483af6c03a4"}
+{"timestamp": "2026-08-20T09:13:09.528346+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.529327+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 04497615-e009-448f-b9eb-dcf409b3a908", "request_id": "821bdad0-4d96-44c8-a8ab-cc7274971b42"}
+{"timestamp": "2026-08-20T09:13:09.529461+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "821bdad0-4d96-44c8-a8ab-cc7274971b42"}
+{"timestamp": "2026-08-20T09:13:09.529637+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+=== F: CALIBRATION_MODE=off ===
+  read_only: tier=AUTONOMOUS composite=0.06999999999999999 floor_name=None calibration_field_present=False
+  single_update: tier=CONFIRM composite=0.35 floor_name=unrecoverable_mutation_requires_confirm calibration_field_present=False
+  bulk_delete: tier=FULL_REVIEW composite=0.65 floor_name=irreversible_bulk calibration_field_present=False
+{"timestamp": "2026-08-20T09:13:09.531988+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 9508e82e-d84d-4ba3-b08e-b4f132fa4749", "request_id": "bf01ee24-3a38-463b-9353-c0fa37d99d34"}
+{"timestamp": "2026-08-20T09:13:09.532168+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "bf01ee24-3a38-463b-9353-c0fa37d99d34"}
+{"timestamp": "2026-08-20T09:13:09.532374+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.533391+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 7ba98356-4715-4420-ac63-7ccfefba1b69", "request_id": "fd381d55-5a56-4d5e-a416-14ac56d8e2a0"}
+{"timestamp": "2026-08-20T09:13:09.533526+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "fd381d55-5a56-4d5e-a416-14ac56d8e2a0"}
+{"timestamp": "2026-08-20T09:13:09.533707+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.534785+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 03d25f99-2f21-4e0a-812c-052dd8529d36", "request_id": "1a8a74be-74c3-4458-a158-866df6e4ebb4"}
+{"timestamp": "2026-08-20T09:13:09.534946+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "1a8a74be-74c3-4458-a158-866df6e4ebb4"}
+{"timestamp": "2026-08-20T09:13:09.535162+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+
+=== E/G: CALIBRATION_MODE=shadow vs F baseline ===
+  read_only: tier AUTONOMOUS->AUTONOMOUS match=True  composite 0.06999999999999999->0.06999999999999999 match=True  floor_name match=True  calibration.applied=False (must be False)  calibration.adjustment=0.0
+  single_update: tier CONFIRM->CONFIRM match=True  composite 0.35->0.35 match=True  floor_name match=True  calibration.applied=False (must be False)  calibration.adjustment=0.0
+  bulk_delete: tier FULL_REVIEW->FULL_REVIEW match=True  composite 0.65->0.65 match=True  floor_name match=True  calibration.applied=False (must be False)  calibration.adjustment=0.0
+  ALL UNCHANGED: True
+{"timestamp": "2026-08-20T09:13:09.537232+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate f113ec31-48ee-4f7c-b1b6-9e7870af5bd9", "request_id": "fb6fe9c8-3c3a-4ecc-a34f-02a6343554a0"}
+{"timestamp": "2026-08-20T09:13:09.537370+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "fb6fe9c8-3c3a-4ecc-a34f-02a6343554a0"}
+{"timestamp": "2026-08-20T09:13:09.537564+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.538591+00:00", "level": "INFO", "message": "POST /v1/actions/f113ec31-48ee-4f7c-b1b6-9e7870af5bd9/confirm -> 200", "request_id": "73d93c13-dc05-4e34-9d0e-ce89a71c9101"}
+{"timestamp": "2026-08-20T09:13:09.538791+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/f113ec31-48ee-4f7c-b1b6-9e7870af5bd9/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.539781+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate a8415acc-97b7-4a81-adcf-b0615b90e334", "request_id": "549570e1-21f8-474f-b5b5-4305e20f6233"}
+{"timestamp": "2026-08-20T09:13:09.539903+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "549570e1-21f8-474f-b5b5-4305e20f6233"}
+{"timestamp": "2026-08-20T09:13:09.540090+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.540948+00:00", "level": "INFO", "message": "POST /v1/actions/a8415acc-97b7-4a81-adcf-b0615b90e334/confirm -> 200", "request_id": "7632f984-b2b9-43ff-8093-70d02ecdaa0b"}
+{"timestamp": "2026-08-20T09:13:09.541136+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/a8415acc-97b7-4a81-adcf-b0615b90e334/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.542364+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate fa4fabf3-26cc-499a-aa2b-517b2a0726f0", "request_id": "79d4d527-3d90-4842-a106-f0153a185386"}
+{"timestamp": "2026-08-20T09:13:09.542491+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "79d4d527-3d90-4842-a106-f0153a185386"}
+{"timestamp": "2026-08-20T09:13:09.542675+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.543515+00:00", "level": "INFO", "message": "POST /v1/actions/fa4fabf3-26cc-499a-aa2b-517b2a0726f0/confirm -> 200", "request_id": "dbb85f0d-2490-47dd-8b27-51dc1063b74a"}
+{"timestamp": "2026-08-20T09:13:09.543696+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/fa4fabf3-26cc-499a-aa2b-517b2a0726f0/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.544736+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 2d4cb8a4-e10a-4ec9-b7a0-8c18cc5a3a0a", "request_id": "a21bb705-3769-46e4-bb88-9c53ea81080a"}
+{"timestamp": "2026-08-20T09:13:09.544856+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "a21bb705-3769-46e4-bb88-9c53ea81080a"}
+{"timestamp": "2026-08-20T09:13:09.545024+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.546061+00:00", "level": "INFO", "message": "POST /v1/actions/2d4cb8a4-e10a-4ec9-b7a0-8c18cc5a3a0a/confirm -> 200", "request_id": "ed1b074b-161c-443b-a582-00fb3a28f4cd"}
+{"timestamp": "2026-08-20T09:13:09.546259+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/2d4cb8a4-e10a-4ec9-b7a0-8c18cc5a3a0a/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.547267+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate bd0ebdb7-ed41-4966-9375-84e81dda01b8", "request_id": "71903f0f-9926-4410-af58-29696f834b46"}
+{"timestamp": "2026-08-20T09:13:09.547393+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "71903f0f-9926-4410-af58-29696f834b46"}
+{"timestamp": "2026-08-20T09:13:09.547578+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.548424+00:00", "level": "INFO", "message": "POST /v1/actions/bd0ebdb7-ed41-4966-9375-84e81dda01b8/confirm -> 200", "request_id": "81ad61d4-fe68-4f2a-b526-9e90680b9130"}
+{"timestamp": "2026-08-20T09:13:09.548613+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/bd0ebdb7-ed41-4966-9375-84e81dda01b8/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.549530+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate c092c202-4080-4d52-9827-5009946605df", "request_id": "f2840dbb-01b1-489d-bdaf-b505da182988"}
+{"timestamp": "2026-08-20T09:13:09.549648+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "f2840dbb-01b1-489d-bdaf-b505da182988"}
+{"timestamp": "2026-08-20T09:13:09.549823+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.550694+00:00", "level": "INFO", "message": "POST /v1/actions/c092c202-4080-4d52-9827-5009946605df/confirm -> 200", "request_id": "239be267-4c8d-4468-b201-6bf6479f318b"}
+{"timestamp": "2026-08-20T09:13:09.550884+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/c092c202-4080-4d52-9827-5009946605df/confirm \"HTTP/1.1 200 OK\"", "request_id": null}
+{"timestamp": "2026-08-20T09:13:09.552971+00:00", "level": "INFO", "message": "embedding_degraded=true for evaluate 6c2f3441-8957-43f0-83b8-f04e507ceb1b", "request_id": "5fd099aa-3fad-47ae-ba38-e720193ce6b8"}
+{"timestamp": "2026-08-20T09:13:09.553102+00:00", "level": "INFO", "message": "POST /v1/actions/evaluate -> 201", "request_id": "5fd099aa-3fad-47ae-ba38-e720193ce6b8"}
+{"timestamp": "2026-08-20T09:13:09.553277+00:00", "level": "INFO", "message": "HTTP Request: POST http://testserver/v1/actions/evaluate \"HTTP/1.1 201 Created\"", "request_id": null}
+
+=== H: fourth action_type ('send') with 6 historical clean confirmations ===
+{
+  "mode": "shadow",
+  "adjustment": -0.1,
+  "base_composite": 0.47000000000000003,
+  "effective_composite": 0.37,
+  "sample_size": 6,
+  "clean_confirmations": 6,
+  "modifications_rejections": 0,
+  "applied": false,
+  "degraded": false
+}
+{"timestamp": "2026-08-20T09:13:09.555012+00:00", "level": "INFO", "message": "GET /v1/calibration -> 200", "request_id": "a1027463-8bbe-4796-ba78-4950985605e9"}
+{"timestamp": "2026-08-20T09:13:09.555235+00:00", "level": "INFO", "message": "HTTP Request: GET http://testserver/v1/calibration \"HTTP/1.1 200 OK\"", "request_id": null}
+
+=== I: GET /v1/calibration ===
+status=200
+{
+  "mode": "shadow",
+  "action_types": [
+    {
+      "action_type": "send",
+      "clean_confirmations": 6,
+      "modifications_rejections": 0,
+      "sample_size": 6,
+      "has_min_evidence": true,
+      "adjustment": -0.1
+    }
+  ]
+}

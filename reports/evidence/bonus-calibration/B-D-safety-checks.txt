@@ -1,0 +1,33 @@
+=== B: git diff a573663 -- tests/test_routing.py (must be empty) ===
+(empty = OK)
+
+=== C: git diff --stat -- app/risk/ (must be empty) ===
+(empty = OK)
+
+=== D: app/llm.py, app/embeddings.py diff (must be empty) ===
+(empty = OK)
+
+=== D: no new migration ===
+(empty = OK, no new migration files)
+
+=== D: weights/thresholds still frozen values ===
+51:    "reversibility": 0.40,
+52:    "data_scope": 0.30,
+53:    "regulatory": 0.20,
+54:    "confidence": 0.10,
+10:THRESHOLD_CONFIRM = 0.30
+11:THRESHOLD_FULL_REVIEW = 0.65
+
+=== D: existing OTHER endpoints untouched (confirm/decision/execute/review-queue/audit/oversight) ===
+app/main.py functions with diff hunks touching their body:
+@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
+@@ -26,12 +27,18 @@ from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
+@@ -155,7 +162,7 @@ async def readyz(
+@@ -174,6 +181,7 @@ def _to_action_response(record, precedent=None) -> ActionResponse:
+@@ -206,13 +214,61 @@ async def evaluate(
+@@ -226,11 +282,11 @@ async def evaluate(
+@@ -246,7 +302,7 @@ async def evaluate(
+@@ -265,7 +321,7 @@ async def evaluate(
+@@ -273,7 +329,7 @@ async def evaluate(
+@@ -517,3 +573,33 @@ async def oversight_reviewers(
+NOTE: only _to_action_response() and evaluate() bodies changed (calibration wiring, spec-mandated); a new GET /v1/calibration endpoint was appended. confirm/decision/execute/review_queue/audit_list/audit_verify/oversight_reviewers/get_action/readyz/livez are untouched.

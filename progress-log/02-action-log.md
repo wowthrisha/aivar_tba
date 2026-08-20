@@ -1282,3 +1282,67 @@ Evidence: `reports/evidence/OD-1-raw-{autonomous,confirm,full-review}-case.json`
 `reports/evidence/OD-1-numerical-reconciliation.txt`.
 Commit: `fddaec7`. `git log --oneline -1 origin/master` == `fddaec7`
 after push (HEAD == origin/master).
+
+### [2026-08-20 14:43 IST] [BONUS-CALIBRATION] [delivery engineer]
+Action: Implemented the adaptive-calibration bonus, shadow mode only by
+default, 40-minute box. New `app/calibration.py`: derives clean vs
+modified/rejected confirmation counts per action_type from EXISTING
+audit ("confirmed"/"decision" events) + approval records - no new
+table, no migration, no writes. Pure formula
+`adjustment = clamp((0.5 - clean_ratio) * 0.20, -0.10, +0.10)`,
+recomputed from history every call, zero below 5 samples. `CALIBRATION_MODE`
+env var (off/shadow/enforce, unknown value -> off, unset -> shadow, enforce
+never enabled by default anywhere in this repo).
+Wiring: `app/schemas.py` (+`CalibrationInfo`, `CalibrationActionTypeStats`,
+`CalibrationResponse`, +`calibration` field on `ActionResponse`, all
+additive). `app/main.py`: imports `evaluate_floors`/`final_tier`/
+`tier_for_composite` from `app/risk/` (NOT modified, only called a
+second time with a calibration-adjusted composite in enforce mode) and
+inserts a calibration step in `evaluate()` between `route_action()` and
+the novelty-escalation block, per the required order (base composite ->
+calibration -> tier -> floors -> novelty). New read-only `GET
+/v1/calibration`. Necessarily modified `evaluate()`'s body and
+`_to_action_response()` to do this - flagging this explicitly since one
+of the final-verification bullets says "no existing endpoint handler
+changed": no OTHER endpoint (confirm/decision/execute/review-queue/
+audit/oversight/get_action) was touched at all, and evaluate()'s
+observable behaviour in off/shadow mode (the default) is proven
+byte-identical to pre-feature baseline by the regression tests below -
+but the source of evaluate() itself did change, which is the only way
+to implement the required calibration interception point.
+Safety: floors are evaluated on raw inputs (reversibility/
+affected_records/regulatory/llm_confidence), never on composite, and
+`final_tier()` is a `max()` over the weighted tier and the floor tier -
+so calibration structurally cannot suppress a floor, proven by test
+(max -0.10 adjustment against an irreversible-bulk floor: still
+FULL_REVIEW). CLI (`cli.py`): a CALIBRATION line, shown only when
+adjustment != 0, labelled "modification/rejection" rather than
+"rejection" since the underlying bucket doesn't distinguish the two -
+avoided overclaiming specificity the data doesn't have.
+Tests: `tests/test_calibration.py`, 13 tests - pure-formula (min
+evidence, negative/positive adjustment, clamp), fail-soft on a
+raising audit (module-level and full API-level), off-mode omits the
+field, the critical regression test (all 3 canonical scenarios,
+parametrized, baseline obtained from a same-run CALIBRATION_MODE=off
+call - not assumed from memory - and asserted byte-identical under
+shadow), shadow-mode-with-real-history-still-untouched, enforce-mode
+floor-suppression-impossible, and the GET /v1/calibration endpoint.
+Result: full suite 138 passed (125 prior + 13 new), 6 skipped
+(pre-existing), 0 failed. All local, no live/deployed calls - per the
+task's "do NOT push yet."
+Final verification (A-I, all local via TestClient, no deploy):
+A) full suite green (above). B) `git diff a573663 -- tests/test_routing.py`
+empty. C) `git diff --stat -- app/risk/` empty. D) no migration; weights
+0.40/0.30/0.20/0.10 and thresholds 0.30/0.65 unedited; only
+evaluate()/_to_action_response() changed in app/main.py (see caveat
+above), every other endpoint untouched. E/G) shadow mode vs a
+same-run off-mode baseline: composite/tier/floor_name identical on all
+3 canonical scenarios, calibration.applied=False on all 3. F) off mode
+omits `calibration` entirely. H) a 4th action_type ("send") seeded with
+6 clean confirmations produced a real -0.10 adjustment in shadow mode
+(still applied=False). I) GET /v1/calibration returns per-action_type
+counts/adjustment/sample_size/has_min_evidence + current mode.
+Evidence: `reports/evidence/bonus-calibration/A-full-suite.txt`,
+`B-D-safety-checks.txt`, `EFGHI-verification.txt`,
+`EFGHI-verification.json`.
+Not pushed, not deployed, per explicit instruction.

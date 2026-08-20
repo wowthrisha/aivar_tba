@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.audit import AuditLog
+from app.calibration import calibration_for_action_type, compute_calibration_by_action_type, get_calibration_mode
 from app.db import make_app_engine
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
 from app.embeddings import (
@@ -26,12 +27,18 @@ from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.logging_config import configure_logging, request_id_var
 from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
+from app.risk.floors import evaluate_floors
+from app.risk.floors import final_tier as risk_final_tier
 from app.risk.router import route_action
 from app.risk.scorer import score_action
+from app.risk.tiers import tier_for_composite
 from app.schemas import (
     ActionResponse,
     AuditRecordResponse,
     AuditVerifyResponse,
+    CalibrationActionTypeStats,
+    CalibrationInfo,
+    CalibrationResponse,
     ConfirmRequest,
     DecisionRequest,
     EvaluateRequest,
@@ -155,7 +162,7 @@ async def readyz(
     return {"status": "ok" if (llm_ok and db_ok) else "degraded", "checks": checks}
 
 
-def _to_action_response(record, precedent=None) -> ActionResponse:
+def _to_action_response(record, precedent=None, calibration=None) -> ActionResponse:
     return ActionResponse(
         id=record.id,
         agent_id=record.agent_id,
@@ -174,6 +181,7 @@ def _to_action_response(record, precedent=None) -> ActionResponse:
         regulatory_score=record.regulatory,
         confidence_score=record.confidence,
         floor_name=record.floor_name,
+        calibration=calibration,
     )
 
 
@@ -206,13 +214,61 @@ async def evaluate(
     weighted = score_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
     routing = route_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
 
-    # Feature B (novelty add-on): a separate step AFTER route_action(),
-    # not a change to app/risk/*.py - see app/embeddings.py's module
-    # docstring. Fail-soft: embedding failure skips precedent/novelty
-    # entirely rather than failing the request.
+    # BONUS (adaptive calibration), SHADOW MODE BY DEFAULT: a separate step
+    # AFTER route_action(), not a change to app/risk/*.py. In "off"/"shadow"
+    # mode `applied` stays False below and final_tier/final_composite/
+    # final_floor_name/final_explanation are byte-identical to routing.* -
+    # existing behaviour wins. In "enforce" mode, the ONLY calibrated input
+    # is the composite fed into tier_for_composite(); floors are then
+    # RE-evaluated via the same (imported, unmodified) evaluate_floors() on
+    # the raw inputs - never on composite - and final_tier() is a max()
+    # over the weighted tier and the floor tier, so calibration can only
+    # ever move the weighted tier, never suppress a floor.
+    calibration_mode = get_calibration_mode()
     final_tier = routing.tier
+    final_composite = routing.composite
     final_explanation = routing.explanation
     final_floor_name = routing.floor_name
+    calibration_info = None
+    if calibration_mode != "off":
+        cal_stats, cal_degraded = await calibration_for_action_type(store, audit, body.action_type)
+        base_composite = routing.composite
+        adjustment = 0.0 if cal_degraded else cal_stats.adjustment
+        effective_composite = base_composite + adjustment
+        applied = calibration_mode == "enforce" and not cal_degraded
+
+        if applied:
+            floor_result = evaluate_floors(
+                body.reversibility, body.affected_records, body.regulatory, combined_confidence
+            )
+            adjusted_weighted_tier = tier_for_composite(effective_composite)
+            final_tier = risk_final_tier(adjusted_weighted_tier, floor_result)
+            final_composite = effective_composite
+            final_floor_name = floor_result.floor_name
+            if floor_result.floor_name is not None:
+                final_explanation = f"{effective_composite:.2f} -> {final_tier.name} ({floor_result.reason})."
+            else:
+                final_explanation = f"{effective_composite:.2f} -> {final_tier.name} (calibration-adjusted)."
+
+        calibration_info = CalibrationInfo(
+            mode=calibration_mode,
+            adjustment=adjustment,
+            base_composite=base_composite,
+            effective_composite=effective_composite,
+            sample_size=cal_stats.total,
+            clean_confirmations=cal_stats.clean_confirmations,
+            modifications_rejections=cal_stats.modifications_rejections,
+            applied=applied,
+            degraded=cal_degraded,
+        )
+
+    # Feature B (novelty add-on): a separate step AFTER route_action()/
+    # calibration, not a change to app/risk/*.py - see app/embeddings.py's
+    # module docstring. Fail-soft: embedding failure skips precedent/
+    # novelty entirely rather than failing the request. Escalates from
+    # final_tier (not routing.tier) so novelty correctly sees whatever
+    # calibration already did - a no-op distinction in off/shadow mode,
+    # where final_tier == routing.tier always.
     precedent_info = None
     embedding = await embedding_provider.embed(
         canonical_action_string(body.action_type, body.resource, body.params)
@@ -226,11 +282,11 @@ async def evaluate(
         precedent_info = retrieve_precedent(embedding, candidates)
         prior_count = len(candidates)
         if novelty_floor_should_escalate(max_similarity(embedding, candidates), prior_count):
-            escalated = escalate_one_tier(routing.tier)
-            if escalated != routing.tier:
+            escalated = escalate_one_tier(final_tier)
+            if escalated != final_tier:
                 final_tier = escalated
                 final_floor_name = "novelty_unprecedented"
-                final_explanation = f"{routing.explanation} Escalated to {escalated.name} ({novelty_reason(prior_count)})."
+                final_explanation = f"{final_explanation} Escalated to {escalated.name} ({novelty_reason(prior_count)})."
 
     target = {
         "AUTONOMOUS": ActionState.AUTONOMOUS,
@@ -246,7 +302,7 @@ async def evaluate(
         regulatory_score=weighted.regulatory,
         confidence_score=weighted.confidence,
         weights_version=weighted.weights_version,
-        composite=routing.composite,
+        composite=final_composite,
         floor_fired=final_floor_name,
         tier=final_tier.name,
         llm_model=os.environ.get("OPENAI_MODEL"),
@@ -265,7 +321,7 @@ async def evaluate(
         payload={
             "action_id": action_id,
             "tier": final_tier.name,
-            "composite": routing.composite,
+            "composite": final_composite,
             "floor_name": final_floor_name,
             "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
@@ -273,7 +329,7 @@ async def evaluate(
         },
     )
 
-    return _to_action_response(record, precedent=precedent_info)
+    return _to_action_response(record, precedent=precedent_info, calibration=calibration_info)
 
 
 @app.get("/v1/actions/{action_id}", response_model=ActionResponse)
@@ -516,4 +572,34 @@ async def oversight_reviewers(
         reviewers=reviewers,
         review_queue_depth=len(queue),
         oldest_pending_age_seconds=oldest_pending_age_seconds,
+    )
+
+
+@app.get("/v1/calibration", response_model=CalibrationResponse)
+async def calibration(
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+    audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_log),
+):
+    """BONUS (adaptive calibration): read-only. Same fail-soft derivation
+    evaluate() uses, just surfaced directly - never writes anything."""
+    mode = get_calibration_mode()
+    try:
+        stats_by_type = await compute_calibration_by_action_type(store, audit)
+    except Exception:
+        logger.error("calibration_degraded=true - error computing /v1/calibration", exc_info=True)
+        stats_by_type = {}
+
+    return CalibrationResponse(
+        mode=mode,
+        action_types=[
+            CalibrationActionTypeStats(
+                action_type=stats.action_type,
+                clean_confirmations=stats.clean_confirmations,
+                modifications_rejections=stats.modifications_rejections,
+                sample_size=stats.total,
+                has_min_evidence=stats.has_min_evidence,
+                adjustment=stats.adjustment,
+            )
+            for stats in stats_by_type.values()
+        ],
     )

@@ -44,6 +44,20 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class CalibrationInfo(BaseModel):
+    """BONUS: shadow/enforce-mode calibration info on one evaluate response."""
+
+    mode: str
+    adjustment: float
+    base_composite: float
+    effective_composite: float
+    sample_size: int
+    clean_confirmations: int
+    modifications_rejections: int
+    applied: bool
+    degraded: bool
+
+
 class ActionResponse(BaseModel):
     id: str
     agent_id: str
@@ -69,6 +83,27 @@ class ActionResponse(BaseModel):
     regulatory_score: float | None = None
     confidence_score: float | None = None
     floor_name: str | None = None
+    # BONUS (adaptive calibration): only populated when CALIBRATION_MODE
+    # is shadow/enforce - omitted entirely in "off" mode.
+    calibration: CalibrationInfo | None = None
+
+
+class CalibrationActionTypeStats(BaseModel):
+    """One row of GET /v1/calibration."""
+
+    action_type: str
+    clean_confirmations: int
+    modifications_rejections: int
+    sample_size: int
+    has_min_evidence: bool
+    adjustment: float
+
+
+class CalibrationResponse(BaseModel):
+    """GET /v1/calibration - read-only."""
+
+    mode: str
+    action_types: list[CalibrationActionTypeStats]
 
 
 class ConfirmRequest(BaseModel):
