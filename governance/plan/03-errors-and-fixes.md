@@ -134,9 +134,12 @@ what was not done, never substitute silently.
   records its branch and commit; this entry records why that matters —
   a finding is only as good as the tree it was run against.
 - No application logic in T-04 (scaffold only, per task spec).
-- `requirements.txt` dependency versions left unpinned — pinning exact
+- ~~`requirements.txt` dependency versions left unpinned — pinning exact
   versions now would be guessing; to be finalized when feature code lands
-  and real compatibility constraints are known.
+  and real compatibility constraints are known.~~ — RESOLVED (Phase 2
+  consolidation, commit e702701): pydantic, fastapi, uvicorn,
+  python-dotenv, pytest, pytest-asyncio pinned to `pip show`'s actual
+  installed versions. Every line in requirements.txt now carries `==`.
 - T-08: `router.route_action`'s explanation, when a floor fires, states the
   floor's own reason (e.g. "irreversible action affecting 500 records (>=
   100)") but does not compute a floor-specific counterfactual ("would have
