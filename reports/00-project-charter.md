@@ -45,3 +45,17 @@ Gate dates beyond G0 depend on the task list to be provided next
   `reports/evidence/T-14-curl.txt` for full raw evidence.
 - CI: GitHub Actions runs the full test suite on every push —
   https://github.com/wowthrisha/aivar_tba/actions/runs/32303917004
+
+## Submission tags
+
+- **`submission-v1`** — pre-novelty-addons snapshot (commit `8551be1`),
+  frozen as a rollback point before merging experimental work.
+- **`submission-v2`** — current submission: `submission-v1` + the three
+  novelty add-ons (Item 0 theoretical reframing, Feature A reviewer
+  oversight metrics, Feature B precedent retrieval + novelty escalation),
+  merged into `master` and redeployed to the same live URL above. Gate
+  check (all three original criterion actions still route correctly,
+  none escalated by the new novelty floor) and a deliberate novelty
+  firing are both verified against this live deployment — see
+  `progress-log/02-action-log.md` for the full record.
+- Rollback path if needed: `git reset --hard submission-v1`.

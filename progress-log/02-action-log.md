@@ -1140,3 +1140,64 @@ Elapsed: ~12 minutes (started ~12:19 IST after switching from the
 blocked AWS task, well under the 50-minute box).
 
 Evidence: reports/evidence/FeatureB-verification.txt.
+
+### [2026-08-20 13:08 IST] [Merge to master + redeploy] [delivery engineer]
+
+Product owner explicitly overrode the standing "never merge to master"
+rule for this session, with a full written rationale (RAG credit for
+proven work already on `feature/novelty-addons`; `submission-v1` as an
+explicit, already-tagged rollback point; avoiding a rebuild of a lesser
+version under time pressure) and a strict, gated, stop-on-red execution
+order. Followed that order exactly; no step was skipped or reordered.
+
+1. **Full suite on master (post-merge)**: `git merge --no-ff
+   feature/novelty-addons` (commit `632ffbf`) - clean, no conflicts.
+   120 passed, 6 skipped, 0 failed.
+2. **T-08 zero-diff**: `git diff a573663 -- tests/test_routing.py` -
+   empty.
+3. **Frozen values + app/risk/ zero-diff**: weights/thresholds
+   re-grepped unchanged; `git diff --stat 8551be1 632ffbf -- app/risk/`
+   - empty (the merge touched nothing in the risk engine, confirming
+   Feature B's architecture choice held).
+4. **Deploy**: `git push origin master` (`8551be1..632ffbf`) triggered
+   Railway's GitHub auto-deploy directly - no separate `railway up`
+   needed. New deployment `10c59093`, Online, `/livez` -> 200.
+5. **Seeded the live deployment**: 24 actions across the three
+   criterion categories (8 bulk deletes with mixed approve/reject
+   outcomes, 8 single updates confirmed+executed - CONFIRM-tier actions
+   have no reject path via the current API, noted honestly rather than
+   worked around -, 8 read-only auto-executed), independently
+   re-verified via a fresh `/v1/audit` count (24 seed-agent `evaluated`
+   records, 8 per tier) and via the new `/v1/oversight/reviewers`
+   endpoint itself (`seed-reviewer`: 8 decisions, 0.5 approval rate,
+   matching the seeded approve/reject alternation).
+6. **Gate check, all three criterion actions on the live URL** - none
+   escalated by the novelty floor, comfortable margin on every one:
+     - bulk delete -> FULL_REVIEW, composite 0.68, max_similarity 0.9427
+     - single update -> CONFIRM, composite 0.44, max_similarity 0.9187
+     - read-only -> AUTONOMOUS, composite 0.07, max_similarity 0.9055
+   The seeding worked on the first attempt - no reseed or threshold
+   adjustment was needed.
+7. **Deliberate novelty firing**: a `pay` action with a resource/params
+   pattern unlike anything seeded (`max_similarity=0.2957`, well under
+   0.75, with 24 >= 20 prior embedded actions) correctly escalated
+   CONFIRM -> FULL_REVIEW. Verified via the actual persisted
+   `/v1/audit` record (not just the evaluate response):
+   `floor_name: "novelty_unprecedented"`, explanation showing both the
+   original floor reason and the escalation.
+8. **`/v1/audit`, `/v1/audit/verify`, `/v1/oversight/reviewers`**: all
+   200. `/v1/audit/verify` -> `valid: true, records_checked: 303` - hash
+   chain intact across the entire session's history, unaffected by the
+   merge/deploy/seed/gate-check work.
+9. **Tagged and pushed `submission-v2`** ("Item 0 + Feature A + Feature
+   B") on the merge commit.
+10. Updated `reports/00-project-charter.md` with a new "Submission
+    tags" section recording both tags and the rollback command.
+
+No step in this sequence hit red - every gate passed on the first
+attempt, including the seeding step the plan itself flagged as the one
+real risk. Rollback path if ever needed: `git reset --hard
+submission-v1`.
+
+Evidence: this action-log entry (raw command output pasted directly in
+conversation at each step, not summarized after the fact).
