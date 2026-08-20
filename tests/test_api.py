@@ -105,6 +105,15 @@ def test_readyz_reports_llm_and_db_checks(client):
     assert body["checks"]["db"] == "ok"
 
 
+def test_negative_affected_records_returns_422(client):
+    # D-13: negative affected_records used to reach _data_scope_score's
+    # `raise ValueError` unhandled -> bare 500. Boundary validation now
+    # catches it at the API edge instead.
+    resp = _evaluate(client, affected_records=-5)
+    assert resp.status_code == 422
+    assert "affected_records" in resp.text
+
+
 def test_evaluate_bulk_delete_routes_to_full_review_via_floor(client):
     # irreversible + 500 records triggers the irreversible_bulk floor
     resp = _evaluate(client)

@@ -37,6 +37,11 @@ _TIER_STYLE = {
     "FULL_REVIEW": ("red", "\U0001f534"),
 }
 
+# Display-only: WEIGHTS' own key stays "confidence" (app/risk/scorer.py,
+# untouched); only the printed FACTORS row label changes. See the
+# render_result FACTORS loop for why.
+_FACTOR_DISPLAY_LABELS = {"confidence": "uncertainty"}
+
 _NEXT_TEXT = {
     "AUTONOMOUS": "Executed. No human in the path.",
     "CONFIRM": "User confirmation required.",
@@ -150,7 +155,15 @@ def render_result(action: dict, affected_records: int) -> None:
             if raw is None:
                 continue
             contribution = raw * weight
-            label = key.replace("_", " ")
+            # Display-only relabel: the "confidence" dimension's raw value
+            # is 1 - llm_confidence (app/risk/scorer.py), i.e. a risk
+            # contribution, not the model's own confidence. Labelling it
+            # "confidence" here would read backwards - "confidence 1.00"
+            # could look like "fully confident" when it means the
+            # opposite. The WEIGHTS key, the API field (confidence_score),
+            # and app/risk/ are untouched - this only changes the printed
+            # label.
+            label = _FACTOR_DISPLAY_LABELS.get(key, key.replace("_", " "))
             console.print(
                 f"            {label:<14} {raw:.2f}  {_factor_bar(raw)}  "
                 f"x{weight:.2f} -> {contribution:.3f}"

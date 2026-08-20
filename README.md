@@ -113,6 +113,13 @@ backstopped by its own floor too. This ordering is original reasoning
 written for this README, not sourced from an existing document — worth
 reading closely rather than taking as pre-approved.
 
+The confidence dimension is expressed as uncertainty: all four
+dimensions run in the same direction, where higher means higher risk.
+An LLM confidence of 0.20 contributes an uncertainty of 0.80. The
+low-confidence floor operates independently on the raw LLM confidence
+(< 0.5 forces CONFIRM), so the continuous score and the safety floor
+are two separate mechanisms reading the same signal.
+
 ## 5. Override floors — why a pure weighted sum is insufficient
 
 Floors (`app/risk/floors.py`) are checked *after* the weighted score and

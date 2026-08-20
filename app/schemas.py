@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.embeddings import PrecedentInfo
 from app.risk.scorer import Regulatory, Reversibility
@@ -29,7 +29,7 @@ class EvaluateRequest(BaseModel):
     resource: str
     params: dict[str, Any]
     reversibility: Reversibility
-    affected_records: int
+    affected_records: int = Field(ge=0)
     regulatory: Regulatory
     idempotency_key: str | None = None
 

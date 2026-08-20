@@ -14,12 +14,80 @@
 | D-10 | Latent (never shipped): `SQLAlchemyAuditLog.append()`'s "read the last record by created_at, then write the next" is a genuine TOCTOU race under concurrent writers | `audit_records` has no auto-incrementing sequence column (only `created_at`, an unordered timestamp) to serialize on, unlike `actions.state`. Two concurrent appends could both read the same "last" row and both compute the same `prev_hash`, forking the hash chain. Found during design review, not from a failing test — no concurrent-audit-write test was run before this was caught. | Serialized all `append()` calls with a Postgres advisory transaction lock (`pg_advisory_xact_lock`), released automatically at transaction end. | Fixed |
 | D-11 | T-16's own raw verification evidence showed the forced-error JSON log line with `"request_id": null`, even though the success-path log line correctly carried a real UUID | `request_id_middleware` (`app/main.py`) set the `request_id` contextvar before `call_next(request)` and reset it in a `finally` block. When `call_next` raised, that `finally` ran and reset the contextvar to `None` BEFORE the exception reached `@app.exception_handler(Exception)`, so the error log line was written after the value was already cleared. Found while capturing T-16's own raw evidence, not from a failing test — the two original tests only asserted the success-path log line and the error response body separately, neither of which exercised the error *log* line's request_id. | Stored `request_id` on `request.state` (set before `call_next`, unaffected by the middleware's `finally`/reset) in addition to the contextvar; `unhandled_exception_handler` now re-sets the contextvar from `request.state.request_id` before logging. Added `test_forced_error_log_line_contains_request_id` (`tests/test_observability.py`) asserting the ERROR log line itself carries a non-null `request_id`. Fixed on the first attempt. | Fixed |
 | D-12 | `README.md`'s risk-model weight-ordering sentence rendered as a broken blockquote on GitHub, splitting one sentence into a paragraph + an unintended quote block | A wrapped markdown line started with `>` — the source read `"...(reversibility > data scope > regulatory\n> confidence): reversibility gets..."`, and GitHub's renderer reads any line starting with `>` as a blockquote marker, regardless of intent. Found by fetching GitHub's own rendered HTML (`gh api repos/.../readme -H "Accept: application/vnd.github.html"`) during T-18's required render-proof step, not from reading the raw markdown source — the source alone gave no indication of the bug. | Reworded to `"reversibility outranks data scope, which outranks regulatory, which outranks confidence"` so no line starts with `>`; re-verified via the same render API (`grep -c '<blockquote>'` → 0) and grepped the whole file for any other `^>` line (none found). Fixed on the first attempt. | Fixed |
+| D-13 | Live adversarial sweep (hardening pass): `POST /v1/actions/evaluate` with `affected_records: -5` returns `500 {"detail": "internal server error"}` instead of a `422` validation error | `EvaluateRequest.affected_records` (`app/schemas.py`) is a bare `int` with no `ge=0` constraint, so Pydantic accepts a negative value. It reaches `app/risk/scorer.py::_data_scope_score`, which explicitly `raise ValueError("affected_records must be >= 0")` — an unhandled exception that propagates to the generic `unhandled_exception_handler`. The FAIL-CLEAN handler (D-11's fix) does its job (clean JSON, no stack trace leaked, audit chain unaffected — reverified `valid: true` immediately after via `/v1/audit/verify`), but the request still 500s for what is genuinely invalid input, not a server fault. | Not fixed — found during a read-only Phase 3 adversarial sweep with an explicit "do not fix yet" instruction. Production approach: add `Field(ge=0)` to `affected_records` on `EvaluateRequest` so this is caught at the API boundary as a `422`, matching how `b`/`c` (malformed types / missing fields) already behave correctly. | Found, not fixed |
 
 ## LEFT OUT
 
 Scope explicitly cut or deferred, and why. Per contract E-6/E-7 — report
 what was not done, never substitute silently.
 
+- **L-A** Re-evaluation is not reproducible across restarts. Audit
+  records ARE reproducible (all inputs, `weights_version`, and
+  `llm_model` are persisted; composite recomputes exactly — verified
+  live during the hardening pass, 5/5 recent rows matched
+  `WEIGHTS[k] * score[k]` summed to the stored `composite` bit-for-bit).
+  Re-evaluation calls a live model at default temperature (D-02: the
+  pinned model rejects `temperature=0`), so composites can vary ~0.03
+  between processes on identical inputs. Tiers stay stable because
+  floors are deterministic (computed from raw inputs, never from
+  composite). Deliberate, not an oversight: an audit must replay
+  exactly what happened; a fresh evaluation should reflect current
+  model evidence, not a frozen historical one. Production approach: an
+  explicit `/replay` endpoint that scores from persisted inputs only
+  (no live LLM call), distinct from `/evaluate`.
+- **L-B** Two tier decision points. `route_action()` (`app/risk/`)
+  returns the BASE tier; the enforced tier is composed in
+  `app/main.py`'s `evaluate()` (calibration -> floors -> novelty). The
+  audit record correctly reflects the ENFORCED tier and reason
+  (verified live throughout this session, including the bonus
+  calibration and OD-1 work), but the risk module is no longer the
+  sole authority on the tier that actually governs an action. Found in
+  self-review, not from a failing test. Production approach: a single
+  `compose_final_decision()` owning base -> calibration -> thresholds
+  -> floors -> novelty end-to-end, so one function is authoritative.
+  Not refactored under deadline: the current path is fully tested
+  (routing, calibration, novelty each independently proven, plus the
+  critical regression test that all three canonical scenarios are
+  byte-identical under calibration=shadow), and a rushed restructure
+  this close to submission would risk that already-verified behaviour
+  for a structural cleanliness gain, not a correctness one.
+- **L-C** Adaptive calibration ships in SHADOW mode: computed, audited,
+  not applied. This is a dark-launch validation stage, not a permanent
+  state. The mechanism is implemented and bounded (±0.10, minimum 5
+  decisions, floors always win — proven by
+  `tests/test_calibration.py::test_enforce_mode_cannot_suppress_full_review_floor`
+  and reverified live: a bulk-delete floor case held FULL_REVIEW under
+  a full -0.10 calibration test in enforce mode); it does not yet
+  influence production routing (`CALIBRATION_MODE` unset on Railway ->
+  defaults to `shadow`; `enforce` is never set anywhere in this repo or
+  its deploy config). Promotion criterion: sustained agreement between
+  the shadow adjustment and actual reviewer outcomes over a meaningful
+  sample, not just passing tests.
+- **L-D** Calibration input is observational, not ground truth.
+  Reviewer behaviour may itself be biased — the automation-bias metrics
+  (`app/oversight.py`, see L-F) exist precisely to surface that
+  possibility. Calibration should stay advisory until its inputs are
+  themselves statistically validated as trustworthy signal, not just
+  until the formula is unit-tested.
+- **L-E** AWS: reporting actual state honestly, not aspirationally. An
+  ECR repository and a `linux/amd64` image were built; an IAM execution
+  role and policy were created. The Lambda function and its Function
+  URL were NOT completed within the available window. Railway
+  (`https://aivartba-production.up.railway.app`) is the deployed
+  environment of record for this entire submission. AWS App Runner was
+  never an option — closed to new customers since 30 Apr 2026 (a
+  documented constraint from the start of this project, not a
+  late-discovered blocker). Do not describe AWS as deployed anywhere in
+  submission materials; it is scripted and partially provisioned, not
+  live.
+- **L-F** Reviewer metrics report `decisions_total` alongside every
+  rate, so a small sample cannot be misread as an extreme signal.
+  Confirmed both in code (`ReviewerMetrics.decisions_total: int`,
+  `app/oversight.py:44`, populated on every code path including the
+  zero-decisions branch) and live: `GET /v1/oversight/reviewers`
+  returned `decisions_total` for every reviewer in the response
+  (`reviewer-9: 4`, `seed-reviewer: 8`, `pre-record-reviewer: 1`, ...)
+  during this hardening pass. The claim holds.
 - No application logic in T-04 (scaffold only, per task spec).
 - `requirements.txt` dependency versions left unpinned — pinning exact
   versions now would be guessing; to be finalized when feature code lands
