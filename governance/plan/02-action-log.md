@@ -1486,3 +1486,32 @@ pre-fix code before implementation, per L-2.
 Evidence: raw `pytest`/`git diff` output and the local crash-reproduction
 tracebacks (NaN/Infinity and deep-nesting) pasted in this session's
 transcript.
+
+### [2026-08-21 19:15 IST] [clean-v2 closeout] [assistant]
+Action: Final closeout after the fix pass (`3047533`) was deployed to
+both Railway and AWS (user confirmed via `GET /v1/version` on both
+matching before this closeout began). Ran, live, both deployments: the
+full parity table (3 canonical scenarios x 4 runs each, seeded resources
+only per D-27), the fingerprint table (F1-F4, `readyz`, `/v1/version`,
+`/v1/audit/verify`), all 4 D-29 fuzz cases (NaN/Infinity/null-byte/
+deep-nesting - all now 422 on both), and L-H's NFC/NFD `params_hash`
+fix (identical hash on both deployments, confirmed after retrying two
+Railway calls that initially timed out client-side - not counted as
+evidence until the retry actually returned data).
+Logged D-30 (five parallel forks writing to one shared live database;
+one became unaddressable and echoed redone copies of other forks'
+assigned work instead of its own - same shape as D-15, concurrency
+across independent workers sharing a mutable resource) and D-31
+(GET /v1/version closes the staleness-verification gap that D-16/D-22/
+the post-rotation sync each had to forensically reconstruct). Re-assessed
+L-B (STILL VALID - D-24 fixed the symptom, not the two-tier-decision-
+point structure) and narrowed L-I (the specific audit-payload gap it
+flagged is now closed by D-28's test; the general "no full pairwise
+cross-layer test" gap remains).
+Result: both deployments identical at every checkpoint (git_sha,
+records_checked, tier/floor_name/floors_fired on every scenario across
+all 4 runs). Audit chain valid on both throughout, growing in lockstep
+(513 -> 621 -> 671 -> 677), never diverging.
+Evidence: `governance/evidence/final-closeout-clean-v2.txt` (parity
+table, fingerprint table, fuzz/unicode verification raw output, all
+four layers).

@@ -22,20 +22,25 @@ log with a plain-English explanation of why that tier was chosen.
 
 ## 1. Live URLs
 
-Both deployments run the same commit (`2a60896`) and share the same
-Neon database — curl-verified together, side by side, after a
-credential rotation on both sides; see
-`governance/evidence/deployment-sync-verified.txt` for the full output and
-parity table.
+Both deployments run the same commit (`3047533`, tag `clean-v2`) and
+share the same Neon database — curl-verified together, side by side;
+see `governance/evidence/final-closeout-clean-v2.txt` for the full
+parity table, fingerprint table, and fuzz/unicode-fix verification on
+both.
+
+Staleness is now a single `GET /v1/version` on each deployment (D-31) —
+returns `git_sha`, `build_time`, and live dependency versions read via
+`importlib.metadata`, rather than the behavioral/forensic reconstruction
+earlier incidents (D-16, D-22) required.
 
 - **Railway (production)**: https://aivartba-production.up.railway.app
   — curl-verified against all three tiers (AUTONOMOUS / CONFIRM /
-  FULL_REVIEW), `/livez`, `/readyz` (rotated credentials confirmed
-  working), and `/v1/audit/verify`.
+  FULL_REVIEW), `/livez`, `/readyz`, `/v1/version`, and `/v1/audit/verify`.
 - **AWS Lambda + Function URL**: https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws/
-  — curl-verified against the same three tiers, `/livez`, `/readyz`, and
-  `/v1/audit/verify`. Deploy path: `infra/aws/deploy-lambda.sh` builds
-  from a throwaway sibling clone (`../gae-aws`) and pushes to ECR; see
+  — curl-verified against the same three tiers, `/livez`, `/readyz`,
+  `/v1/version`, and `/v1/audit/verify`. Deploy path:
+  `infra/aws/deploy-lambda.sh` builds from this repo's own root (the
+  Dockerfile lives here directly — D-26) and pushes to ECR; see
   D-21–D-23 in `governance/plan/03-errors-and-fixes.md` for real failure
   modes hit getting this working (image manifest format, updates that
   silently didn't apply, IAM permissions that covered creation but not
@@ -290,12 +295,13 @@ it — see the commit that added this table for the full command log):
 
 | Metric | Value | Command |
 |---|---|---|
-| Tests passing / skipped | 144 passed, 6 skipped | `pytest -q` |
-| Source LOC (`app/` + `app/risk/` + `cli.py`) | 2,844 | `wc -l app/*.py app/risk/*.py cli.py` |
-| Test LOC (`tests/`) | 2,169 | `wc -l tests/*.py` |
-| Test-to-source ratio | ≈0.76:1 | 2,169 / 2,844 |
-| Endpoints | 12 | `grep -c "^@app\.\(get\|post\)" app/main.py` |
-| Commits | 49 | `git rev-list --all --count` |
+| Tests passing / skipped | 164 passed, 6 skipped | `pytest -q` |
+| Source LOC (`app/` + `app/risk/` + `cli.py`) | 3,129 | `wc -l app/*.py app/risk/*.py cli.py` |
+| Test LOC (`tests/`) | 2,681 | `wc -l tests/*.py` |
+| Test-to-source ratio | ≈0.86:1 | 2,681 / 3,129 |
+| Endpoints | 13 | `grep -c "^@app\.\(get\|post\)" app/main.py` |
+| Commits | 75 | `git rev-list --all --count` |
+| Defects logged / resolved | 23 logged (D-01–D-31, some numbers reserved), 20 fixed or resolved, 3 open by accepted decision (D-13 pre-D-29-fix boundary case superseded by D-29's general fix; D-23 IAM scope, behavioral workaround in place; D-30 a process finding, not a code defect) | `grep -c "^\| D-" governance/plan/03-errors-and-fixes.md` |
 | First commit | 2026-08-19 18:39:53 +0530 | `git log --reverse --format="%ci" \| head -1` |
 | Latest commit | 2026-08-20 16:22:15 +0530 | `git log -1 --format="%ci"` |
 | Defects logged | 14 (D-01–D-14) | `grep -cE "^\| D-[0-9]+" governance/plan/03-errors-and-fixes.md` |
@@ -443,12 +449,12 @@ it — see the commit that added this table for the full command log):
   rename to `uncertainty_score`, persist raw `llm_confidence`
   separately. Deferred: needs a migration and a redeploy of a verified
   system.
-- **L-H** `params_hash` is not Unicode-normalised. NFC and NFD forms of
-  one string hash differently since `json.dumps` doesn't normalise.
-  FAILS CLOSED — a mismatch returns 409 and cannot authorise anything;
-  the impact is rejecting a legitimate confirmation, never admitting an
-  illegitimate one. One-line fix (`unicodedata.normalize("NFC", ...)`),
-  deferred because it changes hashing semantics for existing rows.
+- ~~**L-H** `params_hash` is not Unicode-normalised...~~ — **RESOLVED**
+  (2026-08-21, `clean-v2`): `canonical_params_hash` now NFC-normalizes
+  (plus `ensure_ascii=False`, required for normalization to actually take
+  effect) before hashing. NFC and NFD forms of the same string now hash
+  identically — verified live on both deployments
+  (`governance/evidence/final-closeout-clean-v2.txt`).
 - **L-I** Cross-layer reconciliation (API / `risk_assessments` / audit /
   CLI) is verified manually, repeatedly, not by a standing test.
   Production approach: one test asserting pairwise equality across all
