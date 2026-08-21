@@ -96,6 +96,21 @@ def test_s1_hash_is_computed_over_canonicalised_json_key_order_independent():
     assert a == b
 
 
+def test_s1_hash_is_unicode_normalized_nfc_and_nfd_produce_same_hash():
+    # L-H: a single precomposed "e with acute accent" (U+00E9, NFC) vs
+    # plain "e" (U+0065) followed by a combining acute accent (U+0301,
+    # NFD) are byte-distinct strings that render identically. Built via
+    # explicit codepoint escapes, not source-literal lookalikes, since an
+    # editor/tool can silently re-normalize visually-identical literals
+    # (confirmed while writing this very test).
+    nfc = "caf\u00e9"
+    nfd = "cafe\u0301"
+    assert nfc != nfd  # sanity check: genuinely different code points
+    a = canonical_params_hash({"note": nfc})
+    b = canonical_params_hash({"note": nfd})
+    assert a == b
+
+
 def test_s1_confirm_and_execute_both_reject_hash_drift(client):
     created = _evaluate(
         client,

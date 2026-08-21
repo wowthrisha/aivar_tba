@@ -21,6 +21,8 @@
 | D-23 | `aivar-deploy` could create the Lambda function and push to ECR but could not update the function or read its configuration | Least-privilege IAM granted at resource-creation time did not cover subsequent operations (update, introspection). | Verification was completed behaviourally via the Function URL instead of via AWS API introspection. The agent declined to broaden its own permissions. Note: this mirrors the delegation principle the engine itself enforces — an authorisation obtained for one hop does not authorise the next. Production approach: a scoped deployment role covering the full deploy lifecycle, granted once and reviewed. | Not fixed (behavioural workaround) |
 | D-26 | `git status --short` showed the `Dockerfile` — the build input for the AWS Lambda deployment — as untracked (`??`) in `~/aivar_tba` | The Dockerfile was never `git add`ed and existed only in a working tree (originally written in the separate `gae-aws`/`aws-deploy` checkout, itself never committed there either — see L-J). A fresh clone could not have rebuilt the deployed image. Found during repo consolidation, not by a failing build, because the local file was always present so the build never actually failed. | Committed the Dockerfile to `master`. Production approach: assert that every file referenced by a deploy script is tracked, as a CI check. | Fixed |
 | D-27 | Post-push verification against Railway using freshly-invented resource names (`post-push-readonly`, `post-push-single-update`) showed read escalate to CONFIRM and single-update escalate to FULL_REVIEW, both via `floor_name":"novelty_unprecedented"` — one tier above the documented AUTONOMOUS/CONFIRM baseline, initially reading as a regression from the D-26 Dockerfile commit. | The novelty check (D-14/L-B/L-J territory) correctly escalates any action with no precedent in the audit history, one tier, regardless of its base score. Each response's own `explanation` field showed the base computation was correct before escalation (`"0.12 -> AUTONOMOUS..."`, `"0.42 -> CONFIRM..."`) — this is the novelty feature working as designed, not an app defect. The D-26 commit changed only the Dockerfile and this log; zero `app/*.py` diff. | Not a code fix — a verification-methodology fix. Re-ran the read scenario against both Railway and AWS using the exact seeded resource (`customers/42`, from `demo.sh`/`final-demo-capture.json`, which carries real precedent) and got `floor_name: null`, `tier: AUTONOMOUS` on both, matching baseline exactly. Production approach: smoke/verification scripts must always use the same fixed seeded resource identifiers, never freshly generated ones, or must explicitly treat novelty escalation as expected rather than a diff against a non-seeded baseline. | Fixed (verification methodology) |
+| D-28 | The tamper-evident audit record could not reproduce its own derivation — sub-scores lived only in the mutable, non-chained risk_assessments table. Integrity and reproducibility are different properties; the chain proved nothing had been altered but the record could not show how the composite was reached. Found in cross-layer reconciliation, not by a failing test. | `app/main.py`'s `evaluate()` only wrote `tier`/`composite`/`floor_name`/`floors_fired`/`explanation` to the audit payload, never the four sub-scores, `weights_version`, or the deployed code's `git_sha`. | Added `reversibility_score`, `data_scope_score`, `regulatory_score`, `confidence_score`, `weights_version`, and `git_sha` to the audit payload — additive only, existing hash-chained records and chain integrity unaffected. `tests/test_observability.py::test_audit_payload_can_reconstruct_composite_without_risk_assessments_table` proves `sum(WEIGHTS[k] * payload[f"{k}_score"])` equals the payload's own `composite` exactly. Caveat: this holds only as the system is actually configured (`CALIBRATION_MODE=shadow`, confirmed the only mode ever active in this repo/deploy config) — an "enforce"-mode calibration adjustment isn't itself logged, so the reconstruction guarantee would quietly stop holding if enforce mode were ever turned on. Not fixed now (out of scope of what was asked); named here so it isn't a silent gap later. | Fixed |
+| D-29 | Live fuzz sweep (final defect sweep, Part 1A) found 4 reproducible crashes: `affected_records: NaN`, `affected_records: Infinity`, a null byte in `params`, and 500-level-deep nested `params` — all returned raw `500 {"detail":"internal server error"}` instead of a clean 4xx. | Traced to two distinct root causes via local reproduction (TestClient + fakes, no live secrets), not assumed: (1) NaN/Infinity — Pydantic already rejects these correctly (`finite_number` validation error), but `ValidationError.errors()` always echoes the raw offending value, and FastAPI's default `RequestValidationError` handler crashes trying to JSON-render it, since Starlette's `JSONResponse` enforces `allow_nan=False` (`ValueError: Out of range float values are not JSON compliant: nan`) — the crash is in the framework's own error-rendering path, not in validation, so no per-field validator alone could have prevented it. (2) 500-deep `params` — Pydantic itself parses this fine; the crash was at response-serialization time echoing `params` back in `ActionResponse` (`pydantic-core`: `ValueError: Circular reference detected (depth exceeded)`), downstream of where a request-time validator runs. | Added a `RequestValidationError` exception handler (`app/main.py`) that sanitizes non-finite floats before rendering the 422 response — general, not per-field, covers current and future numeric fields. Added `app/schemas.py` validators: `affected_records` rejects non-finite floats (defense in depth); `params` and all four top-level string fields reject null bytes/control characters, `params` additionally capped at 20 levels of nesting and 64KB serialized size, string fields capped at 10,000 characters. `tests/test_input_validation.py` (8 new tests) proves each case now 422s cleanly instead of 500ing. | Fixed |
 
 ## LEFT OUT
 
@@ -114,15 +116,31 @@ what was not done, never substitute silently.
   approach: rename to `uncertainty_score`, persist raw `llm_confidence`
   separately, add a per-dimension direction-contract test. Deferred:
   needs a migration and a redeploy of a verified system.
-- **L-H** `params_hash` is not Unicode-normalised. Key order,
+- ~~**L-H** `params_hash` is not Unicode-normalised. Key order,
   whitespace, and nesting canonicalise correctly; NFC and NFD forms of
   one string hash differently because `json.dumps` does not normalise.
   FAILS CLOSED — a mismatch returns 409 and cannot authorise anything;
   the impact is rejecting a legitimate confirmation, not admitting an
-  illegitimate one. Production approach:
-  `unicodedata.normalize("NFC", ...)` on both the compute and compare
-  paths. One line, deferred because it changes hashing semantics
-  (every existing persisted hash would need reconciling against it).
+  illegitimate one.~~ — RESOLVED (final defect sweep fix pass,
+  2026-08-21): `app/store.py::canonical_params_hash` now normalizes to
+  NFC before hashing — the only hash-computation site in the codebase
+  (`app/db_store.py` imports it, doesn't redefine it), so this covers
+  both the compute path and, since `confirm`/`execute` compare via plain
+  string equality against the stored value rather than recomputing a
+  hash, the "compare path" too. Required also switching `json.dumps` to
+  `ensure_ascii=False`: with the default `ensure_ascii=True`, non-ASCII
+  characters are escaped to `\uXXXX` sequences *before* normalization
+  ever runs, so NFC and NFD forms were already flattened into two
+  different (but both now all-ASCII, hence normalization-is-a-no-op)
+  escape sequences — confirmed this was the reason the first attempt at
+  this fix still failed its own test. `tests/test_security.py::test_s1_hash_is_unicode_normalized_nfc_and_nfd_produce_same_hash`
+  proves NFC and NFD forms of the same logical string now hash
+  identically. Caveat, not silently omitted: `ensure_ascii=False` changes
+  the hash for *any* params containing non-ASCII characters, not only
+  NFC/NFD edge cases — not verified whether any historical persisted
+  record contains non-ASCII params content that would now hash
+  differently; not reconciling retroactively, per the same reasoning the
+  original entry gave for deferring this fix.
 - **L-I** Cross-layer reconciliation (API / `risk_assessments` / audit
   / CLI) was verified manually during hardening — repeatedly, across
   OD-1, the bonus calibration feature, and this session's live

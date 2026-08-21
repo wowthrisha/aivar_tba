@@ -1,11 +1,14 @@
 import importlib.metadata
 import logging
+import math
 import os
 import platform
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -77,6 +80,30 @@ async def request_id_middleware(request: Request, call_next):
         return response
     finally:
         request_id_var.reset(token)
+
+
+def _json_safe(value):
+    # Final-defect-sweep BLOCKING fix: Pydantic's ValidationError.errors()
+    # always echoes the raw offending input value. When that value is a
+    # non-finite float (NaN/Infinity - accepted by stdlib json.loads on
+    # the way in), FastAPI's own default RequestValidationError handler
+    # crashes trying to render it, because Starlette's JSONResponse
+    # enforces allow_nan=False (RFC-compliant JSON). No per-field
+    # validator prevents this - the crash is in the framework's own
+    # error-rendering path, not in validation itself (confirmed by
+    # reproducing the exact traceback locally before this fix).
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)  # "nan" / "inf" / "-inf" - always JSON-safe, still debuggable
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
 
 
 @app.exception_handler(Exception)
@@ -369,6 +396,22 @@ async def evaluate(
             "composite": final_composite,
             "floor_name": final_floor_name,
             "floors_fired": final_floors_fired,
+            # D-28: additive - lets the hash-chained record reconstruct
+            # its own composite (sum(WEIGHTS[k] * score[k]) for
+            # weights_version) without reading the mutable
+            # risk_assessments table. Caveat, not silently omitted: this
+            # only holds as-configured today (CALIBRATION_MODE=shadow,
+            # confirmed unset everywhere in this repo/deploy config) -
+            # an "enforce"-mode calibration adjustment isn't itself
+            # logged here, so composite would stop being exactly
+            # reconstructible from these fields alone if enforce mode
+            # were ever turned on.
+            "reversibility_score": weighted.reversibility,
+            "data_scope_score": weighted.data_scope,
+            "regulatory_score": weighted.regulatory,
+            "confidence_score": weighted.confidence,
+            "weights_version": weighted.weights_version,
+            "git_sha": os.environ.get("GIT_SHA", "unknown"),
             "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
             "embedding_degraded": embedding is None,

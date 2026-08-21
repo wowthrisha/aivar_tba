@@ -1445,3 +1445,44 @@ FAIL against pre-refactor code before the implementation was written
 (L-2).
 Evidence: raw `pytest` output and `git diff` output pasted in this
 session's transcript.
+
+### [2026-08-21 18:10 IST] [D-28 / D-29 / L-H] [assistant]
+Action: Fix pass approved after the 5-part parallel final-defect-sweep
+audit (fuzz sweep, test-quality review, semantic/cross-layer, security/
+adversarial, deployment parity). Three items, BLOCKING first, explicitly
+scoped to not touch `app/risk/`, routing logic, or `tests/test_routing.py`.
+(1) D-29: 4 confirmed live 500s (NaN/Infinity in `affected_records`, a
+null byte in `params`, 500-deep-nested `params`) - investigated locally
+before implementing rather than assuming the suggested fix mechanism
+would work, and found it wouldn't: Pydantic already rejects non-finite
+floats correctly, but FastAPI's default `RequestValidationError` handler
+crashes trying to render the resulting error (it always echoes the raw
+invalid value, and Starlette's `JSONResponse` enforces `allow_nan=False`).
+Fixed with a custom `RequestValidationError` handler (`app/main.py`) that
+sanitizes non-finite floats before rendering, plus `app/schemas.py`
+validators (finite-number check, null-byte/control-char rejection,
+64KB/20-level params bounds, 10,000-char string cap) applied uniformly
+across every string/numeric field, not just the three that crashed.
+(2) L-H: `canonical_params_hash` (`app/store.py`) now NFC-normalizes
+before hashing - first attempt silently failed its own test because
+`json.dumps`'s default `ensure_ascii=True` escapes non-ASCII chars to
+`\uXXXX` sequences before normalization ever sees them, flattening NFC/NFD
+forms into two different but equally-ASCII (hence normalization-is-a-
+no-op) strings; fixed by also switching to `ensure_ascii=False`.
+(3) D-28: audit payload now additionally carries the four sub-scores,
+`weights_version`, and `git_sha`, so a hash-chained record can
+reconstruct its own composite without reading the mutable
+`risk_assessments` table - caveat noted in the register: only holds
+under `CALIBRATION_MODE=shadow` (confirmed the only mode ever active
+here); an enforce-mode adjustment isn't itself logged.
+Result: `pytest` - 164 passed, 6 skipped, 0 failed (152 prior + 12 new: 10
+in `tests/test_input_validation.py` - the 6 rejection cases plus 2
+allow-list sanity checks for tab/newline/CR and reasonable nesting depth,
+and 2 more from the field-enumeration; 1 in `tests/test_security.py`
+(NFC/NFD); 1 in `tests/test_observability.py` (D-28)). `git diff a573663
+-- tests/test_routing.py` empty.
+`git diff --stat -- app/risk/` empty. New tests confirmed to fail against
+pre-fix code before implementation, per L-2.
+Evidence: raw `pytest`/`git diff` output and the local crash-reproduction
+tracebacks (NaN/Infinity and deep-nesting) pasted in this session's
+transcript.

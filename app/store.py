@@ -11,6 +11,7 @@ decision transitions are genuine conditional updates, not read-then-write.
 import hashlib
 import json
 import threading
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -19,7 +20,22 @@ from app.state_machine import ActionState
 
 
 def canonical_params_hash(params: dict[str, Any]) -> str:
-    canonical = json.dumps(params, sort_keys=True, separators=(",", ":"), default=str)
+    # L-H: NFC-normalize before hashing so visually-identical strings that
+    # arrive as different Unicode code-point sequences (e.g. a precomposed
+    # accented character vs the base letter + combining accent) hash the
+    # same. ensure_ascii=False is required here: with the default
+    # ensure_ascii=True, json.dumps escapes non-ASCII characters into
+    # \uXXXX sequences BEFORE normalization ever sees them, so NFC and NFD
+    # forms would already have been flattened into two different (but now
+    # all-ASCII, and therefore NFC-normalization-is-a-no-op) escape
+    # sequences - normalizing after that point would silently do nothing.
+    # This is the only params_hash computation site in the codebase
+    # (app/db_store.py imports this function rather than redefining it),
+    # so there is no separate compute-vs-compare path to fix - confirm/
+    # execute compare the client-supplied hash against this stored value
+    # with plain string equality, they don't recompute one.
+    canonical = json.dumps(params, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    canonical = unicodedata.normalize("NFC", canonical)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 

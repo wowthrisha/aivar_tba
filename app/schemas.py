@@ -1,13 +1,54 @@
 """Request/response models for the T-10 API."""
 
+import json
+import math
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.embeddings import PrecedentInfo
 from app.risk.scorer import Regulatory, Reversibility
 from app.state_machine import ActionState
+
+# Final-defect-sweep fix pass (1A): bounds applied uniformly to every
+# agent-controlled string/numeric field, not just the ones that happened
+# to crash. See governance/plan/03-errors-and-fixes.md for the crash
+# investigation - these validators reject bad input cleanly; the actual
+# 500->422 fix for NaN/Infinity is the RequestValidationError handler in
+# app/main.py (a validator alone can't prevent it - Pydantic's error
+# object always echoes the raw offending value, which is what crashes
+# Starlette's strict JSON rendering, regardless of which validator caught
+# it).
+MAX_STRING_LENGTH = 10_000
+MAX_PARAMS_BYTES = 64_000
+MAX_PARAMS_DEPTH = 20
+
+# C0 control characters and DEL, excluding tab/newline/CR which are
+# legitimate in free-text agent input.
+_FORBIDDEN_CHARS = frozenset(chr(c) for c in range(0x20) if c not in (0x09, 0x0A, 0x0D)) | {chr(0x7F)}
+
+
+def _reject_control_chars(value: str, field_name: str) -> str:
+    if any(ch in _FORBIDDEN_CHARS for ch in value):
+        raise ValueError(f"{field_name} must not contain null bytes or control characters")
+    if len(value) > MAX_STRING_LENGTH:
+        raise ValueError(f"{field_name} exceeds max length of {MAX_STRING_LENGTH} characters")
+    return value
+
+
+def _validate_params_value(value: Any, depth: int) -> None:
+    if depth > MAX_PARAMS_DEPTH:
+        raise ValueError(f"params nesting exceeds max depth of {MAX_PARAMS_DEPTH}")
+    if isinstance(value, str):
+        _reject_control_chars(value, "params value")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            _reject_control_chars(key, "params key")
+            _validate_params_value(item, depth + 1)
+    elif isinstance(value, list):
+        for item in value:
+            _validate_params_value(item, depth + 1)
 
 # T-13 Finding 4b: action_type <-> reversibility consistency check, for
 # exactly the action types T-06's own prompt already named explicitly
@@ -32,6 +73,38 @@ class EvaluateRequest(BaseModel):
     affected_records: int = Field(ge=0)
     regulatory: Regulatory
     idempotency_key: str | None = None
+
+    @field_validator("agent_id", "action_type", "resource")
+    @classmethod
+    def _validate_plain_strings(cls, v: str, info) -> str:
+        return _reject_control_chars(v, info.field_name)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _validate_idempotency_key(cls, v: str | None) -> str | None:
+        if v is not None:
+            _reject_control_chars(v, "idempotency_key")
+        return v
+
+    @field_validator("affected_records", mode="before")
+    @classmethod
+    def _validate_affected_records_finite(cls, v: Any) -> Any:
+        # Defense in depth: Pydantic already rejects non-finite floats for
+        # an int field on its own (confirmed). The actual 500->422 fix for
+        # the live NaN/Infinity crash is the RequestValidationError handler
+        # in app/main.py, not this validator - see the module docstring.
+        if isinstance(v, float) and not math.isfinite(v):
+            raise ValueError("affected_records must be a finite number")
+        return v
+
+    @field_validator("params")
+    @classmethod
+    def _validate_params(cls, v: dict[str, Any]) -> dict[str, Any]:
+        serialized_size = len(json.dumps(v, default=str).encode("utf-8"))
+        if serialized_size > MAX_PARAMS_BYTES:
+            raise ValueError(f"params exceeds max serialized size of {MAX_PARAMS_BYTES} bytes")
+        _validate_params_value(v, depth=0)
+        return v
 
     @model_validator(mode="after")
     def _reversibility_matches_action_type(self) -> "EvaluateRequest":

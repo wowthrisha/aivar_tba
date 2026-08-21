@@ -8,7 +8,11 @@ import logging
 
 from fastapi.testclient import TestClient
 
-from app.main import app, get_store
+from app.audit import AuditLog
+from app.llm import ConfidenceResult
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_embedding_provider, get_store
+from app.risk.scorer import WEIGHTS
+from app.store import InMemoryStore
 
 
 class _CapturingHandler(logging.Handler):
@@ -84,3 +88,88 @@ def test_forced_error_log_line_contains_request_id():
     error_records = [p for p in error_lines if p.get("level") == "ERROR"]
     assert error_records, "expected at least one ERROR log line for the forced failure"
     assert all(r.get("request_id") for r in error_records)
+
+
+# ---------------------------------------------------------------------------
+# D-28: the audit payload must be able to reconstruct its own composite,
+# without reading the mutable risk_assessments table.
+# ---------------------------------------------------------------------------
+
+
+class _FakeProvider:
+    async def get_confidence(self, action_type, resource, params):
+        return ConfidenceResult(confidence=0.9, degraded=False, reason=None)
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class _FakeEmbeddingProvider:
+    async def embed(self, text: str) -> list[float] | None:
+        return None
+
+
+class _FakeConnection:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def exec_driver_sql(self, sql):
+        return None
+
+
+class _FakeEngine:
+    def connect(self):
+        return _FakeConnection()
+
+
+def test_audit_payload_can_reconstruct_composite_without_risk_assessments_table():
+    store = InMemoryStore()
+    audit_log = AuditLog()
+    app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider()
+    app.dependency_overrides[get_embedding_provider] = lambda: _FakeEmbeddingProvider()
+    app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
+    try:
+        with TestClient(app) as c:
+            created = c.post(
+                "/v1/actions/evaluate",
+                json={
+                    "agent_id": "agent-1",
+                    "action_type": "update",
+                    "resource": "orders/1",
+                    "params": {"resource_id": 1, "fields": {"x": 1}},
+                    "reversibility": "update_without_snapshot",
+                    "affected_records": 1,
+                    "regulatory": "none",
+                },
+            ).json()
+            audit_records = c.get(f"/v1/audit?action_id={created['id']}&event_type=evaluated").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(audit_records) == 1
+    payload = audit_records[0]["payload"]
+
+    for field in (
+        "reversibility_score",
+        "data_scope_score",
+        "regulatory_score",
+        "confidence_score",
+        "weights_version",
+        "git_sha",
+        "composite",
+    ):
+        assert field in payload, f"D-28: audit payload missing {field}"
+
+    assert payload["weights_version"] == "v1"
+    recomputed = (
+        WEIGHTS["reversibility"] * payload["reversibility_score"]
+        + WEIGHTS["data_scope"] * payload["data_scope_score"]
+        + WEIGHTS["regulatory"] * payload["regulatory_score"]
+        + WEIGHTS["confidence"] * payload["confidence_score"]
+    )
+    assert recomputed == payload["composite"]
