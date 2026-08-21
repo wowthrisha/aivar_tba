@@ -1384,3 +1384,30 @@ actually live): `README.md` (Live URLs section + L-E),
 (T-15 status Not started -> Done). Not yet committed - append-to-log-
 before-commit (L-6) done first, per this project's own operating
 contract.
+
+### [2026-08-21 00:05 IST] [D-26/D-27] [assistant] [L-6 catch-up]
+Action: The prior two commits (`475122c`, `6eeff52`) were pushed without
+an entry here first, missing this project's own L-6. Recording
+retroactively before any new work starts.
+`475122c`: found `Dockerfile` (the AWS Lambda build input) untracked in
+`~/aivar_tba` - `git status --short` showed `??`, meaning a fresh clone
+could not have rebuilt the deployed image. Recovered it from the
+`gae-aws`/`aws-deploy` checkout (deleted earlier the same session after
+its only uncommitted file, this Dockerfile, was copied out first) and
+committed it here. Logged as D-26 in `03-errors-and-fixes.md`.
+`6eeff52`: ran the user's 4-axis staleness verification (code/
+dependencies/credentials/shared-state) against Railway and AWS.
+F1-F3 fingerprints passed on both; F4 (`floors_fired`) absent on both,
+expected since it did not exist yet (this is what D-24, below, ships).
+Axis 2 (dependencies) could not be verified - no version endpoint
+existed at the time. Axis 4 (shared state) reconciled exactly
+(505 -> 506, +1 accounted for by one call made between checks). Also
+logged D-27: a follow-up verification pass using freshly-invented
+resource names showed read/update scenarios escalate one tier via
+`novelty_unprecedented` - initially looked like a regression, was
+actually the novelty floor working as designed on unprecedented
+resource names; re-verified correctly with seeded names instead.
+Result: Both commits' content stands as pushed; this entry is the
+missing log record for them, not a code change.
+Evidence: `governance/plan/03-errors-and-fixes.md` (D-26, D-27),
+`governance/evidence/staleness-verification.txt`.
