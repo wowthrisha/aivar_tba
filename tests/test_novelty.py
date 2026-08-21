@@ -9,7 +9,11 @@ touching app/risk/*.py or tests/test_routing.py at all.
 """
 
 import itertools
+from datetime import datetime, timezone
 
+from fastapi.testclient import TestClient
+
+from app.audit import AuditLog
 from app.embeddings import (
     Candidate,
     escalate_one_tier,
@@ -17,9 +21,13 @@ from app.embeddings import (
     novelty_floor_should_escalate,
     retrieve_precedent,
 )
+from app.llm import ConfidenceResult
+from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_embedding_provider, get_store
 from app.risk.floors import evaluate_floors, final_tier
 from app.risk.scorer import Regulatory, Reversibility, score_action
 from app.risk.tiers import Tier
+from app.state_machine import ActionState
+from app.store import ActionRecord, InMemoryStore, canonical_params_hash
 
 
 def test_precedent_returns_similar_actions_with_outcomes():
@@ -112,3 +120,92 @@ def test_escalate_only_invariant_holds_with_novelty_floor():
         len(Reversibility) * len(affected_records_values) * len(Regulatory) * len(confidence_values) * len(novelty_cases)
     )
     assert checked == expected
+
+
+# ---------- D-24: novelty must APPEND to floors_fired, never overwrite floor_name ----------
+
+
+class _FakeConfidenceProvider:
+    def __init__(self, confidence: float):
+        self._confidence = confidence
+
+    async def get_confidence(self, action_type, resource, params):
+        return ConfidenceResult(confidence=self._confidence, degraded=False, reason=None)
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class _FakeNoveltyEmbeddingProvider:
+    async def embed(self, text: str) -> list[float] | None:
+        return [0.0, 1.0]  # orthogonal to every seeded candidate below -> similarity 0.0
+
+
+class _UnusedEngine:
+    def connect(self):
+        raise AssertionError("get_app_engine should not be reached - store/audit are overridden directly")
+
+
+def _seed_prior_actions_with_no_precedent(store: InMemoryStore, count: int = 20) -> None:
+    now = datetime.now(timezone.utc)
+    for i in range(count):
+        params: dict = {}
+        store._actions[f"prior-{i}"] = ActionRecord(
+            id=f"prior-{i}",
+            agent_id="seed-agent",
+            action_type="read",
+            resource=f"seed-resource-{i}",
+            params=params,
+            params_hash=canonical_params_hash(params),
+            idempotency_key=None,
+            created_at=now,
+            state=ActionState.EXECUTED,
+            embedding=[1.0, 0.0],  # orthogonal to the query embedding above
+        )
+
+
+def test_novelty_appends_rather_than_overwrites():
+    """D-24: app/main.py's novelty step must APPEND "novelty_unprecedented"
+    to floors_fired, never overwrite floor_name. Scenario: update_without_
+    snapshot + llm_confidence 0.0, so app/risk/floors.py already fires
+    BOTH unrecoverable_mutation_requires_confirm (higher priority) and
+    low_confidence_on_mutation (lower priority) before novelty ever runs.
+    Forcing novelty escalation on top must not erase the true floor_name -
+    the pre-fix code set final_floor_name = "novelty_unprecedented"
+    unconditionally, which this proves is no longer the case.
+    """
+    store = InMemoryStore()
+    _seed_prior_actions_with_no_precedent(store)
+    audit_log = AuditLog()
+
+    app.dependency_overrides[get_confidence_provider] = lambda: _FakeConfidenceProvider(0.0)
+    app.dependency_overrides[get_embedding_provider] = lambda: _FakeNoveltyEmbeddingProvider()
+    app.dependency_overrides[get_app_engine] = lambda: _UnusedEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
+    try:
+        with TestClient(app) as c:
+            resp = c.post(
+                "/v1/actions/evaluate",
+                json={
+                    "agent_id": "agent-1",
+                    "action_type": "update",
+                    "resource": "orders/1",
+                    "params": {"resource_id": 1, "fields": {"x": 1}},
+                    "reversibility": "update_without_snapshot",
+                    "affected_records": 1,
+                    "regulatory": "none",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["floors_fired"] == [
+        "unrecoverable_mutation_requires_confirm",
+        "novelty_unprecedented",
+        "low_confidence_on_mutation",
+    ]
+    assert body["floor_name"] == "unrecoverable_mutation_requires_confirm"
+    assert body["tier"] == "FULL_REVIEW"  # CONFIRM (floor) escalated one tier by novelty

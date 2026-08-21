@@ -83,6 +83,11 @@ class ActionResponse(BaseModel):
     regulatory_score: float | None = None
     confidence_score: float | None = None
     floor_name: str | None = None
+    # D-24: all floors that fired, in priority order (floor_name is the
+    # highest-priority one). Same pattern as `precedent` above: only
+    # populated by evaluate()'s response, not persisted - every other
+    # endpoint that reuses this model leaves it null.
+    floors_fired: list[str] | None = None
     # BONUS (adaptive calibration): only populated when CALIBRATION_MODE
     # is shadow/enforce - omitted entirely in "off" mode.
     calibration: CalibrationInfo | None = None
@@ -134,3 +139,24 @@ class AuditVerifyResponse(BaseModel):
     valid: bool
     records_checked: int
     first_invalid_id: str | None
+
+
+class KeyDependencyVersions(BaseModel):
+    """GET /v1/version - actual installed versions, read at runtime via
+    importlib.metadata. Never sourced from requirements.txt."""
+
+    pydantic: str
+    fastapi: str
+    openai: str
+    sqlalchemy: str
+
+
+class VersionResponse(BaseModel):
+    """GET /v1/version - closes Axis 2 (dependencies) of staleness
+    verification: one GET reports the commit, build time, and dependency
+    versions a running deployment actually has."""
+
+    git_sha: str
+    build_time: str
+    python_version: str
+    key_dependencies: KeyDependencyVersions

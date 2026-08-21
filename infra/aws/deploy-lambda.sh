@@ -3,10 +3,9 @@
 #
 # Builds the container image from a checkout of THIS repo's current
 # commit (run from the repo root, or point BUILD_DIR at one), pushes to
-# ECR, and updates the Lambda function to the new image. The actual
-# build happens in a throwaway sibling clone (../gae-aws by convention)
-# so the AWS-specific Dockerfile never has to merge into this repo's
-# app code - see CLAUDE.md / README for why.
+# ECR, and updates the Lambda function to the new image. The Dockerfile
+# lives in this repo's root (D-26) - BUILD_DIR defaults to "." here,
+# not a separate sibling clone.
 #
 # D-21: docker buildx attaches OCI provenance/SBOM attestations by
 # default, which turns the pushed artifact into a multi-manifest image
@@ -30,8 +29,9 @@ set -euo pipefail
 FUNCTION_NAME="${FUNCTION_NAME:-ps91-t15}"
 REGION="${AWS_REGION:-us-east-1}"
 ECR_REPO="${ECR_REPO:-ps91-t15}"
-BUILD_DIR="${BUILD_DIR:-../gae-aws}"
+BUILD_DIR="${BUILD_DIR:-.}"
 GIT_SHA="$(git -C "$BUILD_DIR" rev-parse --short HEAD)"
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 IMAGE_TAG="t15-lambda-${GIT_SHA}"
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -48,6 +48,8 @@ docker buildx build \
   --platform=linux/amd64 \
   --provenance=false \
   --sbom=false \
+  --build-arg GIT_SHA="$GIT_SHA" \
+  --build-arg BUILD_TIME="$BUILD_TIME" \
   --output type=image,name="$IMAGE_URI",oci-mediatypes=false,push=true \
   "$BUILD_DIR"
 

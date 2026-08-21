@@ -1,5 +1,7 @@
+import importlib.metadata
 import logging
 import os
+import platform
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -27,7 +29,7 @@ from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.logging_config import configure_logging, request_id_var
 from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
-from app.risk.floors import evaluate_floors
+from app.risk.floors import evaluate_floors, highest_priority_floor, sort_by_priority
 from app.risk.floors import final_tier as risk_final_tier
 from app.risk.router import route_action
 from app.risk.scorer import score_action
@@ -43,6 +45,8 @@ from app.schemas import (
     DecisionRequest,
     EvaluateRequest,
     ExecuteRequest,
+    KeyDependencyVersions,
+    VersionResponse,
 )
 from app.state_machine import ActionState, transition
 from app.store import ApprovalRecord, InMemoryStore
@@ -152,6 +156,34 @@ def livez():
     return {"status": "ok"}
 
 
+def _dep_version(name: str) -> str:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+@app.get("/v1/version")
+def version():
+    # Read-only, no auth, no DB, no LLM, no routing-decision dependency.
+    # git_sha/build_time come from env vars set at deploy/build time
+    # (Dockerfile ARG/ENV, Railway service variables) - "unknown" if
+    # absent, never guessed. Dependency versions are read at runtime via
+    # importlib.metadata, never from requirements.txt, so this reports
+    # what the RUNNING process actually has.
+    return VersionResponse(
+        git_sha=os.environ.get("GIT_SHA", "unknown"),
+        build_time=os.environ.get("BUILD_TIME", "unknown"),
+        python_version=platform.python_version(),
+        key_dependencies=KeyDependencyVersions(
+            pydantic=_dep_version("pydantic"),
+            fastapi=_dep_version("fastapi"),
+            openai=_dep_version("openai"),
+            sqlalchemy=_dep_version("sqlalchemy"),
+        ),
+    )
+
+
 @app.get("/readyz")
 async def readyz(
     response: Response,
@@ -168,7 +200,7 @@ async def readyz(
     return {"status": "ok" if (llm_ok and db_ok) else "degraded", "checks": checks}
 
 
-def _to_action_response(record, precedent=None, calibration=None) -> ActionResponse:
+def _to_action_response(record, precedent=None, calibration=None, floors_fired=None) -> ActionResponse:
     return ActionResponse(
         id=record.id,
         agent_id=record.agent_id,
@@ -187,6 +219,7 @@ def _to_action_response(record, precedent=None, calibration=None) -> ActionRespo
         regulatory_score=record.regulatory,
         confidence_score=record.confidence,
         floor_name=record.floor_name,
+        floors_fired=floors_fired,
         calibration=calibration,
     )
 
@@ -235,6 +268,7 @@ async def evaluate(
     final_composite = routing.composite
     final_explanation = routing.explanation
     final_floor_name = routing.floor_name
+    final_floors_fired: list[str] = list(routing.floors_fired)
     calibration_info = None
     if calibration_mode != "off":
         cal_stats, cal_degraded = await calibration_for_action_type(store, audit, body.action_type)
@@ -251,6 +285,7 @@ async def evaluate(
             final_tier = risk_final_tier(adjusted_weighted_tier, floor_result)
             final_composite = effective_composite
             final_floor_name = floor_result.floor_name
+            final_floors_fired = list(floor_result.floors_fired)
             if floor_result.floor_name is not None:
                 final_explanation = f"{effective_composite:.2f} -> {final_tier.name} ({floor_result.reason})."
             else:
@@ -291,7 +326,11 @@ async def evaluate(
             escalated = escalate_one_tier(final_tier)
             if escalated != final_tier:
                 final_tier = escalated
-                final_floor_name = "novelty_unprecedented"
+                # D-24: APPEND to floors_fired, never overwrite floor_name -
+                # a floor that already fired (e.g. irreversible_bulk) must
+                # not be erased just because novelty also escalated.
+                final_floors_fired = list(sort_by_priority(final_floors_fired + ["novelty_unprecedented"]))
+                final_floor_name = highest_priority_floor(final_floors_fired)
                 final_explanation = f"{final_explanation} Escalated to {escalated.name} ({novelty_reason(prior_count)})."
 
     target = {
@@ -329,13 +368,16 @@ async def evaluate(
             "tier": final_tier.name,
             "composite": final_composite,
             "floor_name": final_floor_name,
+            "floors_fired": final_floors_fired,
             "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
             "embedding_degraded": embedding is None,
         },
     )
 
-    return _to_action_response(record, precedent=precedent_info, calibration=calibration_info)
+    return _to_action_response(
+        record, precedent=precedent_info, calibration=calibration_info, floors_fired=final_floors_fired
+    )
 
 
 @app.get("/v1/actions/{action_id}", response_model=ActionResponse)

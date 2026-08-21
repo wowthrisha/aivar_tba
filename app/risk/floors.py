@@ -25,9 +25,20 @@ confidence about it does not justify consuming human oversight -
 escalating reads on low confidence produces exactly the bottleneck the
 problem statement warns against. This mirrors the reversibility weight
 of 0.40: consequence, not uncertainty alone, drives oversight.
+
+D-24, approved fix (2026-08-21): evaluate_floors() was a first-match/
+return chain, so when multiple floors independently fired, only one was
+ever named and the rest were silently lost. Rewritten to evaluate ALL
+four conditions and collect every match - no trigger condition,
+threshold, or produced tier changed (tier is still max() across
+whatever fires, which is exactly what the old first-match order already
+produced, since it happened to check both FULL_REVIEW-tier floors before
+either CONFIRM-tier floor). FLOOR_PRIORITY below governs only which
+matched floor gets NAMED as floor_name.
 """
 
 from dataclasses import dataclass
+from typing import Iterable
 
 from app.risk.scorer import Regulatory, Reversibility
 from app.risk.tiers import Tier
@@ -36,12 +47,38 @@ from app.risk.tiers import Tier
 FLOOR_RECORDS_THRESHOLD = 100
 FLOOR_CONFIDENCE_THRESHOLD = 0.5
 
+# D-24: naming priority when multiple floors fire simultaneously - an
+# explicit product decision (2026-08-21), not derived from tier severity
+# or trigger order. Do not reorder without the same explicit approval.
+# Action-derived reasons rank above model-state reasons: low confidence
+# is the most transient, least informative signal to show a reviewer.
+# "novelty_unprecedented" is evaluated in app/main.py (Feature B), not
+# here - included so app/main.py can rank it against these four via the
+# same list.
+FLOOR_PRIORITY: tuple[str, ...] = (
+    "irreversible_bulk",
+    "unrecoverable_mutation_requires_confirm",
+    "regulated_mutation",
+    "novelty_unprecedented",
+    "low_confidence_on_mutation",
+)
+
+
+def sort_by_priority(names: Iterable[str]) -> tuple[str, ...]:
+    return tuple(sorted(names, key=FLOOR_PRIORITY.index))
+
+
+def highest_priority_floor(names: Iterable[str]) -> str | None:
+    sorted_names = sort_by_priority(names)
+    return sorted_names[0] if sorted_names else None
+
 
 @dataclass(frozen=True)
 class FloorResult:
     tier: Tier
     floor_name: str | None
     reason: str | None
+    floors_fired: tuple[str, ...] = ()
 
 
 def evaluate_floors(
@@ -54,44 +91,53 @@ def evaluate_floors(
     # mutates state.
     is_mutation = reversibility != Reversibility.READ
 
+    candidates: list[tuple[str, Tier, str]] = []
+
     if reversibility == Reversibility.IRREVERSIBLE and affected_records >= FLOOR_RECORDS_THRESHOLD:
-        return FloorResult(
-            tier=Tier.FULL_REVIEW,
-            floor_name="irreversible_bulk",
-            reason=(
-                f"floor: irreversible action affecting {affected_records} "
-                f"records (>= {FLOOR_RECORDS_THRESHOLD})"
-            ),
-        )
-
-    if regulatory in (Regulatory.PII_GDPR, Regulatory.PHI_SOX) and is_mutation:
-        return FloorResult(
-            tier=Tier.FULL_REVIEW,
-            floor_name="regulated_mutation",
-            reason=f"floor: {regulatory.value}-regulated data mutation",
-        )
-
-    if llm_confidence < FLOOR_CONFIDENCE_THRESHOLD and is_mutation:
-        return FloorResult(
-            tier=Tier.CONFIRM,
-            floor_name="low_confidence_on_mutation",
-            reason=(
-                f"floor: LLM confidence {llm_confidence:.2f} below "
-                f"{FLOOR_CONFIDENCE_THRESHOLD} on a mutating action"
-            ),
-        )
+        candidates.append((
+            "irreversible_bulk",
+            Tier.FULL_REVIEW,
+            f"floor: irreversible action affecting {affected_records} "
+            f"records (>= {FLOOR_RECORDS_THRESHOLD})",
+        ))
 
     if reversibility in (Reversibility.UPDATE_WITHOUT_SNAPSHOT, Reversibility.IRREVERSIBLE):
-        return FloorResult(
-            tier=Tier.CONFIRM,
-            floor_name="unrecoverable_mutation_requires_confirm",
-            reason=(
-                f"floor: reversibility={reversibility.value} has no rollback path; "
-                "unrecoverable mutations may not execute autonomously"
-            ),
-        )
+        candidates.append((
+            "unrecoverable_mutation_requires_confirm",
+            Tier.CONFIRM,
+            f"floor: reversibility={reversibility.value} has no rollback path; "
+            "unrecoverable mutations may not execute autonomously",
+        ))
 
-    return FloorResult(tier=Tier.AUTONOMOUS, floor_name=None, reason=None)
+    if regulatory in (Regulatory.PII_GDPR, Regulatory.PHI_SOX) and is_mutation:
+        candidates.append((
+            "regulated_mutation",
+            Tier.FULL_REVIEW,
+            f"floor: {regulatory.value}-regulated data mutation",
+        ))
+
+    if llm_confidence < FLOOR_CONFIDENCE_THRESHOLD and is_mutation:
+        candidates.append((
+            "low_confidence_on_mutation",
+            Tier.CONFIRM,
+            f"floor: LLM confidence {llm_confidence:.2f} below "
+            f"{FLOOR_CONFIDENCE_THRESHOLD} on a mutating action",
+        ))
+
+    if not candidates:
+        return FloorResult(tier=Tier.AUTONOMOUS, floor_name=None, reason=None, floors_fired=())
+
+    floors_fired = sort_by_priority(name for name, _, _ in candidates)
+    reason_by_name = {name: reason for name, _, reason in candidates}
+    top_name = floors_fired[0]
+    escalation_tier = max(tier for _, tier, _ in candidates)
+
+    return FloorResult(
+        tier=escalation_tier,
+        floor_name=top_name,
+        reason=reason_by_name[top_name],
+        floors_fired=floors_fired,
+    )
 
 
 def final_tier(weighted_tier: Tier, floor_result: FloorResult) -> Tier:

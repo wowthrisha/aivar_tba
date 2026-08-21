@@ -15,6 +15,7 @@ class RoutingResult:
     tier: Tier
     explanation: str
     floor_name: str | None
+    floors_fired: tuple[str, ...] = ()
 
 
 def route_action(
@@ -39,4 +40,5 @@ def route_action(
         tier=tier,
         explanation=explanation,
         floor_name=floors.floor_name,
+        floors_fired=floors.floors_fired,
     )

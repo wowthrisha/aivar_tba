@@ -8,6 +8,14 @@ FROM public.ecr.aws/docker/library/python:3.13-slim
 
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.0.1 /lambda-adapter /opt/extensions/lambda-adapter
 
+# GET /v1/version reports these - "unknown" if not passed at build time.
+# Baked into the image at build, not read from the Lambda's own config,
+# so no IAM write permission is needed to make them show up (D-23).
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+
 ENV PORT=8000
 ENV AWS_LWA_READINESS_CHECK_PATH=/livez
 

@@ -1411,3 +1411,37 @@ Result: Both commits' content stands as pushed; this entry is the
 missing log record for them, not a code change.
 Evidence: `governance/plan/03-errors-and-fixes.md` (D-26, D-27),
 `governance/evidence/staleness-verification.txt`.
+
+### [2026-08-21 00:40 IST] [D-24 / version endpoint] [assistant]
+Action: Two explicitly-approved, explicitly-scoped changes.
+(1) `GET /v1/version` (`app/main.py`, `app/schemas.py`): read-only, no
+auth/DB/LLM. Reports `git_sha`/`build_time` from env vars ("unknown" if
+absent - Railway has no auto-injected git-SHA var on this service,
+confirmed by reading `railway variables`, so this is not guessed) and
+`python_version`/`key_dependencies` (pydantic/fastapi/openai/sqlalchemy)
+read live via `importlib.metadata`, never from requirements.txt. Closes
+Axis 2 of the D-26/D-27 staleness check permanently.
+(2) D-24: `evaluate_floors()` (`app/risk/floors.py`) rewritten from a
+first-match/return chain to evaluate-all-and-collect. Zero change to any
+trigger condition, threshold, or produced tier - only which matched
+floor gets NAMED (`FLOOR_PRIORITY`, an explicit product-decision order)
+and that every match is now recorded (new `floors_fired` field, additive
+on `FloorResult`/`RoutingResult`/`ActionResponse`, not persisted to the
+DB - same pattern as the existing `precedent` field). Separately fixed
+`app/main.py`'s novelty step, which previously overwrote
+`final_floor_name = "novelty_unprecedented"` unconditionally, erasing
+whatever floor had actually fired; it now appends to `floors_fired` and
+re-derives `floor_name` by priority. Also fixed `infra/aws/deploy-lambda.sh`'s
+`BUILD_DIR` default (`../gae-aws` - a sibling clone this session deleted
+after D-26 moved the Dockerfile into this repo) to `.`, and added
+`GIT_SHA`/`BUILD_TIME` `ARG`/`ENV` to `Dockerfile` plus `--build-arg`
+passthrough in the same script, so the AWS image gets real values baked
+in at build time without needing any Lambda IAM write permission (D-23).
+Result: `pytest` — 152 passed, 6 skipped (144 prior + 8 new: 5 in
+`tests/test_floors.py`, 1 in `tests/test_novelty.py`, 2 in new
+`tests/test_version.py`), 0 failed. `git diff a573663 -- tests/test_routing.py`
+empty (T-08 frozen criterion tests untouched). New tests confirmed to
+FAIL against pre-refactor code before the implementation was written
+(L-2).
+Evidence: raw `pytest` output and `git diff` output pasted in this
+session's transcript.
