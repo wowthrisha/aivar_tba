@@ -154,7 +154,21 @@ class ActionResponse(BaseModel):
     reversibility_score: float | None = None
     data_scope_score: float | None = None
     regulatory_score: float | None = None
+    # L-G: confidence_score is DEPRECATED - despite its name, this has
+    # always held 1 - llm_confidence (uncertainty, not confidence). Kept
+    # for backward compatibility; new integrations should read
+    # uncertainty_score instead, which holds the identical value under an
+    # honest name. The underlying risk_assessments.confidence_score DB
+    # column is NOT renamed in this pass - that migration+backfill is a
+    # separate, deferred change.
     confidence_score: float | None = None
+    # L-G: same value as confidence_score, honestly named.
+    uncertainty_score: float | None = None
+    # L-G: the actual model self-report, uninverted by the two-signal
+    # combination or the confidence->uncertainty flip. Same pattern as
+    # `precedent`: only populated by evaluate()'s response, not persisted
+    # (no DB column holds this raw value).
+    llm_confidence_raw: float | None = None
     floor_name: str | None = None
     # D-24: all floors that fired, in priority order (floor_name is the
     # highest-priority one). Same pattern as `precedent` above: only

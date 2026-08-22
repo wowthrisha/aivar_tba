@@ -1536,3 +1536,18 @@ app/risk/floors.py app/risk/scorer.py app/risk/tiers.py` empty.
 `git diff a573663 -- tests/test_routing.py` empty.
 Evidence: raw `pytest` output and the gate sweep pasted in this
 session's transcript.
+
+### [2026-08-22 09:45 IST] [Fix pass, L-G] [assistant]
+Action: `ActionResponse`/audit payload gain `uncertainty_score` (same
+value as `confidence_score`, honestly named) and `llm_confidence_raw`
+(the actual model self-report, uninverted, evaluate()-only per the same
+pattern as `precedent`). `confidence_score` kept as a documented
+deprecated alias - DB column not renamed this pass (separate
+migration+backfill). Direction-contract test
+(`tests/test_scoring.py::test_direction_contract_per_dimension`,
+parameterised over all 4 composite dimensions) added as a standing
+regression guard - passed immediately, confirming the underlying math
+was always directionally correct; only the field NAME lied.
+Result: `pytest` - 174 passed (167 prior + 7 new), 6 skipped, 0 failed.
+`git diff --stat -- app/risk/` empty (schemas.py/main.py only).
+Evidence: raw `pytest` output pasted in this session's transcript.

@@ -109,3 +109,41 @@ def test_counterfactual_states_none_explicitly_when_no_lever_changes_tier():
     result = score_action(Reversibility.READ, 0, Regulatory.NONE, 1.0)
     assert result.tier == Tier.AUTONOMOUS
     assert "No single dimension change would alter the tier" in result.explanation
+
+
+# ---------------------------------------------------------------------------
+# L-G: direction contract - the direction implied by each dimension's NAME
+# must match its actual effect on composite. Parameterised so a future
+# dimension wired with the wrong sign fails on day one, not silently.
+# ---------------------------------------------------------------------------
+
+
+def _composite(reversibility=Reversibility.READ, affected_records=0, regulatory=Regulatory.NONE, llm_confidence=1.0):
+    return score_action(reversibility, affected_records, regulatory, llm_confidence).composite
+
+
+@pytest.mark.parametrize(
+    "dimension,sequence",
+    [
+        (
+            "reversibility",
+            [Reversibility.READ, Reversibility.UPDATE_WITH_SNAPSHOT,
+             Reversibility.UPDATE_WITHOUT_SNAPSHOT, Reversibility.IRREVERSIBLE],
+        ),
+        ("affected_records", [0, 1, 10, 100, 1_000, 10_000]),
+        ("regulatory", [Regulatory.NONE, Regulatory.INTERNAL, Regulatory.PII_GDPR, Regulatory.PHI_SOX]),
+        # llm_confidence DESCENDING = uncertainty ASCENDING = risk ascending -
+        # this is the exact direction L-G's naming bug inverted.
+        ("llm_confidence", [1.0, 0.7, 0.3, 0.0]),
+    ],
+)
+def test_direction_contract_per_dimension(dimension, sequence):
+    composites = [_composite(**{dimension: value}) for value in sequence]
+
+    for earlier, later in zip(composites, composites[1:]):
+        assert later >= earlier, (
+            f"{dimension}: composite decreased along an increasing-risk sequence {sequence} -> {composites}"
+        )
+    assert composites[-1] > composites[0], (
+        f"{dimension}: composite never actually moved across the full risk-increasing sequence {sequence}"
+    )

@@ -222,7 +222,9 @@ async def readyz(
     return {"status": "ok" if (llm_ok and db_ok) else "degraded", "checks": checks}
 
 
-def _to_action_response(record, precedent=None, calibration=None, floors_fired=None) -> ActionResponse:
+def _to_action_response(
+    record, precedent=None, calibration=None, floors_fired=None, llm_confidence_raw=None
+) -> ActionResponse:
     return ActionResponse(
         id=record.id,
         agent_id=record.agent_id,
@@ -240,6 +242,8 @@ def _to_action_response(record, precedent=None, calibration=None, floors_fired=N
         data_scope_score=record.data_scope,
         regulatory_score=record.regulatory,
         confidence_score=record.confidence,
+        uncertainty_score=record.confidence,
+        llm_confidence_raw=llm_confidence_raw,
         floor_name=record.floor_name,
         floors_fired=floors_fired,
         calibration=calibration,
@@ -399,6 +403,7 @@ async def evaluate(
             "data_scope_score": weighted.data_scope,
             "regulatory_score": weighted.regulatory,
             "confidence_score": weighted.confidence,
+            "uncertainty_score": weighted.confidence,
             "weights_version": weighted.weights_version,
             "git_sha": os.environ.get("GIT_SHA", "unknown"),
             "explanation": final_explanation,
@@ -408,7 +413,11 @@ async def evaluate(
     )
 
     return _to_action_response(
-        record, precedent=precedent_info, calibration=calibration_info, floors_fired=final_floors_fired
+        record,
+        precedent=precedent_info,
+        calibration=calibration_info,
+        floors_fired=final_floors_fired,
+        llm_confidence_raw=llm_result.confidence,
     )
 
 

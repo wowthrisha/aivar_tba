@@ -173,3 +173,65 @@ def test_audit_payload_can_reconstruct_composite_without_risk_assessments_table(
         + WEIGHTS["confidence"] * payload["confidence_score"]
     )
     assert recomputed == payload["composite"]
+
+
+# ---------------------------------------------------------------------------
+# L-G: uncertainty_score / llm_confidence_raw - honest field names
+# ---------------------------------------------------------------------------
+
+
+def _evaluate_with_incomplete_update_params():
+    """action_type="update" with empty params -> structural_completeness=0.0,
+    so combined_confidence = min(llm_raw=0.9, structural=0.0) = 0.0. This
+    deliberately makes llm_confidence_raw (0.9) and the inverted
+    confidence_score/uncertainty_score (1 - 0.0 = 1.0) clearly distinct,
+    proving llm_confidence_raw is NOT run through the two-signal
+    combination or the inversion."""
+    store = InMemoryStore()
+    audit_log = AuditLog()
+    app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider()
+    app.dependency_overrides[get_embedding_provider] = lambda: _FakeEmbeddingProvider()
+    app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
+    try:
+        with TestClient(app) as c:
+            resp = c.post(
+                "/v1/actions/evaluate",
+                json={
+                    "agent_id": "agent-1",
+                    "action_type": "update",
+                    "resource": "orders/2",
+                    "params": {},
+                    "reversibility": "update_without_snapshot",
+                    "affected_records": 1,
+                    "regulatory": "none",
+                },
+            )
+            api = resp.json()
+            audit_records = c.get(f"/v1/audit?action_id={api['id']}&event_type=evaluated").json()
+    finally:
+        app.dependency_overrides.clear()
+    return api, audit_records[0]["payload"]
+
+
+def test_uncertainty_score_equals_one_minus_llm_confidence():
+    api, _ = _evaluate_with_incomplete_update_params()
+    # combined_confidence forced to 0.0 by empty params -> uncertainty = 1.0
+    assert api["uncertainty_score"] == 1.0
+
+
+def test_confidence_score_alias_matches_uncertainty_score():
+    api, payload = _evaluate_with_incomplete_update_params()
+    assert api["confidence_score"] == api["uncertainty_score"]
+    assert payload["confidence_score"] == payload["uncertainty_score"]
+
+
+def test_llm_confidence_raw_is_uninverted():
+    api, _ = _evaluate_with_incomplete_update_params()
+    # the raw model self-report (0.9 from _FakeProvider), untouched by the
+    # two-signal combination or the confidence->uncertainty inversion -
+    # distinct from uncertainty_score (1.0) precisely because this scenario
+    # was built to make them differ.
+    assert api["llm_confidence_raw"] == 0.9
+    assert api["llm_confidence_raw"] != api["uncertainty_score"]
