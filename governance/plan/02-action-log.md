@@ -1604,3 +1604,22 @@ non-zero) confirms `sum(WEIGHTS[k]*payload[f"{k}_score"]) + payload["calibration
 exactly. Full suite: 175 passed (174 prior + 1 new), 7 skipped, 0 failed.
 `git diff --stat -- app/risk/` empty.
 Evidence: raw `pytest` output pasted in this session's transcript.
+
+### [2026-08-22 10:45 IST] [Fix pass, register update] [assistant]
+Action: Register updated per the approved plan's item (h). L-B, L-G, L-I
+marked resolved in-place (L-G noting the `risk_assessments.confidence_score`
+DB column as the explicitly deferred remaining half; L-I noting the
+calibration N+1 finding hit while building its test). D-28's caveat
+marked resolved. D-13's row left completely unedited except one
+appended cross-reference sentence to D-29 (its own "Production
+approach" was eventually carried out there) — per instruction, not
+rewriting the historical claim. New D-32 logged for the
+`calibration.py` N+1 pattern (found, not fixed — out of scope for this
+pass) and the `TestClient`/event-loop conflict (fixed, in the test).
+L-H's entry updated with Fix 5's live count: 6 of 629 actions have
+non-ASCII params, all this session's own NFC/NFD test artifacts, not
+historical data — non-zero, so per instruction reported and not
+migrated.
+Result: docs-only change, no code touched, no test run needed beyond
+the prior commits' own verification.
+Evidence: `governance/plan/03-errors-and-fixes.md` diff.
