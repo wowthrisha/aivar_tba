@@ -12,9 +12,14 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import delete
 
+import cli
 from app.db import make_app_engine
 from app.db_models import ActionORM, ApprovalORM, AuditRecordORM, RiskAssessmentORM
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
+from app.llm import ConfidenceResult
+from app.main import _to_action_response, evaluate
+from app.risk.scorer import WEIGHTS, Regulatory, Reversibility
+from app.schemas import EvaluateRequest
 from app.state_machine import ActionState
 from app.store import ApprovalRecord
 
@@ -196,3 +201,125 @@ async def test_audit_append_and_verify(audit_log, action_id):
 
     result = await audit_log.verify()
     assert result.valid is True
+
+
+# ---------------------------------------------------------------------------
+# L-I: standing 4-layer reconciliation test (API JSON / risk_assessments row /
+# audit payload / CLI render). Previously verified manually, repeatedly -
+# this makes it a standing, automated, DB-backed check.
+# ---------------------------------------------------------------------------
+
+
+class _FakeProvider:
+    async def get_confidence(self, action_type, resource, params):
+        return ConfidenceResult(confidence=0.9, degraded=False, reason=None)
+
+    async def health_check(self) -> bool:
+        return True
+
+
+class _FakeEmbeddingProvider:
+    async def embed(self, text: str) -> list[float] | None:
+        return None  # keeps novelty/precedent out - not this test's concern
+
+
+async def test_all_four_layers_agree(store, audit_log, engine, capsys, monkeypatch):
+    # Calls app.main.evaluate()/get_action() DIRECTLY rather than through
+    # TestClient - TestClient runs the FastAPI app in its own internal
+    # event loop, which deadlocks against pytest-asyncio's function-scoped
+    # loop that created the store/audit_log/engine fixtures (same class of
+    # cross-loop issue as D-08, confirmed here by pg_stat_activity showing
+    # ZERO active queries during the hang - the app never even reached the
+    # DB). Every other test in this file calls store/audit_log methods
+    # directly for the same reason; this just extends that to evaluate().
+    #
+    # CALIBRATION_MODE forced to "off": app/calibration.py's
+    # calibration_for_action_type()/_historical_outcomes() does one
+    # store.get_action() round-trip PER historical confirmed/decision audit
+    # record (N+1) - confirmed live at 122s for just 17 records against
+    # this session's now-large audit_records table. That's a real,
+    # pre-existing performance defect, but fixing app/calibration.py is out
+    # of scope for this fix pass (not one of L-B/L-G/L-I/the two closeout
+    # gaps) - reported separately, not silently fixed here. This test
+    # doesn't need calibration behavior at all (Fix 3 is about the four
+    # sub-scores/composite/tier/floor_name/weights_version agreeing across
+    # layers, which "off" mode provides identically), so forcing "off"
+    # avoids the slow path entirely rather than working around it.
+    monkeypatch.setenv("CALIBRATION_MODE", "off")
+    affected_records = 1
+    body = EvaluateRequest(
+        agent_id="test-agent",
+        action_type="update",
+        resource="test-l-i-resource",
+        params={"resource_id": 1, "fields": {"x": 1}},
+        reversibility=Reversibility.UPDATE_WITHOUT_SNAPSHOT,
+        affected_records=affected_records,
+        regulatory=Regulatory.NONE,
+    )
+    action_id = None
+    try:
+        response = await evaluate(
+            body=body, provider=_FakeProvider(), embedding_provider=_FakeEmbeddingProvider(),
+            store=store, audit=audit_log,
+        )
+        api = response.model_dump(mode="json")
+        action_id = api["id"]
+
+        db_record = await store.get_action(action_id)
+        db_row = _to_action_response(db_record).model_dump(mode="json")
+
+        audit_records = await audit_log.list_records(action_id=action_id, event_type="evaluated")
+    finally:
+        if action_id is not None:
+            async with engine.begin() as conn:
+                await conn.execute(delete(RiskAssessmentORM).where(RiskAssessmentORM.action_id == action_id))
+                await conn.execute(
+                    delete(AuditRecordORM).where(AuditRecordORM.payload["action_id"].astext == action_id)
+                )
+                await conn.execute(delete(ActionORM).where(ActionORM.id == action_id))
+
+    assert len(audit_records) == 1
+    payload = audit_records[0].payload
+
+    # four sub-scores + composite + tier + floor_name + weights_version:
+    # API JSON and risk_assessments row (via a fresh store read) must
+    # agree exactly.
+    for field in (
+        "reversibility_score", "data_scope_score", "regulatory_score", "confidence_score",
+        "composite", "tier", "floor_name", "weights_version",
+    ):
+        assert api[field] == db_row[field], f"API vs DB-row mismatch on {field}: {api[field]!r} != {db_row[field]!r}"
+
+    # API JSON and audit payload must also agree on these (all present in
+    # the audit payload since D-28).
+    for field in ("reversibility_score", "data_scope_score", "regulatory_score", "confidence_score", "composite", "weights_version"):
+        assert api[field] == payload[field], f"API vs audit mismatch on {field}: {api[field]!r} != {payload[field]!r}"
+    assert api["tier"] == payload["tier"]
+    assert api["floor_name"] == payload["floor_name"]
+    assert api["explanation"] == payload["explanation"] == db_row["explanation"]
+
+    # floors_fired: API JSON and audit payload agree (both computed live);
+    # the DB-row layer deliberately omits it (D-24's documented scope
+    # decision - not persisted, same as `precedent`) - asserted as an
+    # explicit, understood exception, not silently smoothed over.
+    assert api["floors_fired"] == payload["floors_fired"]
+    assert db_row["floors_fired"] is None
+
+    # composite is exactly reconstructible from the sub-scores alone
+    # (D-28), independently re-confirmed here across all three layers.
+    recomputed = (
+        WEIGHTS["reversibility"] * api["reversibility_score"]
+        + WEIGHTS["data_scope"] * api["data_scope_score"]
+        + WEIGHTS["regulatory"] * api["regulatory_score"]
+        + WEIGHTS["confidence"] * api["confidence_score"]
+    )
+    assert recomputed == api["composite"] == db_row["composite"] == payload["composite"]
+
+    # CLI render: the real render_result() function, not a reimplementation,
+    # fed the actual API JSON - proves the CLI would display this data
+    # faithfully.
+    capsys.readouterr()  # discard anything already captured this test
+    cli.render_result(api, affected_records=affected_records)
+    printed = capsys.readouterr().out
+    assert api["tier"] in printed
+    assert f"{api['composite']:.2f}" in printed

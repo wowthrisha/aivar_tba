@@ -244,6 +244,7 @@ def _to_action_response(
         confidence_score=record.confidence,
         uncertainty_score=record.confidence,
         llm_confidence_raw=llm_confidence_raw,
+        weights_version=record.weights_version,
         floor_name=record.floor_name,
         floors_fired=floors_fired,
         calibration=calibration,

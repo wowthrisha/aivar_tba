@@ -60,6 +60,10 @@ class ActionRecord:
     data_scope: float | None = None
     regulatory: float | None = None
     confidence: float | None = None
+    # L-I: persisted since T-14 (risk_assessments.weights_version) but
+    # never read back until now - needed so the API-JSON layer can be
+    # compared against the DB-row layer in the 4-layer reconciliation test.
+    weights_version: str | None = None
 
 
 @dataclass
@@ -205,4 +209,5 @@ class InMemoryStore:
             record.data_scope = data_scope_score
             record.regulatory = regulatory_score
             record.confidence = confidence_score
+            record.weights_version = weights_version
             return record

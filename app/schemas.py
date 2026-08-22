@@ -169,6 +169,10 @@ class ActionResponse(BaseModel):
     # `precedent`: only populated by evaluate()'s response, not persisted
     # (no DB column holds this raw value).
     llm_confidence_raw: float | None = None
+    # L-I: persisted since T-14 but never read back until now - lets the
+    # 4-layer reconciliation test compare weights_version across the API
+    # JSON, risk_assessments row, and audit payload.
+    weights_version: str | None = None
     floor_name: str | None = None
     # D-24: all floors that fired, in priority order (floor_name is the
     # highest-priority one). Same pattern as `precedent` above: only

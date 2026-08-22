@@ -73,6 +73,7 @@ class SQLAlchemyStore:
             record.data_scope = ra.data_scope_score
             record.regulatory = ra.regulatory_score
             record.confidence = ra.confidence_score
+            record.weights_version = ra.weights_version
         return record
 
     async def get_or_create_action(
@@ -272,6 +273,7 @@ class SQLAlchemyStore:
             record.data_scope = data_scope_score
             record.regulatory = regulatory_score
             record.confidence = confidence_score
+            record.weights_version = weights_version
             return record
 
 

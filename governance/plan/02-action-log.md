@@ -1551,3 +1551,41 @@ was always directionally correct; only the field NAME lied.
 Result: `pytest` - 174 passed (167 prior + 7 new), 6 skipped, 0 failed.
 `git diff --stat -- app/risk/` empty (schemas.py/main.py only).
 Evidence: raw `pytest` output pasted in this session's transcript.
+
+### [2026-08-22 10:20 IST] [Fix pass, L-I] [assistant]
+Action: `weights_version` (persisted since T-14, never read back) now
+flows `risk_assessments.weights_version` -> `ActionRecord.weights_version`
+(`app/store.py`, `app/db_store.py`'s `_hydrate()`/`save_risk_assessment()`)
+-> `ActionResponse.weights_version` (`app/schemas.py`, `app/main.py`).
+Additive, no migration (column already existed). New DB-backed
+`tests/test_db_store.py::test_all_four_layers_agree` (L-I) asserts
+pairwise equality of the 4 sub-scores/composite/tier/floor_name/
+weights_version across API JSON, the `risk_assessments` row, and the
+audit payload, plus a real `cli.render_result()` call against the actual
+API JSON for the CLI layer.
+**Blocker hit and resolved during this fix, reported here rather than
+silently worked around**: the test originally drove `evaluate()` via
+`TestClient`, which hung indefinitely - confirmed via `pg_stat_activity`
+showing ZERO active queries during the hang, ruling out a slow query and
+pointing to a loop conflict between `TestClient`'s internal event loop
+and pytest-asyncio's function-scoped loop (same class of issue as D-08).
+Rewrote the test to call `app.main.evaluate()`/`get_action()` directly
+(matching every other test in this file), which surfaced a SECOND,
+independent, genuine performance defect: `app/calibration.py`'s
+`calibration_for_action_type()`/`_historical_outcomes()` does one
+`store.get_action()` round-trip PER historical confirmed/decision audit
+record (N+1) - measured live at 122s for just 17 records against this
+session's now-600+-row `audit_records` table. **Not fixed** -
+`app/calibration.py` is out of scope for this fix pass (not one of
+L-B/L-G/L-I or the two closeout gaps); the test instead forces
+`CALIBRATION_MODE=off` via `monkeypatch`, which avoids the path entirely
+without needing calibration behavior for what L-I actually tests.
+Flagging this N+1 pattern to the user as a new finding, not silently
+fixing it.
+Result: `pytest tests/test_db_store.py` (real `DATABASE_URL`) - 7 passed
+in 171.40s. Full local suite: 174 passed, 7 skipped (up from 6 - the new
+test also skips without `DATABASE_URL`), 0 failed. `git diff --stat --
+app/risk/` empty.
+Evidence: raw `pytest` output, the `pg_stat_activity` diagnostic query,
+and the isolated 122s `calibration_for_action_type` timing pasted in
+this session's transcript.
