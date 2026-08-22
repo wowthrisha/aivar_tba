@@ -74,6 +74,44 @@ class AuditLog:
             records = [r for r in records if r.event_type == event_type]
         return records[offset : offset + limit]
 
+    async def calibration_outcomes(self, store) -> dict[str, tuple[int, int]]:
+        """Same output contract as SQLAlchemyAuditLog.calibration_outcomes
+        (app/db_store.py, D-32's aggregate-SQL production path). No I/O
+        cost per record here (pure in-memory), so a plain iteration is
+        fine - this exists only to keep the interface identical for
+        InMemoryStore-backed tests."""
+        counts: dict[str, list[int]] = {}
+
+        def bump(action_type: str, is_clean: bool) -> None:
+            bucket = counts.setdefault(action_type, [0, 0])
+            bucket[0 if is_clean else 1] += 1
+
+        for rec in self._records:
+            action_id = rec.payload.get("action_id")
+            if action_id is None:
+                continue
+            if rec.event_type == "confirmed":
+                action = await store.get_action(action_id)
+                if action is None:
+                    continue
+                approved_hash = rec.payload.get("params_hash")
+                bump(action.action_type, approved_hash == action.params_hash)
+            elif rec.event_type == "decision":
+                decision = rec.payload.get("decision")
+                if decision is None:
+                    continue
+                action = await store.get_action(action_id)
+                if action is None:
+                    continue
+                if decision == "reject":
+                    bump(action.action_type, False)
+                    continue
+                approval = await store.get_approval(action_id)
+                approved_hash = approval.approved_params_hash if approval is not None else None
+                bump(action.action_type, approved_hash == action.params_hash)
+
+        return {k: (v[0], v[1]) for k, v in counts.items()}
+
     async def verify(self) -> AuditVerifyResult:
         prev_hash = GENESIS_HASH
         for i, record in enumerate(self._records):

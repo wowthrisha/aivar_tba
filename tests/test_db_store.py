@@ -10,9 +10,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, event
 
 import cli
+from app.calibration import compute_calibration_by_action_type
 from app.db import make_app_engine
 from app.db_models import ActionORM, ApprovalORM, AuditRecordORM, RiskAssessmentORM
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
@@ -323,3 +324,34 @@ async def test_all_four_layers_agree(store, audit_log, engine, capsys, monkeypat
     printed = capsys.readouterr().out
     assert api["tier"] in printed
     assert f"{api['composite']:.2f}" in printed
+
+
+# ---------------------------------------------------------------------------
+# D-32: calibration N+1 fix
+# ---------------------------------------------------------------------------
+
+
+async def test_calibration_report_issues_a_bounded_number_of_queries(store, audit_log, engine):
+    # The old app/calibration.py::_historical_outcomes() issued one
+    # store.get_action() round trip PER historical confirmed/decision
+    # audit record - O(n) in a log that only grows (measured at 122s for
+    # just 17 records against this repo's live, already 600+-row
+    # audit_records table). Asserting query COUNT stays bounded regardless
+    # of table size catches a regression back to that pattern without
+    # asserting on timing, which is flaky (per instruction). Run directly
+    # against the real, already-large shared dev DB - no seeding needed:
+    # if the implementation were still O(n) this would fail with
+    # dozens/hundreds of queries, not the single-digit bound asserted below.
+    query_count = 0
+
+    def _count(*args, **kwargs):
+        nonlocal query_count
+        query_count += 1
+
+    event.listen(engine.sync_engine, "before_cursor_execute", _count)
+    try:
+        await compute_calibration_by_action_type(store, audit_log)
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", _count)
+
+    assert query_count <= 3, f"expected O(1) queries, got {query_count}"

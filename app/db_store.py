@@ -343,6 +343,60 @@ class SQLAlchemyAuditLog:
                 for r in rows
             ]
 
+    async def calibration_outcomes(self, store) -> dict[str, tuple[int, int]]:
+        """D-32: replaces the N+1 store.get_action()-per-record loop
+        (app/calibration.py's old _historical_outcomes) with a single
+        aggregate query joining audit_records against actions/approvals,
+        GROUP BY action_type. `store` is accepted only for interface
+        parity with AuditLog.calibration_outcomes (the in-memory test
+        double) - this implementation queries actions/approvals directly
+        since SQLAlchemyStore and SQLAlchemyAuditLog share the same engine
+        and tables (app/db_models.py).
+        """
+        del store
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                text(
+                    """
+                    WITH latest_approval AS (
+                        SELECT DISTINCT ON (action_id) action_id, approved_params_hash
+                        FROM approvals
+                        ORDER BY action_id, id DESC
+                    ),
+                    decision_events AS (
+                        SELECT ar.payload->>'action_id' AS action_id,
+                               ar.payload->>'decision' AS decision
+                        FROM audit_records ar
+                        WHERE ar.event_type = 'decision'
+                          AND ar.payload ? 'action_id'
+                          AND ar.payload ? 'decision'
+                    ),
+                    outcomes AS (
+                        SELECT a.action_type,
+                               COALESCE((ar.payload->>'params_hash') = a.params_hash, false) AS is_clean
+                        FROM audit_records ar
+                        JOIN actions a ON a.id = (ar.payload->>'action_id')
+                        WHERE ar.event_type = 'confirmed' AND ar.payload ? 'action_id'
+
+                        UNION ALL
+
+                        SELECT a.action_type,
+                               COALESCE(de.decision != 'reject' AND la.approved_params_hash = a.params_hash, false)
+                                   AS is_clean
+                        FROM decision_events de
+                        JOIN actions a ON a.id = de.action_id
+                        LEFT JOIN latest_approval la ON la.action_id = de.action_id
+                    )
+                    SELECT action_type,
+                           COUNT(*) FILTER (WHERE is_clean) AS clean,
+                           COUNT(*) FILTER (WHERE NOT is_clean) AS modified_rejected
+                    FROM outcomes
+                    GROUP BY action_type
+                    """
+                )
+            )
+            return {row.action_type: (row.clean, row.modified_rejected) for row in result}
+
     async def verify(self) -> AuditVerifyResult:
         async with self._sessionmaker() as session:
             result = await session.execute(select(AuditRecordORM).order_by(AuditRecordORM.created_at))

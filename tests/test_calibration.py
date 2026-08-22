@@ -50,6 +50,9 @@ class _RaisingAudit:
     async def list_records(self, *args, **kwargs):
         raise RuntimeError("simulated DB failure")
 
+    async def calibration_outcomes(self, *args, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
     async def append(self, *args, **kwargs):
         return None
 
