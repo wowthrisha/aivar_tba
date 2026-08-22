@@ -392,14 +392,8 @@ async def evaluate(
             "floors_fired": final_floors_fired,
             # D-28: additive - lets the hash-chained record reconstruct
             # its own composite (sum(WEIGHTS[k] * score[k]) for
-            # weights_version) without reading the mutable
-            # risk_assessments table. Caveat, not silently omitted: this
-            # only holds as-configured today (CALIBRATION_MODE=shadow,
-            # confirmed unset everywhere in this repo/deploy config) -
-            # an "enforce"-mode calibration adjustment isn't itself
-            # logged here, so composite would stop being exactly
-            # reconstructible from these fields alone if enforce mode
-            # were ever turned on.
+            # weights_version, plus calibration_adjustment) without
+            # reading the mutable risk_assessments table.
             "reversibility_score": weighted.reversibility,
             "data_scope_score": weighted.data_scope,
             "regulatory_score": weighted.regulatory,
@@ -407,6 +401,15 @@ async def evaluate(
             "uncertainty_score": weighted.confidence,
             "weights_version": weighted.weights_version,
             "git_sha": os.environ.get("GIT_SHA", "unknown"),
+            # Closeout gap fix: without these, D-28's reconstruction
+            # guarantee only held under CALIBRATION_MODE=shadow (the
+            # adjustment itself was never logged) - now holds under
+            # enforce mode too, verified by
+            # test_audit_payload_reconstructs_composite_under_enforce_mode.
+            "calibration_mode": calibration_mode,
+            "calibration_adjustment": calibration_adjustment,
+            "base_composite": decision.base_composite,
+            "effective_composite": decision.effective_composite,
             "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
             "embedding_degraded": embedding is None,

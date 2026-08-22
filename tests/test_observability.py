@@ -5,6 +5,7 @@ exists in the prompt pack, only this one-line task-board entry).
 
 import json
 import logging
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
@@ -12,7 +13,8 @@ from app.audit import AuditLog
 from app.llm import ConfidenceResult
 from app.main import app, get_app_engine, get_audit_log, get_confidence_provider, get_embedding_provider, get_store
 from app.risk.scorer import WEIGHTS
-from app.store import InMemoryStore
+from app.state_machine import ActionState
+from app.store import ActionRecord, InMemoryStore, canonical_params_hash
 
 
 class _CapturingHandler(logging.Handler):
@@ -235,3 +237,81 @@ def test_llm_confidence_raw_is_uninverted():
     # was built to make them differ.
     assert api["llm_confidence_raw"] == 0.9
     assert api["llm_confidence_raw"] != api["uncertainty_score"]
+
+
+# ---------------------------------------------------------------------------
+# Closeout gap: calibration fields in the audit payload, so composite is
+# reconstructible from audit fields alone even under CALIBRATION_MODE=enforce
+# (D-28's own reconstruction test only held under shadow mode).
+# ---------------------------------------------------------------------------
+
+
+async def test_audit_payload_reconstructs_composite_under_enforce_mode(monkeypatch):
+    # Seeds 6 clean confirmations (>= calibration.MIN_EVIDENCE=5) for
+    # action_type "update", in-memory only - fast, no N+1 DB round-trips
+    # (that's a separate, out-of-scope finding in app/calibration.py, not
+    # touched here) - so the adjustment is genuinely non-zero.
+    monkeypatch.setenv("CALIBRATION_MODE", "enforce")
+    store = InMemoryStore()
+    audit_log = AuditLog()
+
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        params = {"seed": i}
+        action_id = f"seed-clean-update-{i}"
+        params_hash = canonical_params_hash(params)
+        store._actions[action_id] = ActionRecord(
+            id=action_id,
+            agent_id="seed-agent",
+            action_type="update",
+            resource=f"seed-resource-{i}",
+            params=params,
+            params_hash=params_hash,
+            idempotency_key=None,
+            created_at=now,
+            state=ActionState.EXECUTED,
+        )
+        await audit_log.append(
+            event_type="confirmed", actor="seed-agent", payload={"action_id": action_id, "params_hash": params_hash}
+        )
+
+    app.dependency_overrides[get_confidence_provider] = lambda: _FakeProvider()
+    app.dependency_overrides[get_embedding_provider] = lambda: _FakeEmbeddingProvider()
+    app.dependency_overrides[get_app_engine] = lambda: _FakeEngine()
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_audit_log] = lambda: audit_log
+    try:
+        with TestClient(app) as c:
+            api = c.post(
+                "/v1/actions/evaluate",
+                json={
+                    "agent_id": "agent-1",
+                    "action_type": "update",
+                    "resource": "orders/1",
+                    "params": {"resource_id": 1, "fields": {"x": 1}},
+                    "reversibility": "update_without_snapshot",
+                    "affected_records": 1,
+                    "regulatory": "none",
+                },
+            ).json()
+            audit_records = c.get(f"/v1/audit?action_id={api['id']}&event_type=evaluated").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert api["calibration"]["applied"] is True, "test setup must actually exercise enforce mode"
+    assert api["calibration"]["adjustment"] != 0.0
+
+    payload = audit_records[0]["payload"]
+    for field in ("calibration_mode", "calibration_adjustment", "base_composite", "effective_composite"):
+        assert field in payload, f"closeout gap: audit payload missing {field}"
+    assert payload["calibration_mode"] == "enforce"
+    assert payload["effective_composite"] == payload["base_composite"] + payload["calibration_adjustment"]
+
+    recomputed = (
+        WEIGHTS["reversibility"] * payload["reversibility_score"]
+        + WEIGHTS["data_scope"] * payload["data_scope_score"]
+        + WEIGHTS["regulatory"] * payload["regulatory_score"]
+        + WEIGHTS["confidence"] * payload["confidence_score"]
+        + payload["calibration_adjustment"]
+    )
+    assert recomputed == payload["composite"]

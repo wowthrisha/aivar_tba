@@ -1589,3 +1589,18 @@ app/risk/` empty.
 Evidence: raw `pytest` output, the `pg_stat_activity` diagnostic query,
 and the isolated 122s `calibration_for_action_type` timing pasted in
 this session's transcript.
+
+### [2026-08-22 10:35 IST] [Fix pass, closeout gap 1] [assistant]
+Action: audit payload (`app/main.py`'s `evaluate()`) gains
+`calibration_mode`, `calibration_adjustment`, `base_composite`,
+`effective_composite` - additive. Closes the caveat D-28's own entry
+named: composite reconstruction from audit fields alone previously only
+held under `CALIBRATION_MODE=shadow` (adjustment wasn't logged);
+now holds under `enforce` too.
+Result: new test `test_audit_payload_reconstructs_composite_under_enforce_mode`
+(in-memory fakes, `CALIBRATION_MODE=enforce`, 6 seeded clean
+confirmations for one action_type so the adjustment is genuinely
+non-zero) confirms `sum(WEIGHTS[k]*payload[f"{k}_score"]) + payload["calibration_adjustment"] == payload["composite"]`
+exactly. Full suite: 175 passed (174 prior + 1 new), 7 skipped, 0 failed.
+`git diff --stat -- app/risk/` empty.
+Evidence: raw `pytest` output pasted in this session's transcript.
