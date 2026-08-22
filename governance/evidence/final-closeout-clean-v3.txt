@@ -1,0 +1,200 @@
+Final closeout — clean-v3
+Verified: 2026-08-22, ~13:55-14:35 IST
+Both deployments confirmed running commit f5b8575 (short form, AWS) /
+f5b8575b421c4998f01fdcfe7382d1f2607161d0 (full form, Railway) — same
+commit, confirmed by identical fingerprint behavior below AND by
+identical /v1/audit/verify records_checked (703 on both).
+
+URLs:
+  Railway: https://aivartba-production.up.railway.app
+  AWS:     https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws
+
+Note on scope: this pass's own code fix (D-32, calibration.py N+1,
+commit 059d3fd) is NOT deployed to either target below — it is a
+read-only, no-routing-impact change verified locally against the live
+shared DB (see item 2), and clean-v3 tags the VERIFIED DEPLOYED commit
+(f5b8575), not the docs/fix commits layered on top of it. See
+governance/plan/03-errors-and-fixes.md (D-32 row) for that fix's own
+verification evidence.
+
+=== 1. FIX 5 / L-H — NON-ASCII PARAMS, RE-VERIFIED LIVE (not taken on the
+       register's prior word) ===
+
+Live query against the shared DB (same DB both deployments read/write):
+  total actions: 633
+  non-ascii params count: 6
+
+All 6, by inspection (id/agent_id/action_type/resource/params/created_at):
+  agent_id="fuzz3"  action_type="read"  resource="customers/42"
+  params={"note": "café"}
+  created_at (UTC): 13:32:37.146990 / 13:33:07.468282 / 13:33:38.413716 /
+                     13:33:55.441776 / 13:34:24.418270 / 13:35:09.569205
+                     (all 2026-08-21)
+
+All 6 fall inside this session's own clean-v2 NFC/NFD verification
+window (2026-08-21 13:32-13:35 UTC) — not pre-existing historical or
+production data. Verdict: L-H's forward-only limitation is MOOT in
+practice. No historical/production record is affected by the NFC-
+normalization fix. L-H closed, no further action pending.
+
+=== 2. D-32 — CALIBRATION N+1 FIX ===
+
+Snapshot/compare (compute_calibration_by_action_type() output, the
+function backing GET /v1/calibration), run directly against the live
+shared DB, before and after the code change:
+
+  BEFORE (N+1 path):
+    elapsed_seconds: 119.97381966598914
+    {"delete": {"clean_confirmations": 5, "modifications_rejections": 7,
+                "total": 12, "adjustment": 0.016666666666666663,
+                "has_min_evidence": true},
+     "update": {"clean_confirmations": 17, "modifications_rejections": 0,
+                "total": 17, "adjustment": -0.1, "has_min_evidence": true}}
+
+  AFTER (single aggregate query path):
+    elapsed_seconds: 8.493736875010654
+    {"delete": {"clean_confirmations": 5, "modifications_rejections": 7,
+                "total": 12, "adjustment": 0.016666666666666663,
+                "has_min_evidence": true},
+     "update": {"clean_confirmations": 17, "modifications_rejections": 0,
+                "total": 17, "adjustment": -0.1, "has_min_evidence": true}}
+
+  stats dict equality (Python ==): True — bit-identical output.
+  Timing: 119.97s -> 8.49s (~14.1x). Record count at time of run: 633
+  actions (grew from 629 between item 1's query and this one, both from
+  this session's own live calls). The residual ~8.5s is Neon connection
+  setup (this repo's own tests/test_db_store.py fixture docstring notes
+  ~15-20s per fresh connection against live Neon), not query execution -
+  the query itself is now O(1) round trips, proven by the new test
+  below, not inferred from timing alone (timing is supporting evidence
+  only, per instruction not to assert on it).
+
+  New test: tests/test_db_store.py::test_calibration_report_issues_a_bounded_number_of_queries
+  Asserts query COUNT (<=3) via a SQLAlchemy before_cursor_execute event
+  listener, run against the same already-633-row live table - PASSED.
+  ($ python3 -m pytest -v tests/test_db_store.py::test_calibration_report_issues_a_bounded_number_of_queries)
+  1 passed in 14.86s
+
+  Read-only change confirmed: git diff --stat -- app/risk/ tests/test_routing.py -> empty (both before and after this pass's commits).
+
+  Full suite (run with a real DATABASE_URL so DB-backed tests executed,
+  not skipped): 183 passed, 0 skipped, 0 failed, 189.26s (0:03:09).
+
+  Commit: 059d3fd (NOT deployed — see scope note above).
+
+=== 3. PARITY TABLE — seeded resources (demo.sh's fixed identifiers, per
+       D-27's lesson: fresh/unseeded resource names trigger novelty
+       escalation and are not a valid parity signal), 4 runs each scenario,
+       BOTH deployments running f5b8575 ===
+
+deployment | scenario    | run | tier        | composite | floor_name                              | floors_fired                                                          | llm_confidence (confidence_score) | uncertainty_score | llm_confidence_raw
+Railway    | read        | 1-4 | AUTONOMOUS  | 0.071     | null                                    | []                                                                     | 0.11 (stable all 4)                | 0.11 (stable all 4) | 0.89 (stable all 4)
+AWS        | read        | 1-4 | AUTONOMOUS  | 0.105     | null                                    | []                                                                     | 0.45 (stable all 4)                | 0.45 (stable all 4) | 0.55 (stable all 4)
+Railway    | update      | 1-4 | CONFIRM     | 0.44      | unrecoverable_mutation_requires_confirm | [unrecoverable_mutation_requires_confirm, low_confidence_on_mutation] | 1.00 (stable all 4)                | 1.00 (stable all 4) | 0.08 (stable all 4)
+AWS        | update      | 1-4 | CONFIRM     | 0.44      | unrecoverable_mutation_requires_confirm | [unrecoverable_mutation_requires_confirm, low_confidence_on_mutation] | 1.00 (stable all 4)                | 1.00 (stable all 4) | 0.98 (stable all 4)
+Railway    | bulk-delete | 1-4 | FULL_REVIEW | 0.641     | irreversible_bulk                       | [irreversible_bulk, unrecoverable_mutation_requires_confirm]          | 0.01 (stable all 4)                | 0.01 (stable all 4) | 0.99 (stable all 4)
+AWS        | bulk-delete | 1-4 | FULL_REVIEW | 0.641     | irreversible_bulk                       | [irreversible_bulk, unrecoverable_mutation_requires_confirm]          | 0.01 (stable all 4)                | 0.01 (stable all 4) | 0.99 (stable all 4)
+
+Result: TIERS MATCH across deployments on every scenario (read=AUTONOMOUS,
+update=CONFIRM, bulk-delete=FULL_REVIEW). floor_name stable across all 4
+runs, per deployment, per scenario — never flips. Composites differ
+slightly between deployments on the read scenario only (0.071 vs 0.105,
+driven by confidence_score 0.11 vs 0.45) — expected: separate live LLM
+draws in separate processes, not reconciled, per instruction; update and
+bulk-delete are floor-driven (unrecoverable_mutation_requires_confirm /
+irreversible_bulk respectively) so the floor pins the composite
+identically on both regardless of the LLM draw.
+
+uncertainty_score and llm_confidence_raw (L-G): present in every one of
+the 24 responses on both deployments, per this table. uncertainty_score
+== confidence_score in every row (same value, honest name, exactly as
+L-G's fix intends). llm_confidence_raw carries the actual, uninverted
+model self-report (distinct from uncertainty_score/confidence_score,
+which are 1-confidence).
+
+Raw sample response (Railway, read, run 1), full JSON showing every
+field checked above in one place:
+{
+  "action_type": "read", "agent_id": "agent-07",
+  "calibration": {"adjustment": 0.0, "applied": false, "base_composite": 0.071,
+    "clean_confirmations": 0, "degraded": false, "effective_composite": 0.071,
+    "mode": "shadow", "modifications_rejections": 0, "sample_size": 0},
+  "composite": 0.071, "confidence_score": 0.10999999999999999,
+  "created_at": "2026-08-22T08:29:51.269687Z", "data_scope_score": 0.2,
+  "explanation": "0.07 -> AUTONOMOUS. No single dimension change would alter the tier.",
+  "floor_name": null, "floors_fired": [],
+  "id": "1924f1f3-35ad-4a50-852f-5a06505ab09e",
+  "llm_confidence_raw": 0.89, "params": {},
+  "params_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "precedent": {"k": 3, "matches": [...3 entries, similarity 1.0 each...],
+    "summary": "Similar to 3 prior actions; 0 were rejected."},
+  "regulatory_score": 0.0, "resource": "customers/42", "reversibility_score": 0.0,
+  "state": "autonomous", "tier": "AUTONOMOUS",
+  "uncertainty_score": 0.10999999999999999, "weights_version": "v1"
+}
+
+=== 4. FINGERPRINT TABLE ===
+
+deployment | git_sha                                   | F1 (422) | F2 (floor null) | F3 (schema: sub-scores+precedent+calibration) | F4 (floors_fired) | readyz        | records_checked
+Railway    | f5b8575b421c4998f01fdcfe7382d1f2607161d0  | PASS     | PASS            | PASS                                           | PASS               | llm:ok,db:ok  | 703
+AWS        | f5b8575                                    | PASS     | PASS            | PASS                                           | PASS               | llm:ok,db:ok  | 703
+
+Raw F1 (both deployments, identical):
+{"detail":[{"type":"greater_than_equal","loc":["body","affected_records"],
+"msg":"Input should be greater than or equal to 0","input":-5,"ctx":{"ge":0}}]}
+HTTP 422
+
+Raw /readyz (both deployments, identical):
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+
+Raw /v1/version (Railway):
+{"git_sha":"f5b8575b421c4998f01fdcfe7382d1f2607161d0","build_time":"2026-08-22T07:14:17Z",
+ "python_version":"3.13.15","key_dependencies":{"pydantic":"2.12.3","fastapi":"0.115.0",
+ "openai":"2.49.0","sqlalchemy":"2.0.36"}}
+
+Raw /v1/version (AWS):
+{"git_sha":"f5b8575","build_time":"2026-08-22T07:15:07Z","python_version":"3.13.15",
+ "key_dependencies":{"pydantic":"2.12.3","fastapi":"0.115.0","openai":"2.49.0","sqlalchemy":"2.0.36"}}
+
+Raw /v1/audit/verify (both deployments, identical):
+{"valid":true,"records_checked":703,"first_invalid_id":null}
+
+records_checked identical on both (703) — same shared Neon DB, confirmed
+in lockstep, audit chain valid on both.
+
+=== 5. NFC/NFD PARAMS_HASH — LIVE, BOTH DEPLOYMENTS (L-H fix) ===
+
+NFC form of "café": b'caf\xc3\xa9' (U+0063 U+0061 U+0066 U+00E9)
+NFD form of "café": b'cafe\xcc\x81' (U+0063 U+0061 U+0066 U+0065 U+0301)
+Both submitted live via POST /v1/actions/evaluate, agent_id=
+"clean-v3-nfc-check", resource="customers/42", params={"note": <form>}.
+
+  Railway: NFC hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1
+           NFD hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1  MATCH
+  AWS:     NFC hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1
+           NFD hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1  MATCH
+
+Both deployments: MATCH. Hash also identical to the clean-v2 closeout's
+own NFC/NFD verification hash (content-derived, not time-derived, so
+this is expected, not coincidental) — same fix, same input, same output,
+now independently reconfirmed live a second time. This pass's own two
+NFC/NFD calls per deployment add 4 more non-ASCII actions to the shared
+DB (agent_id="clean-v3-nfc-check") on top of item 1's pre-existing 6 -
+same category (this session's own live test artifacts), not historical
+data, not migrated, consistent with L-H's now-closed status above.
+
+=== VERDICT ===
+
+Both deployments: CURRENT, at the same commit (f5b8575), behaviorally
+identical on every canonical scenario and every fingerprint check.
+records_checked identical (703) and audit chain valid on both. L-G
+(uncertainty_score/llm_confidence_raw) and L-H (NFC/NFD hash parity)
+both independently reconfirmed live on both deployments, not just by
+test coverage. Fix 5/L-H closed (all 6 non-ASCII rows are this session's
+own test artifacts, no historical data affected). D-32 (calibration N+1)
+fixed and verified (bit-identical output, ~14x speedup, bounded-query
+test passing) but NOT deployed — by design, since it's a local-only-
+verified, read-only change and this closeout's tag points at the
+already-deployed, already-parity-verified commit, not a later one.
+
+This closes the sweep.

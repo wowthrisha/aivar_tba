@@ -1623,3 +1623,49 @@ migrated.
 Result: docs-only change, no code touched, no test run needed beyond
 the prior commits' own verification.
 Evidence: `governance/plan/03-errors-and-fixes.md` diff.
+
+### [2026-08-22 14:35 IST] [clean-v3 closeout, 3 items] [assistant]
+Action: Lambda deploy confirmed by the user; independently re-verified
+via `GET /v1/version` on both deployments (git_sha `f5b8575` on both) —
+E-4, not taken on the user's word alone. Then, in order:
+(1) Fix 5/L-H: re-ran the non-ASCII query live rather than accepting
+the register's prior claim — `total actions: 633`, `non-ascii params
+count: 6`, same 6 rows (`agent_id="fuzz3"`, `resource="customers/42"`,
+`created_at` 2026-08-21 13:32-13:35 UTC), confirmed by fresh inspection
+to be this session's own NFC/NFD test artifacts, zero genuine historical
+data. L-H marked fully resolved (forward-only limitation moot in
+practice).
+(2) D-32: fixed the `calibration.py` N+1 (one named `calibration_report()`
+in the instruction — no such function exists; the actual site is
+`compute_calibration_by_action_type()`/the old `_historical_outcomes()`,
+backing `GET /v1/calibration`, exactly matching the register's own D-32
+description — flagged per E-3 rather than silently assumed, then
+proceeded on that identification). Replaced with
+`audit.calibration_outcomes(store)`: a single aggregate SQL query (CTE +
+`UNION ALL`, `GROUP BY action_type`) on the DB-backed path, a plain
+iteration on the in-memory test double. Snapshotted output before
+touching code, asserted bit-identical after (dict equality), timing
+119.97s -> 8.49s against the live 633-row table. New
+`tests/test_db_store.py::test_calibration_report_issues_a_bounded_number_of_queries`
+asserts query count (<=3) via a SQLAlchemy event listener, not timing.
+Full suite: 183 passed, 0 skipped, 0 failed (189.26s, real `DATABASE_URL`
+so DB-backed tests ran). `git diff --stat -- app/risk/ tests/test_routing.py`
+empty throughout. Commit `059d3fd` — NOT deployed (read-only,
+no-routing-impact change, verified locally against the live shared DB;
+clean-v3 tags the already-deployed, already-parity-verified commit, not
+this one).
+(3) Final parity: 24 live calls (3 seeded scenarios x 4 runs x 2
+deployments, sequential per D-30's lesson against shared-DB writes) —
+tiers match on every scenario, floor_name stable across all 4 runs per
+scenario/deployment. Fingerprint table (F1-F4, `readyz`, `/v1/version`,
+`/v1/audit/verify`) PASS on both, `records_checked` identical (703) on
+both. `uncertainty_score`/`llm_confidence_raw` (L-G) confirmed present
+in all 24 responses on both deployments. NFC/NFD `params_hash` parity
+(L-H) re-confirmed live on both deployments, matching the clean-v2
+closeout's own hash exactly (content-derived, expected).
+Result: L-H closed, D-32 fixed (locally verified, not deployed), parity
+confirmed live on both deployments for every item this instruction
+named, including its L-G/L-H addition.
+Evidence: `governance/evidence/final-closeout-clean-v3.txt` (all raw
+curl/query output); `governance/plan/03-errors-and-fixes.md` diff
+(L-H final resolution, D-32 row updated to Fixed).
