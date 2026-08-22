@@ -1515,3 +1515,24 @@ all 4 runs). Audit chain valid on both throughout, growing in lockstep
 Evidence: `governance/evidence/final-closeout-clean-v2.txt` (parity
 table, fingerprint table, fuzz/unicode verification raw output, all
 four layers).
+
+### [2026-08-22 09:30 IST] [Fix pass, L-B] [assistant]
+Action: New `app/risk/decision.py::compose_final_decision()` - the sole
+tier-composing function (composite -> calibration -> thresholds ->
+floors -> novelty -> final tier/floors_fired/explanation). Wraps
+`route_action()` (unchanged signature/behavior) rather than
+reimplementing it. `app/main.py`'s `evaluate()` rewritten to gather I/O
+(calibration stats, embedding/precedent) then make ONE call and use its
+result verbatim - no post-hoc tier adjustment anywhere in `evaluate()`
+now. `app/risk/router.py`/`floors.py`/`scorer.py`/`tiers.py` untouched.
+Result: THE GATE (`tests/test_decision.py::test_refactor_preserves_every_tier`)
+swept the full `itertools.product(Reversibility, affected_records_values,
+Regulatory, confidence_values)` grid (2,916 combinations) comparing
+`route_action()`'s tier/floor_name/floors_fired against
+`compose_final_decision()`'s (off mode, no novelty) - identical on every
+combination, confirmed before this commit. Full suite: 167 passed (164
+prior + 3 new), 6 skipped, 0 failed. `git diff --stat -- app/risk/router.py
+app/risk/floors.py app/risk/scorer.py app/risk/tiers.py` empty.
+`git diff a573663 -- tests/test_routing.py` empty.
+Evidence: raw `pytest` output and the gate sweep pasted in this
+session's transcript.

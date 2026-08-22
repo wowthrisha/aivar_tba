@@ -22,21 +22,16 @@ from app.embeddings import (
     OpenAIEmbeddingProvider,
     PRECEDENT_WINDOW,
     canonical_action_string,
-    escalate_one_tier,
     max_similarity,
     novelty_floor_should_escalate,
-    novelty_reason,
     retrieve_precedent,
 )
 from app.llm import ConfidenceProvider, OpenAIConfidenceProvider
 from app.logging_config import configure_logging, request_id_var
 from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
-from app.risk.floors import evaluate_floors, highest_priority_floor, sort_by_priority
-from app.risk.floors import final_tier as risk_final_tier
-from app.risk.router import route_action
+from app.risk.decision import compose_final_decision
 from app.risk.scorer import score_action
-from app.risk.tiers import tier_for_composite
 from app.schemas import (
     ActionResponse,
     AuditRecordResponse,
@@ -277,67 +272,35 @@ async def evaluate(
     structural = structural_completeness(body.action_type, body.params)
     combined_confidence = two_signal_confidence(llm_result.confidence, structural)
 
+    # Persisted sub-scores (D-28 audit fields, risk_assessments row) -
+    # deliberately a separate call from compose_final_decision()'s own
+    # internal score_action() call (via route_action()), not consolidated,
+    # to keep the L-B refactor a minimal, bit-identical relocation rather
+    # than also opportunistically deduplicating this pre-existing
+    # redundancy (route_action() already called score_action() a second
+    # time before this refactor too - same redundancy, same place).
     weighted = score_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
-    routing = route_action(body.reversibility, body.affected_records, body.regulatory, combined_confidence)
 
-    # BONUS (adaptive calibration), SHADOW MODE BY DEFAULT: a separate step
-    # AFTER route_action(), not a change to app/risk/*.py. In "off"/"shadow"
-    # mode `applied` stays False below and final_tier/final_composite/
-    # final_floor_name/final_explanation are byte-identical to routing.* -
-    # existing behaviour wins. In "enforce" mode, the ONLY calibrated input
-    # is the composite fed into tier_for_composite(); floors are then
-    # RE-evaluated via the same (imported, unmodified) evaluate_floors() on
-    # the raw inputs - never on composite - and final_tier() is a max()
-    # over the weighted tier and the floor tier, so calibration can only
-    # ever move the weighted tier, never suppress a floor.
+    # BONUS (adaptive calibration), SHADOW MODE BY DEFAULT: gather the I/O
+    # (historical stats) here; app/risk/decision.py::compose_final_decision()
+    # owns the pure decision logic (mode branching, threshold recomputation,
+    # floor re-evaluation) - main.py hands it plain values, never applies
+    # calibration itself.
     calibration_mode = get_calibration_mode()
-    final_tier = routing.tier
-    final_composite = routing.composite
-    final_explanation = routing.explanation
-    final_floor_name = routing.floor_name
-    final_floors_fired: list[str] = list(routing.floors_fired)
-    calibration_info = None
+    cal_stats = None
+    cal_degraded = False
+    calibration_adjustment = 0.0
     if calibration_mode != "off":
         cal_stats, cal_degraded = await calibration_for_action_type(store, audit, body.action_type)
-        base_composite = routing.composite
-        adjustment = 0.0 if cal_degraded else cal_stats.adjustment
-        effective_composite = base_composite + adjustment
-        applied = calibration_mode == "enforce" and not cal_degraded
+        calibration_adjustment = 0.0 if cal_degraded else cal_stats.adjustment
 
-        if applied:
-            floor_result = evaluate_floors(
-                body.reversibility, body.affected_records, body.regulatory, combined_confidence
-            )
-            adjusted_weighted_tier = tier_for_composite(effective_composite)
-            final_tier = risk_final_tier(adjusted_weighted_tier, floor_result)
-            final_composite = effective_composite
-            final_floor_name = floor_result.floor_name
-            final_floors_fired = list(floor_result.floors_fired)
-            if floor_result.floor_name is not None:
-                final_explanation = f"{effective_composite:.2f} -> {final_tier.name} ({floor_result.reason})."
-            else:
-                final_explanation = f"{effective_composite:.2f} -> {final_tier.name} (calibration-adjusted)."
-
-        calibration_info = CalibrationInfo(
-            mode=calibration_mode,
-            adjustment=adjustment,
-            base_composite=base_composite,
-            effective_composite=effective_composite,
-            sample_size=cal_stats.total,
-            clean_confirmations=cal_stats.clean_confirmations,
-            modifications_rejections=cal_stats.modifications_rejections,
-            applied=applied,
-            degraded=cal_degraded,
-        )
-
-    # Feature B (novelty add-on): a separate step AFTER route_action()/
-    # calibration, not a change to app/risk/*.py - see app/embeddings.py's
-    # module docstring. Fail-soft: embedding failure skips precedent/
-    # novelty entirely rather than failing the request. Escalates from
-    # final_tier (not routing.tier) so novelty correctly sees whatever
-    # calibration already did - a no-op distinction in off/shadow mode,
-    # where final_tier == routing.tier always.
+    # Feature B (novelty add-on): gather the I/O (embedding + precedent)
+    # here; compose_final_decision() owns the escalation decision. Fail-
+    # soft: embedding failure skips precedent/novelty entirely rather than
+    # failing the request.
     precedent_info = None
+    novelty_should_escalate = False
+    novelty_prior_count = 0
     embedding = await embedding_provider.embed(
         canonical_action_string(body.action_type, body.resource, body.params)
     )
@@ -348,17 +311,43 @@ async def evaluate(
             exclude_action_id=action_id, limit=PRECEDENT_WINDOW
         )
         precedent_info = retrieve_precedent(embedding, candidates)
-        prior_count = len(candidates)
-        if novelty_floor_should_escalate(max_similarity(embedding, candidates), prior_count):
-            escalated = escalate_one_tier(final_tier)
-            if escalated != final_tier:
-                final_tier = escalated
-                # D-24: APPEND to floors_fired, never overwrite floor_name -
-                # a floor that already fired (e.g. irreversible_bulk) must
-                # not be erased just because novelty also escalated.
-                final_floors_fired = list(sort_by_priority(final_floors_fired + ["novelty_unprecedented"]))
-                final_floor_name = highest_priority_floor(final_floors_fired)
-                final_explanation = f"{final_explanation} Escalated to {escalated.name} ({novelty_reason(prior_count)})."
+        novelty_prior_count = len(candidates)
+        novelty_should_escalate = novelty_floor_should_escalate(
+            max_similarity(embedding, candidates), novelty_prior_count
+        )
+
+    # L-B: the ONE call. app/main.py uses this result verbatim - no
+    # post-hoc tier adjustment anywhere below.
+    decision = compose_final_decision(
+        body.reversibility,
+        body.affected_records,
+        body.regulatory,
+        combined_confidence,
+        calibration_mode=calibration_mode,
+        calibration_adjustment=calibration_adjustment,
+        calibration_degraded=cal_degraded,
+        novelty_should_escalate=novelty_should_escalate,
+        novelty_prior_count=novelty_prior_count,
+    )
+    final_tier = decision.tier
+    final_composite = decision.composite
+    final_explanation = decision.explanation
+    final_floor_name = decision.floor_name
+    final_floors_fired: list[str] = list(decision.floors_fired)
+
+    calibration_info = None
+    if calibration_mode != "off":
+        calibration_info = CalibrationInfo(
+            mode=calibration_mode,
+            adjustment=calibration_adjustment,
+            base_composite=decision.base_composite,
+            effective_composite=decision.effective_composite,
+            sample_size=cal_stats.total,
+            clean_confirmations=cal_stats.clean_confirmations,
+            modifications_rejections=cal_stats.modifications_rejections,
+            applied=decision.calibration_applied,
+            degraded=cal_degraded,
+        )
 
     target = {
         "AUTONOMOUS": ActionState.AUTONOMOUS,
