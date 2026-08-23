@@ -1669,3 +1669,39 @@ named, including its L-G/L-H addition.
 Evidence: `governance/evidence/final-closeout-clean-v3.txt` (all raw
 curl/query output); `governance/plan/03-errors-and-fixes.md` diff
 (L-H final resolution, D-32 row updated to Fixed).
+
+### [2026-08-23 10:20 IST] [Final resolution pass, Step 1] [assistant]
+Action: Full suite green (183 passed, 0 skipped, 0 failed, 178.26s) run
+before pushing. Pushed `059d3fd`/`27aa4d2` and tag `clean-v3` to
+`origin/master`, triggering Railway's connected auto-deploy - confirmed
+via `railway logs --build` (image digest `sha256:689d2a15...`,
+healthcheck succeeded) and `GET /v1/calibration` timing (1.958s,
+independent proof the D-32 fix is actually running, not just that a SHA
+string changed). Built and pushed the Lambda image
+(`GIT_SHA=27aa4d2`/`BUILD_TIME=2026-08-23T04:48:42Z` build-args, digest
+`sha256:6d7675a2...`, manifest media type confirmed
+`application/vnd.docker.distribution.manifest.v2+json`) but did NOT call
+`update-function-code` - user deploys via console, per instruction.
+User confirmed Lambda deploy and `/v1/version` match on both platforms;
+independently re-verified via direct curl to both URLs before proceeding
+(E-4).
+Found D-33 while doing this (`GIT_SHA`/`BUILD_TIME` were static Railway
+variables, not derived per-deploy - `/v1/version` kept reporting the OLD
+commit despite a real, healthy, functionally-verified new deploy).
+Checked whether Railway exposes a git-commit variable before assuming a
+fix - `railway run env`, full runtime environment, grepped for every
+`RAILWAY_*`/`GIT_*` key: none exists for this service (root-Dockerfile
+build, not Nixpacks). Logged as D-33. Fixed the immediate instance via
+`railway variables --set` (confirmed live: `/v1/version` now reports
+`27aa4d2ab0d6e3e2910c490a54e5af7c6d1ff615`). Since no Railway-provided
+variable exists to wire `/v1/version` to, the durable fix is process, not
+code: new `infra/railway/deploy-railway.sh` scripts the required
+`railway variables --set GIT_SHA=... BUILD_TIME=...` step, and
+`CLAUDE.md`'s Known constraints section documents the requirement so the
+next Railway deploy doesn't rediscover this the same way.
+Result: both deployments verified on `27aa4d2` (raw `/v1/version` output
+pasted in this session); D-33 logged with the "checked, doesn't exist"
+finding stated explicitly, not guessed; process gap closed via a script
++ CLAUDE.md, not a code change (there was no code to change).
+Evidence: this session's transcript (raw curl/`railway`/`aws ecr`
+output); `governance/plan/03-errors-and-fixes.md` diff (new D-33 row).

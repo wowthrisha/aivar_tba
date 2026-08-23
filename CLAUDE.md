@@ -52,6 +52,16 @@ has rolled back twice; anything not on the plan is about to be committed.
   `additionalProperties=false`, model string **pinned**, not aliased.
 - An LLM safety refusal is TERMINAL — never retry it. Fail closed.
 - Build container images with `--platform=linux/amd64`.
+- Railway (D-33): `git push origin master` triggers auto-deploy, but does
+  NOT update `GET /v1/version`'s reported `git_sha`/`build_time` — those
+  come from `GIT_SHA`/`BUILD_TIME` Railway service variables, which are
+  static until manually set. Confirmed by direct inspection (`railway run
+  env`) that Railway injects no git-metadata variable for this service
+  (root-Dockerfile build, not Nixpacks). After every Railway deploy, run
+  `infra/railway/deploy-railway.sh` (or `railway variables --set
+  GIT_SHA=$(git rev-parse HEAD) --set BUILD_TIME=$(date -u
+  +%Y-%m-%dT%H:%M:%SZ)`) or `/v1/version` will silently keep reporting
+  the previous commit.
 
 ## Commands
 
