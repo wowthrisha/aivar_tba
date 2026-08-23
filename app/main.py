@@ -111,9 +111,19 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error(f"unhandled exception on {request.method} {request.url.path}", exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": "internal server error"})
 
-# FROZEN (T-12/S-3): CONFIRM 30 min, FULL_REVIEW 4 hours.
-CONFIRM_TTL = timedelta(minutes=30)
-FULL_REVIEW_TTL = timedelta(hours=4)
+# T-12/S-3: "both configurable" - env-var overridable, read once at
+# startup (module load), same defaults as before (30 min / 4 h) when the
+# var is absent. Not on CLAUDE.md's FROZEN LIST (that's risk weights/
+# thresholds/floors/fail-closed direction) - these are approval-window
+# durations, unrelated to tier routing.
+def _ttl_from_env(var_name: str, default: int, unit: str) -> timedelta:
+    raw = os.environ.get(var_name)
+    value = int(raw) if raw is not None else default
+    return timedelta(**{unit: value})
+
+
+CONFIRM_TTL = _ttl_from_env("CONFIRM_TTL_MINUTES", 30, "minutes")
+FULL_REVIEW_TTL = _ttl_from_env("FULL_REVIEW_TTL_HOURS", 4, "hours")
 
 _real_provider: ConfidenceProvider | None = None
 _app_engine: AsyncEngine | None = None

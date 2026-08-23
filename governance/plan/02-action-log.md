@@ -1733,3 +1733,25 @@ Result: L-G's remaining half resolved. Not yet deployed to either
 platform - deploy happens together with 2B/2C before Step 4's closeout.
 Evidence: this session's transcript (alembic + verification SQL output,
 pytest output).
+
+### [2026-08-23 11:35 IST] [Step 2B - T-12/S-3 TTL configurability] [assistant]
+Action: `CONFIRM_TTL`/`FULL_REVIEW_TTL` (`app/main.py`) were module-level
+constants despite S-3's spec calling for "both configurable". Extracted
+`_ttl_from_env(var_name, default, unit)`, called once at module load
+(startup) for each: `CONFIRM_TTL_MINUTES` (default 30) and
+`FULL_REVIEW_TTL_HOURS` (default 4) - same defaults as before when the
+var is absent. Removed the stale in-code "FROZEN (T-12/S-3)" comment
+(not CLAUDE.md's actual FROZEN LIST - that's weights/thresholds/floors/
+fail-closed direction, unrelated to approval-window durations) and
+replaced it with one noting the distinction, since this instruction
+explicitly asked for this exact change. New tests in
+`tests/test_security.py`: env var override (both vars), and absent-var
+default (both the helper AND the already-imported module constants,
+proving "read once at startup" - the module import happened before the
+test ran). Full suite: 186 passed (184 prior + 2 new), 0 skipped, 0
+failed, 209.06s. `git diff --stat -- app/risk/ tests/test_routing.py`
+empty - no tier changed.
+Result: T-12/S-3's "both configurable" gap closed. No live behavior
+change (env vars unset on both deployments currently -> same 30min/4h
+defaults). Not yet deployed - deploy happens with 2A/2C before Step 4.
+Evidence: this session's transcript (pytest output).

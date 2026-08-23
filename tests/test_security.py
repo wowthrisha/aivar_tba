@@ -202,6 +202,42 @@ async def test_s3_expired_approval_cannot_execute(client, store):
 
 
 # ---------------------------------------------------------------------------
+# 2B (T-12/S-3): TTLs configurable via env vars, read once at startup
+# ---------------------------------------------------------------------------
+
+
+def test_ttl_env_var_overrides_default(monkeypatch):
+    from datetime import timedelta
+
+    from app.main import _ttl_from_env
+
+    monkeypatch.setenv("CONFIRM_TTL_MINUTES", "45")
+    assert _ttl_from_env("CONFIRM_TTL_MINUTES", 30, "minutes") == timedelta(minutes=45)
+
+    monkeypatch.setenv("FULL_REVIEW_TTL_HOURS", "8")
+    assert _ttl_from_env("FULL_REVIEW_TTL_HOURS", 4, "hours") == timedelta(hours=8)
+
+
+def test_ttl_absent_env_var_yields_current_default(monkeypatch):
+    from datetime import timedelta
+
+    from app.main import CONFIRM_TTL, FULL_REVIEW_TTL, _ttl_from_env
+
+    monkeypatch.delenv("CONFIRM_TTL_MINUTES", raising=False)
+    monkeypatch.delenv("FULL_REVIEW_TTL_HOURS", raising=False)
+
+    assert _ttl_from_env("CONFIRM_TTL_MINUTES", 30, "minutes") == timedelta(minutes=30)
+    assert _ttl_from_env("FULL_REVIEW_TTL_HOURS", 4, "hours") == timedelta(hours=4)
+    # module-level constants (computed once at import time, env var absent
+    # in this test process) must equal exactly what shipped before this
+    # change - the module import happened before this test ever ran, so
+    # this also proves the "read once at startup" contract: these are
+    # already-computed values, not re-read per call.
+    assert CONFIRM_TTL == timedelta(minutes=30)
+    assert FULL_REVIEW_TTL == timedelta(hours=4)
+
+
+# ---------------------------------------------------------------------------
 # S-5: hash-chained audit, tampering detected
 # ---------------------------------------------------------------------------
 
