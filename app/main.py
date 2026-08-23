@@ -227,8 +227,19 @@ def version():
     # absent, never guessed. Dependency versions are read at runtime via
     # importlib.metadata, never from requirements.txt, so this reports
     # what the RUNNING process actually has.
+    #
+    # git_sha_short: AWS's build script (infra/aws/deploy-lambda.sh) and
+    # Railway's (infra/railway/deploy-railway.sh) can pass GIT_SHA at
+    # different lengths (short vs full) - a plain string comparison of
+    # git_sha between deployments then fails on identical commits. Both
+    # scripts now pass the full 40-char SHA (D-33/parity fix), but this
+    # derives the short form defensively from whatever GIT_SHA actually
+    # holds, so parity checks always have one directly comparable field
+    # regardless of what any given deploy script passed.
+    git_sha = os.environ.get("GIT_SHA", "unknown")
     return VersionResponse(
-        git_sha=os.environ.get("GIT_SHA", "unknown"),
+        git_sha=git_sha,
+        git_sha_short=git_sha[:7] if git_sha != "unknown" else "unknown",
         build_time=os.environ.get("BUILD_TIME", "unknown"),
         python_version=platform.python_version(),
         key_dependencies=KeyDependencyVersions(

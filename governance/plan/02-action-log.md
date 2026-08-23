@@ -1846,3 +1846,52 @@ locally, not just re-asserted. Will re-verify live against Railway
 again before declaring D-34 closed.
 Evidence: this session's transcript (2 live Railway tracebacks, local
 TestClient re-verification, pytest output).
+
+### [2026-08-23 13:35 IST] [D-34 confirmed fixed live, both platforms] [assistant]
+Action: Redeployed round 2 to Railway, updated GIT_SHA/BUILD_TIME,
+re-ran the full 93-case matrix - 0 BLOCKING, 0 unexpected. User deployed
+the same commit's Lambda image via console; independently re-confirmed
+both `/v1/version` outputs before trusting the user's own confirmation
+(E-4) - both report `8797d92` (full vs short form). Ran the full 93-case
+matrix against AWS - 0 BLOCKING, 0 unexpected.
+Result: D-34 (both rounds) verified fixed live on both deployments, not
+just by local tests. D-33's resolution restated explicitly per
+instruction, not left to be inferred: Railway's `GIT_SHA` is NOT
+platform-derived - `railway run env` (checked in D-33's own
+investigation) confirmed no `RAILWAY_GIT_COMMIT_SHA` or equivalent
+exists for this service. It is a Railway service variable set by
+`infra/railway/deploy-railway.sh` running `git rev-parse HEAD` locally
+and `railway variables --set` - i.e. scripted-and-derived-at-deploy-time,
+but still a manually-set variable under the hood, not an automatic
+platform feature. The user's stated assumption ("suggesting it is now
+DERIVED from RAILWAY_GIT_COMMIT_SHA") does not hold; corrected rather
+than left standing.
+Evidence: this session's transcript (both full 93-row tables,
+independent /v1/version curls).
+
+### [2026-08-23 13:40 IST] [Addition 1 - git_sha_short] [assistant]
+Action: Railway's GIT_SHA was full-length (40 chars), AWS's was short
+(7 chars, from `deploy-lambda.sh`'s `rev-parse --short HEAD`) - same
+commit, different string, so a naive parity comparison would fail.
+Added `git_sha_short` to `VersionResponse`/`GET /v1/version`
+(`app/schemas.py`, `app/main.py`), derived defensively as
+`git_sha[:7]` regardless of whether `GIT_SHA` itself is short or full -
+works no matter which deploy script set it. Also updated
+`infra/aws/deploy-lambda.sh` to pass the FULL sha as the `GIT_SHA`
+build-arg going forward (matching `deploy-railway.sh`), keeping a
+separate short var only for the ECR image tag - so future AWS deploys
+report full-length `git_sha` too, not just a derived short field
+papering over an asymmetry. 3 new/updated tests in
+`tests/test_version.py`. Full suite: 197 passed (196 prior + 1 new), 0
+skipped, 0 failed. `git diff a573663 -- tests/test_routing.py` empty.
+Result: new field, requires one more deploy round to both platforms
+before Step 4 can report it live - see the next entry.
+Evidence: this session's transcript (pytest output).
+
+### D-35 logged
+Per instruction: a Lambda console image deploy presented as complete
+but did not apply, the third such occurrence (D-22, plus two earlier
+saves this session before the D-34 image that stuck). `/v1/version`
+caught it every time; no code fix possible without an IAM policy change
+outside this session's write access (same ceiling as D-23). See the
+register (`governance/plan/03-errors-and-fixes.md`) for the full entry.

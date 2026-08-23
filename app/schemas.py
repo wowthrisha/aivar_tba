@@ -283,6 +283,10 @@ class VersionResponse(BaseModel):
     versions a running deployment actually has."""
 
     git_sha: str
+    # D-33/parity fix: full-length where the deploy script provides it,
+    # so cross-deployment parity checks have a directly comparable field
+    # even when git_sha itself is reported at different lengths.
+    git_sha_short: str
     build_time: str
     python_version: str
     key_dependencies: KeyDependencyVersions

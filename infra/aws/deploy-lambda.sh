@@ -30,9 +30,17 @@ FUNCTION_NAME="${FUNCTION_NAME:-ps91-t15}"
 REGION="${AWS_REGION:-us-east-1}"
 ECR_REPO="${ECR_REPO:-ps91-t15}"
 BUILD_DIR="${BUILD_DIR:-.}"
-GIT_SHA="$(git -C "$BUILD_DIR" rev-parse --short HEAD)"
+# D-33/parity fix: GIT_SHA (the Dockerfile build-arg, ends up in
+# GET /v1/version) is now the FULL 40-char SHA, matching
+# infra/railway/deploy-railway.sh - a plain string comparison between
+# deployments used to fail on identical commits because this script
+# passed only the 7-char short form while Railway's passed the full
+# one. GIT_SHA_SHORT is kept separate, short, for the ECR image tag only
+# (tag readability/convention) - unrelated to what /v1/version reports.
+GIT_SHA="$(git -C "$BUILD_DIR" rev-parse HEAD)"
+GIT_SHA_SHORT="$(git -C "$BUILD_DIR" rev-parse --short HEAD)"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-IMAGE_TAG="t15-lambda-${GIT_SHA}"
+IMAGE_TAG="t15-lambda-${GIT_SHA_SHORT}"
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}"
