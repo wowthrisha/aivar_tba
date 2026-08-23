@@ -376,6 +376,8 @@ async def evaluate(
         degraded=llm_result.degraded,
         rendered_explanation=final_explanation,
         new_state=target,
+        uncertainty_score=weighted.confidence,
+        llm_confidence_raw=llm_result.confidence,
     )
 
     if embedding is not None:

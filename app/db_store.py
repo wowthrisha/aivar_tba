@@ -74,6 +74,8 @@ class SQLAlchemyStore:
             record.regulatory = ra.regulatory_score
             record.confidence = ra.confidence_score
             record.weights_version = ra.weights_version
+            record.uncertainty_score = ra.uncertainty_score
+            record.llm_confidence_raw = ra.llm_confidence_raw
         return record
 
     async def get_or_create_action(
@@ -240,6 +242,8 @@ class SQLAlchemyStore:
         degraded: bool,
         rendered_explanation: str,
         new_state: ActionState,
+        uncertainty_score: float | None = None,
+        llm_confidence_raw: float | None = None,
     ) -> ActionRecord:
         async with self._sessionmaker() as session:
             async with session.begin():
@@ -250,6 +254,8 @@ class SQLAlchemyStore:
                         data_scope_score=data_scope_score,
                         regulatory_score=regulatory_score,
                         confidence_score=confidence_score,
+                        uncertainty_score=uncertainty_score,
+                        llm_confidence_raw=llm_confidence_raw,
                         weights_version=weights_version,
                         composite=composite,
                         floor_fired=floor_fired,
@@ -274,6 +280,8 @@ class SQLAlchemyStore:
             record.regulatory = regulatory_score
             record.confidence = confidence_score
             record.weights_version = weights_version
+            record.uncertainty_score = uncertainty_score
+            record.llm_confidence_raw = llm_confidence_raw
             return record
 
 

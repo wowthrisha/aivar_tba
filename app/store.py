@@ -64,6 +64,12 @@ class ActionRecord:
     # never read back until now - needed so the API-JSON layer can be
     # compared against the DB-row layer in the 4-layer reconciliation test.
     weights_version: str | None = None
+    # L-G second half: additive passthrough, same pattern as the four
+    # per-dimension scores above. uncertainty_score is confidence_score
+    # under its honest name (same value); llm_confidence_raw is the true,
+    # uninverted model self-report.
+    uncertainty_score: float | None = None
+    llm_confidence_raw: float | None = None
 
 
 @dataclass
@@ -189,6 +195,8 @@ class InMemoryStore:
         degraded: bool,
         rendered_explanation: str,
         new_state: ActionState,
+        uncertainty_score: float | None = None,
+        llm_confidence_raw: float | None = None,
     ) -> ActionRecord:
         """Atomically records the risk assessment and transitions the
         action's state (mirrors SQLAlchemyStore, which does both writes in
@@ -210,4 +218,6 @@ class InMemoryStore:
             record.regulatory = regulatory_score
             record.confidence = confidence_score
             record.weights_version = weights_version
+            record.uncertainty_score = uncertainty_score
+            record.llm_confidence_raw = llm_confidence_raw
             return record

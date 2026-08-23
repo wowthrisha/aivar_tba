@@ -49,6 +49,13 @@ class RiskAssessmentORM(Base):
     data_scope_score: Mapped[float] = mapped_column(Float, nullable=False)
     regulatory_score: Mapped[float] = mapped_column(Float, nullable=False)
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
+    # L-G: confidence_score actually holds 1 - llm_confidence - the name
+    # lies (DB comment carries the full explanation, see migration
+    # cbd4d076c66a). uncertainty_score is the same value, honestly named.
+    # llm_confidence_raw is the true, uninverted model self-report.
+    # Additive, nullable - confidence_score is unchanged and still written.
+    uncertainty_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    llm_confidence_raw: Mapped[float | None] = mapped_column(Float, nullable=True)
     weights_version: Mapped[str] = mapped_column(String, nullable=False)
     composite: Mapped[float] = mapped_column(Float, nullable=False)
     floor_fired: Mapped[str | None] = mapped_column(String, nullable=True)

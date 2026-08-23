@@ -1705,3 +1705,31 @@ finding stated explicitly, not guessed; process gap closed via a script
 + CLAUDE.md, not a code change (there was no code to change).
 Evidence: this session's transcript (raw curl/`railway`/`aws ecr`
 output); `governance/plan/03-errors-and-fixes.md` diff (new D-33 row).
+
+### [2026-08-23 11:20 IST] [Step 2A - L-G second half] [assistant]
+Action: Judged the migration not risky (purely additive: two new
+nullable columns + a backfill UPDATE, no rename/drop/type-change, table
+is ~640 rows, 3 prior Alembic migrations against this same live DB with
+no incident) and proceeded rather than stopping, per instruction.
+Migration `cbd4d076c66a` adds `uncertainty_score`/`llm_confidence_raw`
+to `risk_assessments`, backfills from `confidence_score`/`1 -
+confidence_score`, adds a DB comment marking `confidence_score`
+deprecated (kept, not dropped). Ran `alembic upgrade head` against
+`DATABASE_URL_DIRECT` (live shared Neon DB). Verified: 644/644 rows
+backfilled correctly (0 mismatches via a direct SQL check), comment
+applied, spot-checked 3 sample rows. Wired the write path
+(`app/store.py`/`app/db_store.py::save_risk_assessment`,
+`app/main.py::evaluate()`) so every new evaluation populates all three
+columns. New test
+`tests/test_db_store.py::test_uncertainty_score_and_llm_confidence_raw_populated_on_new_evaluation`
+uses `action_type="read"` (empty required-params set, so
+`structural_completeness()` is always 1.0 and the two-signal minimum
+always picks the raw LLM signal verbatim) to guarantee
+`uncertainty_score + llm_confidence_raw == 1.0` exactly, not just
+approximately - passed. Full suite: 184 passed (183 prior + 1 new), 0
+skipped, 0 failed, 209.29s. `git diff --stat -- app/risk/
+tests/test_routing.py` empty - no tier changed anywhere.
+Result: L-G's remaining half resolved. Not yet deployed to either
+platform - deploy happens together with 2B/2C before Step 4's closeout.
+Evidence: this session's transcript (alembic + verification SQL output,
+pytest output).

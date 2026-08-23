@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import delete, event
+from sqlalchemy import delete, event, select
 
 import cli
 from app.calibration import compute_calibration_by_action_type
@@ -355,3 +355,63 @@ async def test_calibration_report_issues_a_bounded_number_of_queries(store, audi
         event.remove(engine.sync_engine, "before_cursor_execute", _count)
 
     assert query_count <= 3, f"expected O(1) queries, got {query_count}"
+
+
+# ---------------------------------------------------------------------------
+# 2A (L-G second half): uncertainty_score / llm_confidence_raw columns
+# ---------------------------------------------------------------------------
+
+
+async def test_uncertainty_score_and_llm_confidence_raw_populated_on_new_evaluation(
+    store, audit_log, engine, monkeypatch
+):
+    # Migration cbd4d076c66a added uncertainty_score/llm_confidence_raw as
+    # additive columns on risk_assessments, alongside the still-populated,
+    # now-deprecated confidence_score. action_type="read" has an EMPTY
+    # required-params set (app/risk/confidence.py's ACTION_CATALOGUE), so
+    # structural_completeness() is always 1.0 and
+    # two_signal_confidence(raw, 1.0) == raw exactly - guarantees
+    # uncertainty_score (1 - combined) and llm_confidence_raw (the raw
+    # signal) sum to exactly 1.0 for this action_type, not approximately.
+    monkeypatch.setenv("CALIBRATION_MODE", "off")
+    body = EvaluateRequest(
+        agent_id="test-agent",
+        action_type="read",
+        resource="test-2a-resource",
+        params={},
+        reversibility=Reversibility.READ,
+        affected_records=1,
+        regulatory=Regulatory.NONE,
+    )
+    new_action_id = None
+    try:
+        response = await evaluate(
+            body=body, provider=_FakeProvider(), embedding_provider=_FakeEmbeddingProvider(),
+            store=store, audit=audit_log,
+        )
+        new_action_id = response.id
+
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                select(
+                    RiskAssessmentORM.confidence_score,
+                    RiskAssessmentORM.uncertainty_score,
+                    RiskAssessmentORM.llm_confidence_raw,
+                ).where(RiskAssessmentORM.action_id == new_action_id)
+            )
+            row = result.one()
+    finally:
+        if new_action_id is not None:
+            async with engine.begin() as conn:
+                await conn.execute(delete(RiskAssessmentORM).where(RiskAssessmentORM.action_id == new_action_id))
+                await conn.execute(
+                    delete(AuditRecordORM).where(AuditRecordORM.payload["action_id"].astext == new_action_id)
+                )
+                await conn.execute(delete(ActionORM).where(ActionORM.id == new_action_id))
+
+    confidence_score, uncertainty_score, llm_confidence_raw = row
+    assert confidence_score is not None
+    assert uncertainty_score is not None
+    assert llm_confidence_raw is not None
+    assert uncertainty_score == confidence_score  # same value, honest name
+    assert abs(uncertainty_score + llm_confidence_raw - 1.0) < 1e-9
