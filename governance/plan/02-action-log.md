@@ -1816,3 +1816,33 @@ and live re-verification.
 Evidence: this session's transcript (pytest output, local validator
 re-verification of the 3 corrected harness cases against the real
 schema before any live re-run).
+
+### [2026-08-23 13:20 IST] [D-34 round 2 - live re-verification found round 1 incomplete] [assistant]
+Action: Pushed round 1's D-34 fix, deployed to Railway, re-ran the full
+fuzz matrix live per instruction (step c). NaN/Infinity-in-params now
+correctly 422 - but all 3 surrogate cases (`resource`, params value,
+params key) still returned 500. Not the same crash: pulled the live
+Railway traceback and confirmed the crash moved from
+`app/db_store.py:111` (DB write) to `starlette/responses.py:187`
+(`JSONResponse.render()`, called from `app/main.py`'s
+`validation_exception_handler`). Root cause: rejecting the surrogate in
+the validator worked exactly as intended, but Pydantic's
+`ValidationError.errors()` echoes the raw offending input back in the
+error body, and `_json_safe()` (the existing D-29 fix for this same
+"echoes the raw input" pathology, previously only handling non-finite
+floats) didn't sanitize unencodable strings. Extended `_json_safe()` to
+also sanitize strings (and dict keys, not just values) that fail
+`.encode("utf-8", errors="strict")`, via `backslashreplace` - same
+pattern as the existing float handling. Verified locally via the real
+HTTP path (TestClient, not just schema validation) before redeploying:
+all 3 surrogate variants now return clean 422. New HTTP-level test
+added. Full suite: 196 passed (195 + 1), 0 skipped, 0 failed.
+`git diff a573663 -- tests/test_routing.py` still empty.
+Result: reporting this honestly as a second attempt, not silently
+folding it into "D-34 fixed" as if round 1 had been sufficient (E-7) -
+per the two-attempt rule (L-5), this is attempt 2 of 2 for this specific
+gap; it is now verified correct via the real request-to-response path
+locally, not just re-asserted. Will re-verify live against Railway
+again before declaring D-34 closed.
+Evidence: this session's transcript (2 live Railway tracebacks, local
+TestClient re-verification, pytest output).

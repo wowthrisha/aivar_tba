@@ -108,6 +108,33 @@ def test_affected_records_rejects_infinity_with_clean_422_not_500():
     assert "detail" in body
 
 
+def test_unpaired_surrogate_rejected_with_clean_422_not_500():
+    # D-34 round 2: app/schemas.py rejecting the surrogate isn't enough on
+    # its own - Pydantic's ValidationError.errors() echoes the raw
+    # offending value (here, a string containing the surrogate) back in
+    # the error body, and Starlette's JSONResponse.render() crashes
+    # .encode("utf-8")-ing it, exactly like the original NaN/Infinity
+    # crash but for strings instead of floats. Schema-level tests alone
+    # (test_unpaired_surrogate_in_params_rejected below) only prove
+    # rejection happens - they use TestClient's raise_server_exceptions=
+    # False specifically so a 500 here would surface as a real status
+    # code, not a raised exception in the test process.
+    client = _make_client()
+    try:
+        raw = json.dumps(_BASE_FIELDS | {"params": {}}).replace(
+            f'"{_BASE_FIELDS["resource"]}"', r'"bad\ud800resource"'
+        )
+        resp = client.post(
+            "/v1/actions/evaluate", content=raw.encode(), headers={"content-type": "application/json"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 422
+    body = resp.json()  # must parse cleanly - a 500 would return {"detail": "internal server error"}
+    assert "detail" in body
+
+
 # ---------- schema-level: params / string-field bounds ----------
 
 

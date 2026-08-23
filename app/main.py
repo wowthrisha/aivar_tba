@@ -87,10 +87,34 @@ def _json_safe(value):
     # validator prevents this - the crash is in the framework's own
     # error-rendering path, not in validation itself (confirmed by
     # reproducing the exact traceback locally before this fix).
+    #
+    # D-34 (round 2): the same "echoes the raw offending input" pathology
+    # applies to strings, not just floats. Once app/schemas.py's params
+    # validator started REJECTING an unpaired Unicode surrogate (correct -
+    # that was the whole point of D-34), the surrogate-laden input got
+    # echoed back verbatim inside exc.errors()["input"] (the WHOLE params
+    # dict/value being validated, including any bad dict KEY, since the
+    # field validator raises against the value as a unit, not per-key) -
+    # and Starlette's JSONResponse.render() crashed trying to
+    # .encode("utf-8") a string containing that surrogate. Confirmed via
+    # live Railway traceback (starlette/responses.py:187, same
+    # UnicodeEncodeError as the original DB-write crash, just relocated
+    # to error rendering) before this fix, not assumed from the float
+    # case alone. Keys are sanitized too, not just values, for the same
+    # reason.
     if isinstance(value, float) and not math.isfinite(value):
         return str(value)  # "nan" / "inf" / "-inf" - always JSON-safe, still debuggable
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            # backslashreplace keeps this ASCII/UTF-8-safe while staying
+            # debuggable (shows exactly which code point was unencodable),
+            # same intent as str(nan)/str(inf) above for floats.
+            return value.encode("utf-8", errors="backslashreplace").decode("utf-8")
+        return value
     if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
+        return {_json_safe(k) if isinstance(k, str) else k: _json_safe(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_json_safe(v) for v in value]
     return value
