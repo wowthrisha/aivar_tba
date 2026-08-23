@@ -1755,3 +1755,30 @@ Result: T-12/S-3's "both configurable" gap closed. No live behavior
 change (env vars unset on both deployments currently -> same 30min/4h
 defaults). Not yet deployed - deploy happens with 2A/2C before Step 4.
 Evidence: this session's transcript (pytest output).
+
+### [2026-08-23 11:50 IST] [Step 2C - T-08 counterfactual gap] [assistant]
+Action: `app/risk/floors.py::evaluate_floors()`'s per-floor `reason`
+strings stated the trigger but no counterfactual. Appended one static,
+always-true counterfactual sentence per floor, naming the real,
+changeable input that would prevent THAT floor specifically from firing
+(`affected_records`, `reversibility`, `regulatory`, `llm_confidence`
+respectively) - explicitly NOT claiming a specific resulting final tier,
+since floors can compound (e.g. `irreversible_bulk` and
+`unrecoverable_mutation_requires_confirm` always co-fire whenever
+reversibility=IRREVERSIBLE, so a bare "would have been CONFIRM if
+affected_records<100" claim can be wrong when `regulated_mutation` also
+fires) - each sentence says "(other floors may still apply)" rather than
+asserting a tier. Presentation-only: no trigger condition, threshold, or
+weight touched - confirmed by `git diff` on `app/risk/floors.py` showing
+only string literals changed, `FLOOR_RECORDS_THRESHOLD`/
+`FLOOR_CONFIDENCE_THRESHOLD` values themselves unchanged. New tests in
+`tests/test_floors.py` (one per floor) assert the reason contains the
+named input. `test_final_tier_unchanged_by_refactor` and
+`test_escalate_only_sweep` (both pre-existing, both exhaustive over the
+full input grid) passed unmodified - proof no tier changed anywhere, not
+just an assertion. Full suite: 190 passed (186 prior + 4 new), 0
+skipped, 0 failed, 216.87s. `git diff --stat -- tests/test_routing.py`
+empty.
+Result: T-08's counterfactual gap closed for all four floors. Not yet
+deployed - deploy happens with 2A/2B before Step 4.
+Evidence: this session's transcript (pytest output, git diff excerpt).

@@ -225,3 +225,35 @@ def test_final_tier_unchanged_by_refactor():
         checked += 1
 
     assert checked == len(Reversibility) * len(affected_records_values) * len(Regulatory) * len(confidence_values)
+
+
+# ---------------------------------------------------------------------------
+# 2C (T-08 counterfactual gap): floor-fired explanations name a real,
+# changeable input - presentation only, tiers unchanged (proven by
+# test_final_tier_unchanged_by_refactor above, which still passes
+# unmodified against this same evaluate_floors()).
+# ---------------------------------------------------------------------------
+
+
+def test_irreversible_bulk_reason_contains_counterfactual():
+    result = evaluate_floors(Reversibility.IRREVERSIBLE, 500, Regulatory.NONE, 1.0)
+    assert result.floor_name == "irreversible_bulk"
+    assert "affected_records" in result.reason
+
+
+def test_unrecoverable_mutation_reason_contains_counterfactual():
+    result = evaluate_floors(Reversibility.UPDATE_WITHOUT_SNAPSHOT, 1, Regulatory.NONE, 1.0)
+    assert result.floor_name == "unrecoverable_mutation_requires_confirm"
+    assert "reversibility" in result.reason
+
+
+def test_regulated_mutation_reason_contains_counterfactual():
+    result = evaluate_floors(Reversibility.UPDATE_WITH_SNAPSHOT, 0, Regulatory.PHI_SOX, 1.0)
+    assert result.floor_name == "regulated_mutation"
+    assert "regulatory" in result.reason
+
+
+def test_low_confidence_reason_contains_counterfactual():
+    result = evaluate_floors(Reversibility.UPDATE_WITH_SNAPSHOT, 0, Regulatory.NONE, 0.1)
+    assert result.floor_name == "low_confidence_on_mutation"
+    assert "llm_confidence" in result.reason

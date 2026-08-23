@@ -98,7 +98,9 @@ def evaluate_floors(
             "irreversible_bulk",
             Tier.FULL_REVIEW,
             f"floor: irreversible action affecting {affected_records} "
-            f"records (>= {FLOOR_RECORDS_THRESHOLD})",
+            f"records (>= {FLOOR_RECORDS_THRESHOLD}). "
+            f"Would not have fired with affected_records < {FLOOR_RECORDS_THRESHOLD} "
+            "(other floors may still apply).",
         ))
 
     if reversibility in (Reversibility.UPDATE_WITHOUT_SNAPSHOT, Reversibility.IRREVERSIBLE):
@@ -106,14 +108,18 @@ def evaluate_floors(
             "unrecoverable_mutation_requires_confirm",
             Tier.CONFIRM,
             f"floor: reversibility={reversibility.value} has no rollback path; "
-            "unrecoverable mutations may not execute autonomously",
+            "unrecoverable mutations may not execute autonomously. "
+            "Would not have fired if reversibility were read or "
+            "update_with_snapshot (other floors may still apply).",
         ))
 
     if regulatory in (Regulatory.PII_GDPR, Regulatory.PHI_SOX) and is_mutation:
         candidates.append((
             "regulated_mutation",
             Tier.FULL_REVIEW,
-            f"floor: {regulatory.value}-regulated data mutation",
+            f"floor: {regulatory.value}-regulated data mutation. "
+            "Would not have fired if regulatory were not PII_GDPR or PHI_SOX "
+            "(other floors may still apply).",
         ))
 
     if llm_confidence < FLOOR_CONFIDENCE_THRESHOLD and is_mutation:
@@ -121,7 +127,9 @@ def evaluate_floors(
             "low_confidence_on_mutation",
             Tier.CONFIRM,
             f"floor: LLM confidence {llm_confidence:.2f} below "
-            f"{FLOOR_CONFIDENCE_THRESHOLD} on a mutating action",
+            f"{FLOOR_CONFIDENCE_THRESHOLD} on a mutating action. "
+            f"Would not have fired with llm_confidence >= {FLOOR_CONFIDENCE_THRESHOLD} "
+            "(other floors may still apply).",
         ))
 
     if not candidates:
