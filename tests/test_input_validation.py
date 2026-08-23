@@ -166,3 +166,56 @@ def test_string_fields_reject_null_bytes():
 def test_string_fields_cap_length():
     with pytest.raises(ValidationError):
         EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {}, "resource": "a" * 10_001})
+
+
+# ---------------------------------------------------------------------------
+# D-34: params dict[str, Any] had no finiteness/encoding constraint on
+# nested values - these 3 crashed at INSERT (app/db_store.py:111), past
+# every check above, since none of them touch values inside params.
+# ---------------------------------------------------------------------------
+
+
+def test_nested_nan_in_params_rejected():
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {"x": float("nan")}})
+
+
+def test_infinity_in_params_rejected():
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {"x": float("inf")}})
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {"x": float("-inf")}})
+
+
+def test_unpaired_surrogate_in_params_rejected():
+    # A lone UTF-16 surrogate: valid inside a JSON string (json.loads
+    # decodes it fine), no valid UTF-8 encoding (asyncpg crashed on this
+    # exact shape trying to write it - see app/schemas.py's
+    # _reject_control_chars docstring). Tested both as a value and as a
+    # key, since _validate_params_value checks both.
+    surrogate = "bad\ud800value"
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {"x": surrogate}})
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": {surrogate: "value"}})
+
+
+def test_excessive_nesting_depth_rejected():
+    nested: dict = {"v": 0}
+    for _ in range(25):
+        nested = {"nested": nested}
+
+    with pytest.raises(ValidationError):
+        EvaluateRequest.model_validate(_BASE_FIELDS | {"params": nested})
+
+
+def test_valid_unicode_and_nested_params_still_accepted():
+    # No regression: real Unicode (not a lone surrogate), finite floats,
+    # and reasonable nesting must still pass.
+    params = {
+        "note": "café résumé naïve 日本語 emoji 🎉",
+        "score": 3.14159,
+        "nested": {"a": {"b": {"c": [1, 2, {"d": "ok"}]}}},
+    }
+    req = EvaluateRequest.model_validate(_BASE_FIELDS | {"params": params})
+    assert req.params == params

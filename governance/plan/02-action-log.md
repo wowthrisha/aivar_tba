@@ -1782,3 +1782,37 @@ empty.
 Result: T-08's counterfactual gap closed for all four floors. Not yet
 deployed - deploy happens with 2A/2B before Step 4.
 Evidence: this session's transcript (pytest output, git diff excerpt).
+
+### [2026-08-23 12:40 IST] [D-34 - 3 BLOCKING crashes from Step 3A] [assistant]
+Action: Fixed the 3 confirmed BLOCKING defects from Step 3A's fuzz
+sweep (NaN/Infinity nested in `params`, unpaired Unicode surrogate in a
+string field) per explicit instruction that these outrank the deferred
+2A/2B/2C work. Added a UTF-8-encodability check to
+`_reject_control_chars()` (`app/schemas.py`) - the single function
+already shared by every string-typed field and every `params` key/value,
+so one fix covers both the typed top-level fields (closing the actual
+`resource` crash) and the untyped `params` dict. Added a non-finite-
+float check to `_validate_params_value()`. Confirmed by enumerating
+every route/schema field that `EvaluateRequest.params`
+(`POST /v1/actions/evaluate`) is the ONLY input accepting a `params`
+dict in this API. 5 new tests, one per defect plus a no-regression case.
+Also corrected the 6 harness-construction errors flagged in the 3A
+report: `_deep_params()` had an off-by-one (leaf landed one level
+deeper than the wrapper count implied); the "well under 64000 bytes"
+negative control used a single 63,000-char string, tripping the
+separate per-string `MAX_STRING_LENGTH` cap instead of testing the
+total-payload cap it was meant to test (fixed: 6 fields of 9,000 chars
+each); `affected_records: true` was mislabeled as a fuzz case when it's
+correct Pydantic bool-as-int coercion. Committed the fuzz matrix itself
+as `governance/evidence/fuzz-matrix.py` (93 cases now, corrected +
+2 extra param-nested-surrogate variants + a valid-unicode negative
+control added), runnable with a base-URL argument, exit code non-zero
+on any 5xx or unexpected-classification result - reproducible, not
+reconstructed by hand next time.
+Result: Full suite 195 passed (190 prior + 5 new), 0 skipped, 0 failed.
+`git diff a573663 -- tests/test_routing.py` empty. `git diff --stat --
+app/risk/` empty. Not yet deployed - see the next entry for the deploy
+and live re-verification.
+Evidence: this session's transcript (pytest output, local validator
+re-verification of the 3 corrected harness cases against the real
+schema before any live re-run).

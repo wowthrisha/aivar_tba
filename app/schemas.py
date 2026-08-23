@@ -30,16 +30,51 @@ _FORBIDDEN_CHARS = frozenset(chr(c) for c in range(0x20) if c not in (0x09, 0x0A
 
 
 def _reject_control_chars(value: str, field_name: str) -> str:
+    # D-34: shared by every string-typed field (agent_id/action_type/
+    # resource/idempotency_key via _validate_plain_strings/
+    # _validate_idempotency_key below, AND every params key/string value
+    # via _validate_params_value) - one fix point covers both the typed
+    # top-level fields and the untyped params dict. A lone UTF-16
+    # surrogate (e.g. U+D800) is syntactically valid inside a JSON string
+    # - json.loads decodes it without complaint - but has no UTF-8
+    # encoding, so nothing here caught it before asyncpg crashed trying
+    # to encode it for Postgres at INSERT time (app/db_store.py:111,
+    # confirmed via live traceback: UnicodeEncodeError - surrogates not
+    # allowed). Encoding it here, at the API boundary, catches that AND
+    # any other UTF-8-unencodable content generically, before it ever
+    # reaches the DB layer.
     if any(ch in _FORBIDDEN_CHARS for ch in value):
         raise ValueError(f"{field_name} must not contain null bytes or control characters")
     if len(value) > MAX_STRING_LENGTH:
         raise ValueError(f"{field_name} exceeds max length of {MAX_STRING_LENGTH} characters")
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ValueError(
+            f"{field_name} contains a character with no valid UTF-8 encoding "
+            f"(e.g. an unpaired Unicode surrogate): {exc}"
+        ) from exc
     return value
 
 
 def _validate_params_value(value: Any, depth: int) -> None:
+    # D-34: params is dict[str, Any] - Pydantic applies no finiteness,
+    # encoding, or size constraint to values nested inside it (unlike
+    # affected_records, a typed int field with its own dedicated
+    # validator). NaN/Infinity anywhere in this structure passed
+    # validation cleanly and crashed at INSERT instead (Postgres's JSON
+    # parser rejects the literal NaN/Infinity tokens - confirmed via live
+    # traceback: asyncpg.exceptions.InvalidTextRepresentationError:
+    # invalid input syntax for type json). The depth check below already
+    # sets an explicit limit (MAX_PARAMS_DEPTH=20) rather than relying on
+    # whatever a parser tolerates - re-verified live (4/4 direct retests)
+    # that a 21-deep structure correctly 422s; a single transient 502
+    # seen during a larger batch sweep did not reproduce and was not
+    # depth-check-related.
     if depth > MAX_PARAMS_DEPTH:
         raise ValueError(f"params nesting exceeds max depth of {MAX_PARAMS_DEPTH}")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("params value must be a finite number (NaN/Infinity not allowed)")
     if isinstance(value, str):
         _reject_control_chars(value, "params value")
     elif isinstance(value, dict):
