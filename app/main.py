@@ -20,7 +20,9 @@ from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
 from app.embeddings import (
     EmbeddingProvider,
     OpenAIEmbeddingProvider,
+    PRECEDENT_K,
     PRECEDENT_WINDOW,
+    PrecedentInfo,
     canonical_action_string,
     max_similarity,
     novelty_floor_should_escalate,
@@ -48,6 +50,7 @@ from app.schemas import (
     EvaluateRequest,
     ExecuteRequest,
     KeyDependencyVersions,
+    PrecedentCheckRequest,
     ReviewerContextResponse,
     SessionFloorInfo,
     SessionStatsResponse,
@@ -583,6 +586,40 @@ async def evaluate(
         stability=stability_info,
         session_floor=session_floor_info,
     )
+
+
+@app.get("/v1/actions/pending", response_model=list[ActionResponse])
+async def list_pending(agent_id: str, store: InMemoryStore | SQLAlchemyStore = Depends(get_store)):
+    """FEATURE A (MCP list_pending tool): the caller's OWN pending items
+    - evaluated but not yet terminal. Read-only. Registered BEFORE
+    GET /v1/actions/{action_id} - Starlette matches routes in
+    registration order, and "pending" would otherwise be swallowed as an
+    {action_id} path value."""
+    records = await store.list_pending_for_agent(agent_id)
+    return [_to_action_response(r) for r in records]
+
+
+@app.post("/v1/precedent/check", response_model=PrecedentInfo)
+async def precedent_check(
+    body: PrecedentCheckRequest,
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+):
+    """FEATURE A (MCP check_precedent tool): similar prior actions and
+    their outcomes for a PROPOSED action, without proposing it - no
+    action row, no audit entry. Genuinely read-only, unlike
+    evaluate_action (which does propose/score, just never execute)."""
+    embedding = await embedding_provider.embed(
+        canonical_action_string(body.action_type, body.resource, body.params)
+    )
+    if embedding is None:
+        return PrecedentInfo(
+            k=PRECEDENT_K, matches=[], summary="Embedding unavailable - cannot compute precedent."
+        )
+    candidates = await store.list_recent_embedded_terminal_actions(
+        exclude_action_id="", limit=PRECEDENT_WINDOW
+    )
+    return retrieve_precedent(embedding, candidates)
 
 
 @app.get("/v1/actions/{action_id}", response_model=ActionResponse)

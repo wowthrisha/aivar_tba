@@ -132,6 +132,20 @@ class SQLAlchemyStore:
             rows = result.scalars().all()
             return [await self._hydrate(session, row) for row in rows]
 
+    _PENDING_STATES = (ActionState.CONFIRM.value, ActionState.FULL_REVIEW.value, ActionState.APPROVED.value)
+
+    async def list_pending_for_agent(self, agent_id: str) -> list[ActionRecord]:
+        """FEATURE A (MCP list_pending tool): the caller's OWN pending
+        items - evaluated but not yet in a terminal state."""
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                select(ActionORM)
+                .where(ActionORM.agent_id == agent_id, ActionORM.state.in_(self._PENDING_STATES))
+                .order_by(ActionORM.created_at)
+            )
+            rows = result.scalars().all()
+            return [await self._hydrate(session, row) for row in rows]
+
     async def set_embedding(self, action_id: str, embedding: list[float]) -> None:
         async with self._sessionmaker() as session:
             await session.execute(update(ActionORM).where(ActionORM.id == action_id).values(embedding=embedding))

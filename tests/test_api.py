@@ -308,6 +308,40 @@ def test_session_stats_endpoint_degrades_gracefully_on_store_error(client, monke
     assert body["action_count"] == 0
 
 
+def test_list_pending_returns_only_this_agents_non_terminal_actions(client):
+    mine = _evaluate(client, agent_id="agent-mine").json()  # full_review, pending
+    _evaluate(client, agent_id="agent-other").json()  # different agent, excluded
+    autonomous = _evaluate(
+        client, agent_id="agent-mine", action_type="read", params={}, reversibility="read",
+        affected_records=1,
+    ).json()  # autonomous -> not "pending"
+
+    resp = client.get("/v1/actions/pending?agent_id=agent-mine")
+    assert resp.status_code == 200
+    ids = {a["id"] for a in resp.json()}
+    assert ids == {mine["id"]}
+    assert autonomous["id"] not in ids
+
+
+def test_precedent_check_is_read_only_no_action_or_audit_created(client):
+    resp = client.post(
+        "/v1/precedent/check",
+        json={"action_type": "delete", "resource": "users/1", "params": {"resource_id": 1}},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "matches" in body and "summary" in body
+
+    audit_before = client.get("/v1/audit").json()
+    resp2 = client.post(
+        "/v1/precedent/check",
+        json={"action_type": "delete", "resource": "users/2", "params": {"resource_id": 2}},
+    )
+    assert resp2.status_code == 200
+    audit_after = client.get("/v1/audit").json()
+    assert len(audit_after) == len(audit_before)  # no new audit entry
+
+
 def test_get_action_returns_current_state(client):
     created = _evaluate(client).json()
     resp = client.get(f"/v1/actions/{created['id']}")

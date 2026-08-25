@@ -164,6 +164,17 @@ class InMemoryStore:
         pending = [a for a in self._actions.values() if a.state == ActionState.FULL_REVIEW]
         return sorted(pending, key=lambda a: a.created_at)
 
+    _PENDING_STATES = (ActionState.CONFIRM, ActionState.FULL_REVIEW, ActionState.APPROVED)
+
+    async def list_pending_for_agent(self, agent_id: str) -> list[ActionRecord]:
+        """FEATURE A (MCP list_pending tool): the caller's OWN pending
+        items - evaluated but not yet in a terminal state
+        (executed/rejected/expired)."""
+        pending = [
+            a for a in self._actions.values() if a.agent_id == agent_id and a.state in self._PENDING_STATES
+        ]
+        return sorted(pending, key=lambda a: a.created_at)
+
     async def set_embedding(self, action_id: str, embedding: list[float]) -> None:
         record = self._actions.get(action_id)
         if record is not None:

@@ -601,3 +601,79 @@ A second acknowledged gap: the deferral literature largely ignores
 **capacity management**. A review queue is a finite resource. This
 engine records queue depth and decision latency but does not yet
 allocate against a capacity budget.
+
+## 14. MCP server (intelligence-v6, Feature A)
+
+`app/mcp_server.py` exposes the governance gate as an [MCP](https://modelcontextprotocol.io)
+server, so any MCP-compatible agent can consult it **before** acting.
+Protocol version: **2026-07-28** (current stable — confirmed against
+`blog.modelcontextprotocol.io`'s release-candidate post and the
+python-sdk repo's `docs/whats-new.md`; the release candidate locked
+2026-05-21, finalized 2026-07-28). SDK: the official `mcp` PyPI package,
+v2 (`MCPServer`, the v1 SDK's `FastMCP` renamed — `from
+mcp.server.fastmcp import FastMCP` no longer exists in v2).
+
+**Tools exposed** (all read-mostly; `evaluate_action` proposes/scores
+but never executes — the propose/commit boundary is absolute):
+
+| Tool | Calls | Notes |
+|---|---|---|
+| `evaluate_action` | `POST /v1/actions/evaluate` | Returns tier + reasoning. **The verdict is binding** — CONFIRM/FULL_REVIEW require human approval; a calling agent must not treat either as advisory. |
+| `check_precedent` | `POST /v1/precedent/check` | Similar prior actions + outcomes for a hypothetical action, with no action/audit record created. |
+| `get_review_status` | `GET /v1/actions/{id}` | Current state/tier/composite/explanation of a previously-proposed action. |
+| `list_pending` | `GET /v1/actions/pending?agent_id=` | The caller's own non-terminal actions. |
+
+**Why a separate venv.** The `mcp` package (both its v2 line and the
+legacy v1.x line — both tried) pulls in a starlette major version
+incompatible with this project's pinned `fastapi==0.115.0`, confirmed
+by direct reproduction (`TypeError: Router.__init__() got an
+unexpected keyword argument 'on_startup'` when both are installed in
+one environment and `app.main` is imported). Rather than upgrading a
+pinned, documented dependency mid-pass, `app/mcp_server.py` runs as a
+thin HTTP client over the same REST API any other MCP-compatible agent
+would use — no import of `app.main` or anything under `app/risk/`. See
+`scripts/mcp/requirements.txt` and the module's own docstring.
+
+**Setup:**
+
+```bash
+python3 -m venv .venv-mcp
+source .venv-mcp/bin/activate
+pip install -r scripts/mcp/requirements.txt
+GOVERNANCE_API_BASE_URL=https://aivartba-production.up.railway.app \
+  python3 app/mcp_server.py   # stdio transport
+```
+
+**Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json`
+on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows —
+stdio only; Claude Desktop's JSON config has no `url` field for remote
+servers, a remote/HTTP MCP server is added via Settings → Connectors →
+Add custom connector instead):
+
+```json
+{
+  "mcpServers": {
+    "ps91-governance": {
+      "command": "/absolute/path/to/aivar_tba/.venv-mcp/bin/python3",
+      "args": ["/absolute/path/to/aivar_tba/app/mcp_server.py"],
+      "env": {
+        "GOVERNANCE_API_BASE_URL": "https://aivartba-production.up.railway.app"
+      }
+    }
+  }
+}
+```
+
+**Tests** live in `tests_mcp/` (not part of the main `pytest -q` suite —
+the main venv doesn't have `mcp` installed, and can't, per the
+starlette conflict above):
+
+```bash
+source .venv-mcp/bin/activate
+MAIN_VENV_PYTHON=/path/to/main/python3 python3 -m pytest tests_mcp/ -v
+```
+
+The key test, `test_evaluate_action_matches_http_endpoint_for_identical_input`,
+spins up the real FastAPI app (via the main venv, as a subprocess) and
+asserts the MCP tool call and a direct HTTP call return the same tier
+for identical input.

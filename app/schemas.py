@@ -153,6 +153,16 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class PrecedentCheckRequest(BaseModel):
+    """FEATURE A (MCP check_precedent tool): the same shape evaluate()
+    would score, but this endpoint never creates an action or audit
+    entry - genuinely read-only."""
+
+    action_type: str
+    resource: str
+    params: dict[str, Any]
+
+
 class SimilarActionsStatsResponse(BaseModel):
     count: int
     approved: int
