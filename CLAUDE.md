@@ -63,6 +63,31 @@ has rolled back twice; anything not on the plan is about to be committed.
   +%Y-%m-%dT%H:%M:%SZ)`) or `/v1/version` will silently keep reporting
   the previous commit.
 
+## NEVER-DUMP — secrets (D-36)
+
+**Never emit a secret value, not even redacted mid-string — no exceptions,
+no "just this once to debug."** Secrets were exposed seven times in this
+project: `railway variables` dumping all values to a transcript,
+`aws lambda get-function` returning env vars in plaintext metadata, and
+recursive `grep -rn` over a tree containing `.env` (four times in one
+session). Root cause in every case: the unsafe command was easier to type
+than the safe one. These wrappers exist so that stops being true —
+**use them, don't reach for the raw command.**
+
+| Unsafe (never run this) | Safe wrapper | Why |
+|---|---|---|
+| `railway variables` (bare) | `scripts/check-var.sh railway <NAME>` | Bare form prints every value. The wrapper prints `PRESENT`/`ABSENT` and at most 6 chars. |
+| `aws lambda get-function` (bare, no `--query`) | `scripts/check-var.sh lambda <NAME>` | Bare form returns env vars in plaintext metadata — this is exactly how the second exposure happened. |
+| `grep -rn <pattern> .` on a tree containing `.env` | `scripts/scan-secrets.sh` (filenames only, `grep -rl`) | `-n`/no `-l` prints matching line *content* — if a line contains a secret, so does your terminal/transcript. |
+| `cat .env`, `printenv`, `env`, `set` | `scripts/check-var.sh local <NAME>` | Same idea for the local file/shell env. |
+
+If a command you're about to run could print a secret and no wrapper
+above covers it: **stop and find the scoped alternative before running
+it** — e.g. `--query` a specific field (AWS CLI), `--json | jq '.NAME'`
+truncated, or a filenames-only grep. Report `PRESENT`/`ABSENT` and at
+most the first 6 characters when identification is genuinely needed;
+never more.
+
 ## Commands
 
 ```

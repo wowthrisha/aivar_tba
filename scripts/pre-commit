@@ -2,25 +2,35 @@
 # Blocks commits containing key-shaped strings. Installed into
 # .git/hooks/pre-commit by scripts/install-hooks.sh (git does not version
 # .git/hooks, so this canonical copy lives in scripts/ and gets copied in).
+#
+# D-36: NEVER prints the matched value, only the file and line NUMBER.
+# The previous version of this hook echoed the actual matched line
+# (including the secret-shaped substring) to stderr when blocking - a
+# real gap found during the D-36 secrets-exposure remediation: a hook
+# whose entire purpose is preventing secret exposure was itself printing
+# one, e.g. into a CI log or terminal scrollback.
 
 set -e
 
-pattern='sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(SECRET|TOKEN|PASSWORD|API_KEY)[A-Za-z_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{16,}'
+pattern='sk-proj-[A-Za-z0-9_-]{20,}|npg_[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|postgres(ql)?://[^ ]*:[^ @]*@|-----BEGIN [A-Z ]*PRIVATE KEY-----|(SECRET|TOKEN|PASSWORD|API_KEY)[A-Za-z_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{16,}'
 
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 found=0
 
 for f in $staged; do
   [ -f "$f" ] || continue
-  if git diff --cached -- "$f" | grep -Ein "$pattern" >/dev/null 2>&1; then
-    echo "BLOCKED: possible secret in $f" >&2
-    git diff --cached -- "$f" | grep -Ein "$pattern" >&2
+  # Line NUMBERS only (-n), never content: cut discards everything after
+  # the first ":" that grep's -n output adds, so the matched substring
+  # itself never reaches stdout/stderr regardless of what it contains.
+  lines=$(git diff --cached -- "$f" | grep -Ein "$pattern" 2>/dev/null | cut -d: -f1 || true)
+  if [ -n "$lines" ]; then
+    echo "BLOCKED: possible secret in $f (diff line(s): $(echo "$lines" | tr '\n' ' '))" >&2
     found=1
   fi
 done
 
 if [ "$found" -eq 1 ]; then
-  echo "Commit blocked by pre-commit secret scan. Remove the key-shaped string(s) above, or use .env (gitignored)." >&2
+  echo "Commit blocked by pre-commit secret scan. Remove the key-shaped string(s) above, or use .env (gitignored). Value(s) not shown - check the file at the reported line(s)." >&2
   exit 1
 fi
 

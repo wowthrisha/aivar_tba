@@ -64,6 +64,52 @@ def test_forced_error_returns_clean_json():
     assert body == {"detail": "internal server error"}
 
 
+def test_redaction_filter_masks_secret_shaped_message():
+    # D-36: reuses the app's actual configured formatter AND filter
+    # (from root.handlers[0]), not a reimplementation, same philosophy
+    # as this file's other tests.
+    root = logging.getLogger()
+    capture = _CapturingHandler()
+    capture.setFormatter(root.handlers[0].formatter)
+    for f in root.handlers[0].filters:
+        capture.addFilter(f)
+    root.addHandler(capture)
+    logger = logging.getLogger("app")
+    # Split across a concatenation so this source line doesn't itself
+    # match scripts/pre-commit's own sk-proj- pattern (same shape, by
+    # design) - the runtime string is identical to what the redaction
+    # filter needs to match, only the SOURCE TEXT's contiguity differs.
+    fake_key = "sk-proj-" + "thisisnotarealkeyABCDEFGHIJKLMNOP1234567890"
+    try:
+        logger.error(f"failed calling provider with key {fake_key}")
+    finally:
+        root.removeHandler(capture)
+
+    assert capture.lines
+    line = capture.lines[-1]
+    assert fake_key not in line
+    parsed = json.loads(line)
+    assert "[REDACTED]" in parsed["message"]
+
+
+def test_redaction_filter_leaves_normal_message_unchanged():
+    root = logging.getLogger()
+    capture = _CapturingHandler()
+    capture.setFormatter(root.handlers[0].formatter)
+    for f in root.handlers[0].filters:
+        capture.addFilter(f)
+    root.addHandler(capture)
+    logger = logging.getLogger("app")
+    try:
+        logger.error("a perfectly normal error message with no secrets in it")
+    finally:
+        root.removeHandler(capture)
+
+    assert capture.lines
+    parsed = json.loads(capture.lines[-1])
+    assert parsed["message"] == "a perfectly normal error message with no secrets in it"
+
+
 def test_forced_error_log_line_contains_request_id():
     # Regression: the middleware's `finally: request_id_var.reset(token)`
     # runs BEFORE an exception reaches unhandled_exception_handler, so a

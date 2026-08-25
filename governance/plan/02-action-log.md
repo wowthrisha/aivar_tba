@@ -1895,3 +1895,67 @@ saves this session before the D-34 image that stuck). `/v1/version`
 caught it every time; no code fix possible without an IAM policy change
 outside this session's write access (same ceiling as D-23). See the
 register (`governance/plan/03-errors-and-fixes.md`) for the full entry.
+
+### [2026-08-25 20:15 IST] [D-36 - secret exposure prevention, Parts 1-2] [assistant]
+Action: Standalone task, PS-9.1 closeout paused per instruction (still
+waiting on Lambda console deploy of `6221401` from before this task
+started).
+Part 1 (inventory, read-only): re-verified containment independently
+rather than trusting the task's own CONTEXT block - `git log --all -S`
+for `sk-proj-`/`npg_`/`AKIA` (0/0/1; the 1 is a false positive, the
+detection pattern's own literal text in `scripts/pre-commit` since the
+first scaffold commit, confirmed by character-level analysis, not
+assumed). Repo-wide scan found this environment's interactive `grep` is
+aliased to `ugrep --ignore-files --hidden`, which silently skips
+gitignored files (including `.env`) during recursive scans - re-ran with
+`command grep` (bypassing the alias) to avoid a false "clean" result;
+confirmed `.env` is the only matching file in the tree. Enumerated every
+secret location (names only, no values) across `.env`, Railway (17
+vars), Lambda (3 vars, no `DATABASE_URL_DIRECT` - correct), GitHub
+Actions (`secrets.DATABASE_URL` only), and every script/doc. Found a
+real gap: `scripts/pre-commit` itself echoed the matched secret-shaped
+line to stderr when blocking a commit - fixed in Part 2.
+Part 2 (guardrails, all seven items):
+  - `scripts/scan-secrets.sh` (2A): filenames-only scan. First version
+    used a generic 40-hex-char pattern which false-positived on git SHAs
+    this governance-heavy repo references constantly in docs/tests -
+    caught this by actually running it, not assumed correct; scoped the
+    hex check to code paths only (`app/`, `infra/`, `scripts/`, `.github/`)
+    where a real secret could cause damage, kept the unambiguous patterns
+    repo-wide. Verified clean, then proved it still detects a real
+    fake-secret shape before cleanup.
+  - `scripts/check-var.sh` (2B): PRESENT/ABSENT, max 6 chars, demonstrated
+    on one variable per platform (railway/lambda/local).
+  - `scripts/pre-commit` (2C): rewritten with the exact 5 required
+    patterns plus the pre-existing generic SECRET/TOKEN/PASSWORD/API_KEY
+    pattern; fixed the value-echoing bug found in Part 1. All 5 patterns
+    demonstrated blocking a fake value each, value never printed (file +
+    diff line number only). Installed via `install-hooks.sh`, confirmed
+    identical to `.git/hooks/pre-commit`.
+  - `app/logging_config.py` (2D): `RedactSecretsFilter`, applied to the
+    real handler; `JsonFormatter` also redacts `exc_info` text separately
+    (filters don't see formatter-derived text). 2 new tests reusing the
+    app's actual configured formatter+filter, not a reimplementation.
+  - `.github/workflows/secret-scan.yml` (2E): scans the PR diff on
+    `pull_request`, full-tree `scan-secrets.sh` on plain `push` (no diff
+    base available). Demonstration pending a scratch-branch push (next
+    entry).
+  - `CLAUDE.md` (2F): NEVER-DUMP section, unsafe->safe table for all
+    three historical vectors.
+  - `.env.example` (2G): cross-checked against actual `os.environ`
+    reads in `app/`+`migrations/` - found 5 vars missing
+    (`GIT_SHA`/`BUILD_TIME`/`CALIBRATION_MODE`/`CONFIRM_TTL_MINUTES`/
+    `FULL_REVIEW_TTL_HOURS`); added with correct defaults noted.
+    Also noted (not fixed, out of scope): `ENV`/`LOG_LEVEL` are
+    documented and in `.env.example` but not actually read by any app
+    code.
+Full suite: 199 passed, 0 skipped, 0 failed. `git diff a573663 --
+tests/test_routing.py` empty.
+Result: Part 2 complete. Checked Part 3 (SSM) before attempting it -
+`aws ssm describe-parameters` and `aws iam list-*-policies` both
+AccessDenied for `aivar-deploy` (zero ssm:*/iam:* permissions, can't
+even introspect its own policies). Per instruction, stopping rather than
+working around it - reporting the exact policy JSON and console steps
+instead of attempting SSM migration.
+Evidence: this session's transcript (all script runs, 5 pre-commit
+demonstrations, pytest output, IAM AccessDenied errors verbatim).
