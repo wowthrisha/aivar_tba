@@ -47,6 +47,20 @@ earlier incidents (D-16, D-22) required.
   later operations). App Runner was never an option — closed to new
   customers since 30 Apr 2026.
 
+**Secrets storage differs by platform, deliberately (D-36):** Lambda's
+`DATABASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL` are being migrated to SSM
+Parameter Store as `SecureString`, resolved at cold start and cached for
+the process lifetime — closing the exposure vector `aws lambda
+get-function` opened (it returns plaintext env vars in its metadata).
+`DATABASE_URL_DIRECT` is deliberately NOT present on Lambda: it never
+runs migrations. **Railway has no equivalent secret store** — its
+`DATABASE_URL`/`DATABASE_URL_DIRECT`/`OPENAI_API_KEY` remain plain
+service variables, protected only by the tooling guardrails in
+`scripts/scan-secrets.sh`, `scripts/check-var.sh`, and the `pre-commit`
+hook (see `CLAUDE.md`'s NEVER-DUMP section) — not by platform-level
+encryption at rest. This is a real asymmetry, not an oversight to be
+read as parity with Lambda's SSM migration.
+
 ## 2. Quickstart
 
 ```bash
