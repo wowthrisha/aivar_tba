@@ -204,6 +204,110 @@ def test_evaluate_response_reports_confidence_bound_stability_and_does_not_chang
     assert 0.495 <= body["stability"]["flips_below"] <= 0.505
 
 
+def test_evaluate_response_includes_session_floor_and_does_not_change_tier(client):
+    # FEATURE B3: default SESSION_FLOOR_MODE=shadow means every evaluate()
+    # response carries a session_floor block; a single read-only action is
+    # far under every threshold, so would_fire is False and applied is
+    # always False (shadow never applies).
+    resp = _evaluate(
+        client,
+        action_type="read",
+        params={},
+        reversibility="read",
+        affected_records=1,
+        regulatory="none",
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["tier"] == "AUTONOMOUS"
+    assert body["session_floor"]["would_fire"] is False
+    assert body["session_floor"]["applied"] is False
+
+
+def test_evaluate_response_reports_session_floor_would_fire_without_changing_tier(client):
+    # FEATURE B3/B4 (critical): 20 mutating actions by the same agent in
+    # one window crosses SESSION_MUTATION_COUNT_THRESHOLD - the 20th
+    # call's session_floor must report would_fire=True, applied=False,
+    # and its OWN tier must be exactly what a standalone evaluation of
+    # the same input would produce (shadow never changes a tier).
+    last_body = None
+    for i in range(20):
+        last_body = _evaluate(
+            client,
+            action_type="update",
+            resource=f"users/{i}",
+            params={"resource_id": i, "fields": {"x": 1}},
+            reversibility="update_with_snapshot",
+            affected_records=1,
+            regulatory="none",
+        ).json()
+
+    assert last_body["session_floor"]["would_fire"] is True
+    assert last_body["session_floor"]["floor"] == "session_mutation_volume"
+    assert last_body["session_floor"]["applied"] is False
+    # Same inputs, isolated agent (no session history) -> same tier as
+    # the 20th call would have gotten standalone: proves the floor never
+    # touched routing.
+    isolated = _evaluate(
+        client,
+        agent_id="agent-isolated",
+        action_type="update",
+        resource="users/19",
+        params={"resource_id": 19, "fields": {"x": 1}},
+        reversibility="update_with_snapshot",
+        affected_records=1,
+        regulatory="none",
+    ).json()
+    assert last_body["tier"] == isolated["tier"]
+    assert last_body["composite"] == isolated["composite"]
+
+
+def test_session_stats_endpoint_aggregates_recent_actions(client):
+    for i in range(3):
+        _evaluate(
+            client,
+            agent_id="agent-session",
+            action_type="delete",
+            resource=f"item/{i}",
+            params={"resource_id": i},
+            reversibility="irreversible",
+            affected_records=1,
+            regulatory="none",
+        )
+    resp = client.get("/v1/sessions/agent-session?window=300")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["degraded"] is False
+    assert body["action_count"] == 3
+    assert body["distinct_resource_count"] == 3
+    assert body["mutation_count"] == 3
+    assert body["session_floor"] is not None
+
+
+def test_session_stats_endpoint_window_excludes_agents_with_no_recent_actions(client):
+    resp = client.get("/v1/sessions/never-seen-agent?window=300")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["action_count"] == 0
+    assert body["escalation_rate"] is None
+    assert body["novelty_rate"] is None
+
+
+def test_session_stats_endpoint_degrades_gracefully_on_store_error(client, monkeypatch):
+    from app.main import get_store
+
+    class _BrokenStore:
+        async def list_session_actions(self, agent_id, since):
+            raise RuntimeError("boom")
+
+    client.app.dependency_overrides[get_store] = lambda: _BrokenStore()
+    resp = client.get("/v1/sessions/agent-x?window=300")
+    assert resp.status_code == 200  # never fails the request (B4)
+    body = resp.json()
+    assert body["degraded"] is True
+    assert body["action_count"] == 0
+
+
 def test_get_action_returns_current_state(client):
     created = _evaluate(client).json()
     resp = client.get(f"/v1/actions/{created['id']}")

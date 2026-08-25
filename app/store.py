@@ -72,6 +72,29 @@ class ActionRecord:
     llm_confidence_raw: float | None = None
 
 
+@dataclass(frozen=True)
+class SessionActionRow:
+    """FEATURE B (intelligence-v6) - one action's worth of data for the
+    session read model. reversibility_score/data_scope_score/tier/
+    floor_name come from risk_assessments (None if evaluate() never
+    completed for this action, which should not normally happen).
+
+    affected_records is NOT persisted anywhere (no column holds the
+    exact int) - approximated here as the LOWER BOUND of the persisted
+    data_scope_score's band (app/risk/scorer.py's DATA_SCOPE_THRESHOLDS),
+    a conservative undercount, documented in app/risk/session_read_model.py.
+    """
+
+    action_id: str
+    resource: str
+    created_at: datetime
+    tier: str | None
+    floor_name: str | None
+    reversibility_score: float | None
+    data_scope_score: float | None
+    embedding: list[float] | None
+
+
 @dataclass
 class ApprovalRecord:
     action_id: str
@@ -151,6 +174,24 @@ class InMemoryStore:
             Candidate(action_id=a.id, embedding=a.embedding, outcome=a.state.value)
             for a in candidates[:limit]
         ]
+
+    async def list_session_actions(self, agent_id: str, since: datetime) -> list[SessionActionRow]:
+        rows = [
+            SessionActionRow(
+                action_id=a.id,
+                resource=a.resource,
+                created_at=a.created_at,
+                tier=a.tier,
+                floor_name=a.floor_name,
+                reversibility_score=a.reversibility,
+                data_scope_score=a.data_scope,
+                embedding=a.embedding,
+            )
+            for a in self._actions.values()
+            if a.agent_id == agent_id and a.created_at >= since
+        ]
+        rows.sort(key=lambda r: r.created_at)
+        return rows
 
     async def set_approval(self, approval: ApprovalRecord) -> None:
         self._approvals[approval.action_id] = approval

@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from app.audit import GENESIS_HASH, AuditRecord, AuditVerifyResult, _entry_hash
 from app.db_models import ActionORM, ApprovalORM, AuditRecordORM, RiskAssessmentORM
 from app.state_machine import ActionState
-from app.store import ActionRecord, ApprovalRecord, canonical_params_hash
+from app.store import ActionRecord, ApprovalRecord, SessionActionRow, canonical_params_hash
 
 logger = logging.getLogger("app")
 
@@ -150,6 +150,35 @@ class SQLAlchemyStore:
             )
             rows = result.all()
             return [Candidate(action_id=r.id, embedding=r.embedding, outcome=r.state) for r in rows]
+
+    async def list_session_actions(self, agent_id: str, since: datetime) -> list[SessionActionRow]:
+        """FEATURE B (intelligence-v6): read-only, derived from the
+        existing actions/risk_assessments tables. Assumes at most one
+        risk_assessments row per action_id (true today - evaluate() calls
+        save_risk_assessment() exactly once per newly-created action;
+        idempotent replays return before scoring again). LEFT JOIN so an
+        action whose evaluate() never completed still appears (with null
+        tier/scores) rather than vanishing from the count."""
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                select(ActionORM, RiskAssessmentORM)
+                .join(RiskAssessmentORM, RiskAssessmentORM.action_id == ActionORM.id, isouter=True)
+                .where(ActionORM.agent_id == agent_id, ActionORM.created_at >= since)
+                .order_by(ActionORM.created_at)
+            )
+            return [
+                SessionActionRow(
+                    action_id=action.id,
+                    resource=action.resource,
+                    created_at=action.created_at,
+                    tier=ra.tier if ra is not None else None,
+                    floor_name=ra.floor_fired if ra is not None else None,
+                    reversibility_score=ra.reversibility_score if ra is not None else None,
+                    data_scope_score=ra.data_scope_score if ra is not None else None,
+                    embedding=action.embedding,
+                )
+                for action, ra in result.all()
+            ]
 
     async def set_approval(self, approval: ApprovalRecord) -> None:
         async with self._sessionmaker() as session:

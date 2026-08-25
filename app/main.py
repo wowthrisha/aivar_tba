@@ -32,6 +32,8 @@ from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_met
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.decision import compose_final_decision
 from app.risk.scorer import score_action
+from app.risk.session_floor import evaluate_session_floor, get_session_floor_mode
+from app.risk.session_read_model import compute_session_stats
 from app.risk.stability import compute_stability
 from app.schemas import (
     ActionResponse,
@@ -45,6 +47,8 @@ from app.schemas import (
     EvaluateRequest,
     ExecuteRequest,
     KeyDependencyVersions,
+    SessionFloorInfo,
+    SessionStatsResponse,
     StabilityInfo,
     VersionResponse,
 )
@@ -150,6 +154,11 @@ def _ttl_from_env(var_name: str, default: int, unit: str) -> timedelta:
 
 CONFIRM_TTL = _ttl_from_env("CONFIRM_TTL_MINUTES", 30, "minutes")
 FULL_REVIEW_TTL = _ttl_from_env("FULL_REVIEW_TTL_HOURS", 4, "hours")
+
+# FEATURE B: the window evaluate() itself uses for its own shadow-mode
+# session-floor check (B3). GET /v1/sessions/{agent_id} accepts its own
+# ?window= query param independently (B2) - these are unrelated knobs.
+SESSION_FLOOR_WINDOW_SECONDS = int(os.environ.get("SESSION_FLOOR_WINDOW_SECONDS", "300"))
 
 _real_provider: ConfidenceProvider | None = None
 _app_engine: AsyncEngine | None = None
@@ -301,7 +310,13 @@ async def readyz(
 
 
 def _to_action_response(
-    record, precedent=None, calibration=None, floors_fired=None, llm_confidence_raw=None, stability=None
+    record,
+    precedent=None,
+    calibration=None,
+    floors_fired=None,
+    llm_confidence_raw=None,
+    stability=None,
+    session_floor=None,
 ) -> ActionResponse:
     return ActionResponse(
         id=record.id,
@@ -327,6 +342,7 @@ def _to_action_response(
         floors_fired=floors_fired,
         calibration=calibration,
         stability=stability,
+        session_floor=session_floor,
     )
 
 
@@ -481,6 +497,29 @@ async def evaluate(
     if embedding is not None:
         await store.set_embedding(action_id, embedding)
 
+    # FEATURE B3: SHADOW MODE ONLY (S5) - computed and reported, never
+    # applied. Fail-soft (B4): a computation error degrades to "not
+    # fired" rather than failing the whole evaluate() request.
+    session_floor_info = None
+    session_floor_mode = get_session_floor_mode()
+    if session_floor_mode != "off":
+        try:
+            since = datetime.now(timezone.utc) - timedelta(seconds=SESSION_FLOOR_WINDOW_SECONDS)
+            session_rows = await store.list_session_actions(body.agent_id, since)
+            session_stats = compute_session_stats(
+                body.agent_id, SESSION_FLOOR_WINDOW_SECONDS, session_rows
+            )
+            session_floor_result = evaluate_session_floor(session_stats)
+            session_floor_info = SessionFloorInfo(
+                would_fire=session_floor_result.would_fire,
+                floor=session_floor_result.floor,
+                reason=session_floor_result.reason,
+                applied=session_floor_result.applied,
+            )
+        except Exception:
+            logger.error("session_floor_degraded=true - error computing session floor", exc_info=True)
+            session_floor_info = SessionFloorInfo(would_fire=False, floor=None, reason=None, applied=False)
+
     await audit.append(
         event_type="evaluated",
         actor=body.agent_id,
@@ -516,6 +555,17 @@ async def evaluate(
             # FEATURE C: additive - see stability_result comment above.
             "stability": stability_result.stability,
             "flips_below": stability_result.flips_below,
+            # FEATURE B3: additive, shadow-mode only - never applied.
+            "session_floor": (
+                {
+                    "would_fire": session_floor_info.would_fire,
+                    "floor": session_floor_info.floor,
+                    "reason": session_floor_info.reason,
+                    "applied": session_floor_info.applied,
+                }
+                if session_floor_info is not None
+                else None
+            ),
         },
     )
 
@@ -526,6 +576,7 @@ async def evaluate(
         floors_fired=final_floors_fired,
         llm_confidence_raw=llm_result.confidence,
         stability=stability_info,
+        session_floor=session_floor_info,
     )
 
 
@@ -724,6 +775,68 @@ async def audit_verify(audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_
     return AuditVerifyResponse(
         valid=result.valid, records_checked=result.records_checked, first_invalid_id=result.first_invalid_id
     )
+
+
+@app.get("/v1/sessions/{agent_id}", response_model=SessionStatsResponse)
+async def session_stats(
+    agent_id: str,
+    window: int = 300,
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+):
+    """FEATURE B2/B3: a READ MODEL, derived on request from existing
+    tables (actions/risk_assessments) - no new table, no cache, no
+    writes. session_floor is SHADOW MODE ONLY (B3/S5): would_fire/floor/
+    reason describe what WOULD happen, applied is always False.
+
+    B4: a computation error degrades this response (degraded=true, every
+    numeric field a zero/null fallback) rather than failing the request.
+    """
+    try:
+        since = datetime.now(timezone.utc) - timedelta(seconds=window)
+        rows = await store.list_session_actions(agent_id, since)
+        stats = compute_session_stats(agent_id, window, rows)
+        session_floor_mode = get_session_floor_mode()
+        floor_info = None
+        if session_floor_mode != "off":
+            floor_result = evaluate_session_floor(stats)
+            floor_info = SessionFloorInfo(
+                would_fire=floor_result.would_fire,
+                floor=floor_result.floor,
+                reason=floor_result.reason,
+                applied=floor_result.applied,
+            )
+        return SessionStatsResponse(
+            agent_id=stats.agent_id,
+            window_seconds=stats.window_seconds,
+            action_count=stats.action_count,
+            cumulative_affected_records=stats.cumulative_affected_records,
+            cumulative_irreversible_records=stats.cumulative_irreversible_records,
+            tier_distribution=stats.tier_distribution,
+            mutation_count=stats.mutation_count,
+            distinct_resource_count=stats.distinct_resource_count,
+            mean_pairwise_similarity=stats.mean_pairwise_similarity,
+            escalation_rate=stats.escalation_rate,
+            novelty_rate=stats.novelty_rate,
+            session_floor=floor_info,
+            degraded=False,
+        )
+    except Exception:
+        logger.error(f"session_stats_degraded=true agent_id={agent_id}", exc_info=True)
+        return SessionStatsResponse(
+            agent_id=agent_id,
+            window_seconds=window,
+            action_count=0,
+            cumulative_affected_records=0,
+            cumulative_irreversible_records=0,
+            tier_distribution={},
+            mutation_count=0,
+            distinct_resource_count=0,
+            mean_pairwise_similarity=None,
+            escalation_rate=None,
+            novelty_rate=None,
+            session_floor=None,
+            degraded=True,
+        )
 
 
 @app.get("/v1/oversight/reviewers", response_model=OversightResponse)

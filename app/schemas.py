@@ -152,6 +152,37 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class SessionFloorInfo(BaseModel):
+    """FEATURE B3 (intelligence-v6) — SHADOW MODE ONLY. applied is always
+    False in this pass; would_fire/floor/reason describe what WOULD have
+    happened, never what did."""
+
+    would_fire: bool
+    floor: str | None
+    reason: str | None
+    applied: bool
+
+
+class SessionStatsResponse(BaseModel):
+    """GET /v1/sessions/{agent_id} — read model, derived on request from
+    existing tables. degraded=true means computation failed and every
+    numeric field below is a zero/null fallback, not a real count."""
+
+    agent_id: str
+    window_seconds: int
+    action_count: int
+    cumulative_affected_records: int
+    cumulative_irreversible_records: int
+    tier_distribution: dict[str, int]
+    mutation_count: int
+    distinct_resource_count: int
+    mean_pairwise_similarity: float | None
+    escalation_rate: float | None
+    novelty_rate: float | None
+    session_floor: SessionFloorInfo | None
+    degraded: bool
+
+
 class StabilityInfo(BaseModel):
     """FEATURE C (intelligence-v6): would this decision have gone the
     other way at a different llm_confidence? Additive, never changes the
@@ -229,6 +260,9 @@ class ActionResponse(BaseModel):
     # FEATURE C: only populated by evaluate() - not persisted, same
     # pattern as `precedent`/`floors_fired` above.
     stability: StabilityInfo | None = None
+    # FEATURE B3: only populated by evaluate() when SESSION_FLOOR_MODE
+    # != "off" - not persisted, same pattern as `stability` above.
+    session_floor: SessionFloorInfo | None = None
 
 
 class CalibrationActionTypeStats(BaseModel):
