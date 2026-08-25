@@ -327,24 +327,20 @@ what was not done, never substitute silently.
   tier. Found in self-review, not from a failing test. Production
   approach: compose the novelty signal inside app/risk/ so
   route_action() returns the enforced tier, restoring one authority.
-- D-36: local `.env` currently holds the DEAD pre-rotation credentials
-  (`DATABASE_URL`/`OPENAI_API_KEY`) — the platform-side rotation
-  (Railway, Lambda) was not mirrored into the local file. `pytest -q`
-  passed clean (199/199) locally against these values regardless (the
-  suite mocks the LLM/confidence provider almost everywhere via
-  `_FakeProvider`, and the DB-backed tests' connectivity against
-  whatever's in local `.env` apparently still works), so this is not
-  blocking local automated tests today - but any local run that makes a
-  REAL OpenAI call (e.g. `uvicorn app.main:app --reload` against a live
-  request) will fail with 401 until `.env` is updated with the rotated
-  values.
-  **Found live, not assumed:** GitHub Actions' `secrets.DATABASE_URL` is
-  a SEPARATE stale copy, and unlike local `.env` it IS currently
-  blocking CI - confirmed via the `tests` job's actual failure on the
-  D-36 secret-scan demo branch's push-triggered run:
+- D-36: **CORRECTED (2026-08-25, live-verified, not assumed):** local
+  `.env` was originally logged here as holding dead pre-rotation
+  credentials - checked directly and that was wrong. `DATABASE_URL`:
+  every DB-backed pytest run this session (199/199, repeatedly) has
+  succeeded against real Neon using exactly this value. `OPENAI_API_KEY`:
+  live `GET https://api.openai.com/v1/models` with this key returned
+  HTTP 200 (status code only checked, key never printed). **Local `.env`
+  holds the current, rotated values for both.**
+  What IS still dead, found live, not assumed: GitHub Actions'
+  `secrets.DATABASE_URL` - a SEPARATE copy, confirmed stale via the most
+  recent `tests` workflow run on `master` (`15b4932`, run `32864124175`):
   `asyncpg.exceptions.InvalidPasswordError: password authentication
-  failed for user 'neondb_owner'` (9 failed, 9 errored, 190 passed).
-  Neither copy fixed here - requires the actual rotated values, which
-  this session does not have reason to hold or set. Both need updating:
-  local `.env` (interactively) and the GitHub repo secret
-  `DATABASE_URL` (Settings -> Secrets and variables -> Actions).
+  failed for user 'neondb_owner'` (9 failed, 9 errored, 190 passed) -
+  this is currently blocking CI on every push/PR. Not fixed here -
+  requires the actual rotated value, which this session does not have
+  reason to hold or set. Needs updating via GitHub UI (Settings ->
+  Secrets and variables -> Actions -> `DATABASE_URL`).
