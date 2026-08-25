@@ -330,11 +330,21 @@ what was not done, never substitute silently.
 - D-36: local `.env` currently holds the DEAD pre-rotation credentials
   (`DATABASE_URL`/`OPENAI_API_KEY`) — the platform-side rotation
   (Railway, Lambda) was not mirrored into the local file. `pytest -q`
-  passed clean (199/199) against these stale values because the suite
-  mocks the LLM/confidence provider almost everywhere (`_FakeProvider`)
-  and the DB-backed tests' connectivity apparently still works, so this
-  is not blocking automated tests today - but any local run that makes a
+  passed clean (199/199) locally against these values regardless (the
+  suite mocks the LLM/confidence provider almost everywhere via
+  `_FakeProvider`, and the DB-backed tests' connectivity against
+  whatever's in local `.env` apparently still works), so this is not
+  blocking local automated tests today - but any local run that makes a
   REAL OpenAI call (e.g. `uvicorn app.main:app --reload` against a live
   request) will fail with 401 until `.env` is updated with the rotated
-  values. Not fixed here - requires the actual rotated values, which
-  this session does not have reason to hold or set.
+  values.
+  **Found live, not assumed:** GitHub Actions' `secrets.DATABASE_URL` is
+  a SEPARATE stale copy, and unlike local `.env` it IS currently
+  blocking CI - confirmed via the `tests` job's actual failure on the
+  D-36 secret-scan demo branch's push-triggered run:
+  `asyncpg.exceptions.InvalidPasswordError: password authentication
+  failed for user 'neondb_owner'` (9 failed, 9 errored, 190 passed).
+  Neither copy fixed here - requires the actual rotated values, which
+  this session does not have reason to hold or set. Both need updating:
+  local `.env` (interactively) and the GitHub repo secret
+  `DATABASE_URL` (Settings -> Secrets and variables -> Actions).
