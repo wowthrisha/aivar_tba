@@ -112,6 +112,27 @@ class AuditLog:
 
         return {k: (v[0], v[1]) for k, v in counts.items()}
 
+    async def reviewer_decisions_with_embeddings(self, store, reviewer_id: str) -> list["ReviewerDecisionRow"]:
+        """FEATURE D: same output contract as
+        SQLAlchemyAuditLog.reviewer_decisions_with_embeddings
+        (app/db_store.py). Pure in-memory iteration - exists only to keep
+        the interface identical for InMemoryStore-backed tests, same
+        pattern as calibration_outcomes above."""
+        from app.store import ReviewerDecisionRow
+
+        rows: list[ReviewerDecisionRow] = []
+        for rec in self._records:
+            if rec.event_type != "decision" or rec.actor != reviewer_id:
+                continue
+            action_id = rec.payload.get("action_id")
+            decision = rec.payload.get("decision")
+            if action_id is None or decision is None:
+                continue
+            action = await store.get_action(action_id)
+            embedding = action.embedding if action is not None else None
+            rows.append(ReviewerDecisionRow(action_id=action_id, decision=decision, embedding=embedding))
+        return rows
+
     async def verify(self) -> AuditVerifyResult:
         prev_hash = GENESIS_HASH
         for i, record in enumerate(self._records):

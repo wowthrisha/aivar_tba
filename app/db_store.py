@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from app.audit import GENESIS_HASH, AuditRecord, AuditVerifyResult, _entry_hash
 from app.db_models import ActionORM, ApprovalORM, AuditRecordORM, RiskAssessmentORM
 from app.state_machine import ActionState
-from app.store import ActionRecord, ApprovalRecord, SessionActionRow, canonical_params_hash
+from app.store import ActionRecord, ApprovalRecord, ReviewerDecisionRow, SessionActionRow, canonical_params_hash
 
 logger = logging.getLogger("app")
 
@@ -53,6 +53,10 @@ class SQLAlchemyStore:
             idempotency_key=row.idempotency_key,
             created_at=row.created_at,
             state=ActionState(row.state),
+            # FEATURE D: previously never populated here even though
+            # ActionRecord has always had this field - row.embedding is
+            # already loaded (plain column, not deferred), just unused.
+            embedding=row.embedding,
         )
 
     async def _hydrate(self, session, row: ActionORM) -> ActionRecord:
@@ -433,6 +437,35 @@ class SQLAlchemyAuditLog:
                 )
             )
             return {row.action_type: (row.clean, row.modified_rejected) for row in result}
+
+    async def reviewer_decisions_with_embeddings(self, store, reviewer_id: str) -> list[ReviewerDecisionRow]:
+        """FEATURE D (intelligence-v6): read-only, derived from the
+        existing audit_records/actions tables via a single aggregate
+        query - same D-32 pattern as calibration_outcomes above (no
+        per-record store.get_action() round trip). `store` is accepted
+        only for interface parity with the in-memory test double."""
+        del store
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                text(
+                    """
+                    SELECT ar.payload->>'action_id' AS action_id,
+                           ar.payload->>'decision' AS decision,
+                           a.embedding AS embedding
+                    FROM audit_records ar
+                    JOIN actions a ON a.id = (ar.payload->>'action_id')
+                    WHERE ar.event_type = 'decision'
+                      AND ar.actor = :reviewer_id
+                      AND ar.payload ? 'action_id'
+                      AND ar.payload ? 'decision'
+                    """
+                ),
+                {"reviewer_id": reviewer_id},
+            )
+            return [
+                ReviewerDecisionRow(action_id=row.action_id, decision=row.decision, embedding=row.embedding)
+                for row in result
+            ]
 
     async def verify(self) -> AuditVerifyResult:
         async with self._sessionmaker() as session:

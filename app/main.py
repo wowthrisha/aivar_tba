@@ -31,6 +31,7 @@ from app.logging_config import configure_logging, request_id_var
 from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_metrics
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.decision import compose_final_decision
+from app.risk.reviewer_context import compute_reviewer_context
 from app.risk.scorer import score_action
 from app.risk.session_floor import evaluate_session_floor, get_session_floor_mode
 from app.risk.session_read_model import compute_session_stats
@@ -47,8 +48,10 @@ from app.schemas import (
     EvaluateRequest,
     ExecuteRequest,
     KeyDependencyVersions,
+    ReviewerContextResponse,
     SessionFloorInfo,
     SessionStatsResponse,
+    SimilarActionsStatsResponse,
     StabilityInfo,
     VersionResponse,
 )
@@ -317,6 +320,7 @@ def _to_action_response(
     llm_confidence_raw=None,
     stability=None,
     session_floor=None,
+    reviewer_context=None,
 ) -> ActionResponse:
     return ActionResponse(
         id=record.id,
@@ -343,6 +347,7 @@ def _to_action_response(
         calibration=calibration,
         stability=stability,
         session_floor=session_floor,
+        reviewer_context=reviewer_context,
     )
 
 
@@ -645,6 +650,65 @@ async def confirm(
 @app.get("/v1/review-queue", response_model=list[ActionResponse])
 async def review_queue(store: InMemoryStore | SQLAlchemyStore = Depends(get_store)):
     return [_to_action_response(r) for r in await store.list_review_queue()]
+
+
+@app.get("/v1/review-queue/{action_id}", response_model=ActionResponse)
+async def review_queue_item(
+    action_id: str,
+    reviewer_id: str | None = None,
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+    audit: AuditLog | SQLAlchemyAuditLog = Depends(get_audit_log),
+):
+    """FEATURE D1: GET /v1/review-queue/{id}, extended with
+    reviewer_context when ?reviewer_id= is given. D2: read-only
+    aggregation over existing tables, no new table. D3: no reviewer_id
+    -> the plain unpersonalised payload (reviewer_context stays None)."""
+    record = await store.get_action(action_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="action not found")
+
+    reviewer_context = None
+    if reviewer_id is not None:
+        decision_records = await audit.list_records(event_type="decision", limit=1_000_000)
+        events = []
+        for rec in decision_records:
+            if rec.actor != reviewer_id:
+                continue
+            decided_action_id = rec.payload.get("action_id")
+            rec_decision = rec.payload.get("decision")
+            if decided_action_id is None or rec_decision is None:
+                continue
+            decided_action = await store.get_action(decided_action_id)
+            if decided_action is None:
+                continue
+            events.append(
+                DecisionEvent(
+                    action_id=decided_action_id,
+                    decision=rec_decision,
+                    decided_at=rec.created_at,
+                    proposed_at=decided_action.created_at,
+                    action_current_state=decided_action.state.value,
+                )
+            )
+        reviewer_stats = compute_reviewer_metrics(events)
+
+        decisions_with_embeddings = await audit.reviewer_decisions_with_embeddings(store, reviewer_id)
+        context = compute_reviewer_context(record.embedding, decisions_with_embeddings)
+        reviewer_context = ReviewerContextResponse(
+            similar_actions_decided_by_this_reviewer=(
+                SimilarActionsStatsResponse(
+                    count=context.similar_actions_decided_by_this_reviewer.count,
+                    approved=context.similar_actions_decided_by_this_reviewer.approved,
+                    rejected=context.similar_actions_decided_by_this_reviewer.rejected,
+                )
+                if context.similar_actions_decided_by_this_reviewer is not None
+                else None
+            ),
+            consistency_note=context.consistency_note,
+            this_reviewer_stats=reviewer_stats,
+        )
+
+    return _to_action_response(record, reviewer_context=reviewer_context)
 
 
 @app.post("/v1/review-queue/{action_id}/decision", response_model=ActionResponse)

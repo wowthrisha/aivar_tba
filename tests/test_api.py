@@ -351,6 +351,55 @@ def test_review_queue_lists_full_review_oldest_first(client):
     assert ids.index(first["id"]) < ids.index(second["id"])
 
 
+def test_review_queue_item_without_reviewer_id_is_unpersonalised(client):
+    created = _evaluate(client).json()  # default body -> full_review
+    resp = client.get(f"/v1/review-queue/{created['id']}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == created["id"]
+    assert body["reviewer_context"] is None
+
+
+def test_review_queue_item_not_found_is_404(client):
+    resp = client.get("/v1/review-queue/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_review_queue_item_reviewer_context_only_this_reviewers_decisions(client):
+    # client fixture's _FakeEmbeddingProvider returns the SAME fixed
+    # vector for every action, so every action is "similar" to every
+    # other by construction here - isolates the test to reviewer
+    # SCOPING (D3's "only THIS reviewer's decisions"), not similarity math
+    # (already covered by tests/test_reviewer_context.py).
+    a = _evaluate(client, resource="a").json()
+    client.post(f"/v1/review-queue/{a['id']}/decision", json={"decision": "approve", "reviewer_id": "rev1"})
+
+    b = _evaluate(client, resource="b").json()
+    client.post(f"/v1/review-queue/{b['id']}/decision", json={"decision": "reject", "reviewer_id": "rev2"})
+
+    target = _evaluate(client, resource="target").json()
+
+    resp = client.get(f"/v1/review-queue/{target['id']}?reviewer_id=rev1")
+    assert resp.status_code == 200
+    ctx = resp.json()["reviewer_context"]
+    assert ctx["similar_actions_decided_by_this_reviewer"]["count"] == 1
+    assert ctx["similar_actions_decided_by_this_reviewer"]["approved"] == 1
+    assert ctx["similar_actions_decided_by_this_reviewer"]["rejected"] == 0
+    assert ctx["consistency_note"] == "You approved 1 of 1 similar action."
+    assert ctx["this_reviewer_stats"]["decisions_total"] == 1
+
+
+def test_review_queue_item_empty_reviewer_history_returns_nulls_not_zeros(client):
+    target = _evaluate(client, resource="target-2").json()
+    resp = client.get(f"/v1/review-queue/{target['id']}?reviewer_id=never-decided-anything")
+    assert resp.status_code == 200
+    ctx = resp.json()["reviewer_context"]
+    assert ctx["similar_actions_decided_by_this_reviewer"] is None
+    assert ctx["consistency_note"] is None
+    assert ctx["this_reviewer_stats"]["decisions_total"] == 0
+    assert ctx["this_reviewer_stats"]["approval_rate"] is None
+
+
 def test_decision_requires_reviewer_id(client):
     created = _evaluate(client).json()
     resp = client.post(f"/v1/review-queue/{created['id']}/decision", json={"decision": "approve"})

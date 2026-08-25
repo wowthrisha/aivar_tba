@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.embeddings import PrecedentInfo
+from app.oversight import ReviewerMetrics
 from app.risk.scorer import Regulatory, Reversibility
 from app.state_machine import ActionState
 
@@ -152,6 +153,23 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class SimilarActionsStatsResponse(BaseModel):
+    count: int
+    approved: int
+    rejected: int
+
+
+class ReviewerContextResponse(BaseModel):
+    """FEATURE D (intelligence-v6) — only populated by
+    GET /v1/review-queue/{action_id} when a reviewer_id is given. D3:
+    similar_actions_decided_by_this_reviewer/consistency_note are null
+    (not zero-filled) when there is nothing to compare against."""
+
+    similar_actions_decided_by_this_reviewer: SimilarActionsStatsResponse | None
+    consistency_note: str | None
+    this_reviewer_stats: ReviewerMetrics | None
+
+
 class SessionFloorInfo(BaseModel):
     """FEATURE B3 (intelligence-v6) — SHADOW MODE ONLY. applied is always
     False in this pass; would_fire/floor/reason describe what WOULD have
@@ -263,6 +281,9 @@ class ActionResponse(BaseModel):
     # FEATURE B3: only populated by evaluate() when SESSION_FLOOR_MODE
     # != "off" - not persisted, same pattern as `stability` above.
     session_floor: SessionFloorInfo | None = None
+    # FEATURE D: only populated by GET /v1/review-queue/{action_id} when
+    # a reviewer_id query param is given.
+    reviewer_context: ReviewerContextResponse | None = None
 
 
 class CalibrationActionTypeStats(BaseModel):

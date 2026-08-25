@@ -95,6 +95,17 @@ class SessionActionRow:
     embedding: list[float] | None
 
 
+@dataclass(frozen=True)
+class ReviewerDecisionRow:
+    """FEATURE D (intelligence-v6) - one past decision by one reviewer,
+    with the decided action's embedding (None if that action never got
+    one - fail-soft, same as everywhere else embeddings are optional)."""
+
+    action_id: str
+    decision: str  # "approve" | "reject"
+    embedding: list[float] | None
+
+
 @dataclass
 class ApprovalRecord:
     action_id: str
