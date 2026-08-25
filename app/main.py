@@ -219,6 +219,36 @@ def _dep_version(name: str) -> str:
         return "unknown"
 
 
+def _git_sha_and_source() -> tuple[str, str]:
+    """hardening-v5 / Phase 3: GIT_SHA is manually set (Railway service
+    variable via infra/railway/deploy-railway.sh, or a Docker build-arg
+    via infra/aws/deploy-lambda.sh) - it can drift from what's actually
+    running and nothing catches that automatically (D-33). Checked
+    whether Railway exposes RAILWAY_GIT_COMMIT_SHA before assuming a
+    fix, per instruction not to guess: `railway run env`, full runtime
+    environment, re-verified fresh (not assumed from a past session) -
+    no such variable exists for this service (root-Dockerfile build,
+    not Nixpacks). If it's ever added, this prefers it automatically
+    and reports source="derived"; until then, falls back to the manual
+    GIT_SHA var and reports which manual mechanism set it - "manual"
+    (Railway: any RAILWAY_* var present means this is a
+    `railway variables --set` runtime value) or "build-arg" (no
+    RAILWAY_* vars present means this is a Docker ARG/ENV baked in at
+    build time, e.g. Lambda) - so a reader knows how much to trust it:
+    a stale "manual"/"build-arg" value can silently drift from what's
+    deployed; a "derived" one is asserted correct by the platform
+    itself.
+    """
+    railway_derived = os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+    if railway_derived:
+        return railway_derived, "derived"
+    manual_sha = os.environ.get("GIT_SHA", "unknown")
+    if manual_sha == "unknown":
+        return manual_sha, "unknown"
+    is_railway = any(k.startswith("RAILWAY_") for k in os.environ)
+    return manual_sha, ("manual" if is_railway else "build-arg")
+
+
 @app.get("/v1/version")
 def version():
     # Read-only, no auth, no DB, no LLM, no routing-decision dependency.
@@ -236,10 +266,11 @@ def version():
     # derives the short form defensively from whatever GIT_SHA actually
     # holds, so parity checks always have one directly comparable field
     # regardless of what any given deploy script passed.
-    git_sha = os.environ.get("GIT_SHA", "unknown")
+    git_sha, git_sha_source = _git_sha_and_source()
     return VersionResponse(
         git_sha=git_sha,
         git_sha_short=git_sha[:7] if git_sha != "unknown" else "unknown",
+        git_sha_source=git_sha_source,
         build_time=os.environ.get("BUILD_TIME", "unknown"),
         python_version=platform.python_version(),
         key_dependencies=KeyDependencyVersions(

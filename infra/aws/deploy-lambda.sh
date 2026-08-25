@@ -47,6 +47,22 @@ ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}"
 IMAGE_URI="${ECR_URI}:${IMAGE_TAG}"
 
 echo "== Building ${IMAGE_URI} from ${BUILD_DIR} (commit ${GIT_SHA}) =="
+
+# hardening-v5 Phase 3.2: GIT_SHA was captured once, above, before the ECR
+# login round-trip and the (potentially slow) docker build itself - a
+# window in which the working tree could change (a concurrent commit, a
+# stale/shared BUILD_DIR checkout being updated by something else) and
+# silently bake a WRONG git_sha into the image that GET /v1/version would
+# then report as fact. Re-read the repo immediately before the build
+# starts and fail loudly on any mismatch, rather than shipping a lie.
+CURRENT_SHA="$(git -C "$BUILD_DIR" rev-parse HEAD)"
+if [ "$CURRENT_SHA" != "$GIT_SHA" ]; then
+  echo "FAIL: GIT_SHA drifted between capture and build - captured ${GIT_SHA}," \
+       "repo now at ${CURRENT_SHA}. The working tree changed mid-deploy;" \
+       "re-run this script from a clean, unchanging checkout." >&2
+  exit 1
+fi
+
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 

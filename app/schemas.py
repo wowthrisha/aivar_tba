@@ -287,6 +287,12 @@ class VersionResponse(BaseModel):
     # so cross-deployment parity checks have a directly comparable field
     # even when git_sha itself is reported at different lengths.
     git_sha_short: str
+    # hardening-v5 Phase 3: "derived" (a platform-injected variable,
+    # trustworthy by construction), "manual" (a Railway service variable
+    # set by a deploy script - can drift), "build-arg" (a Docker ARG/ENV
+    # baked in at build time - can also drift), or "unknown" (GIT_SHA
+    # absent entirely).
+    git_sha_source: str
     build_time: str
     python_version: str
     key_dependencies: KeyDependencyVersions
