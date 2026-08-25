@@ -153,6 +153,20 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class ExplainResponse(BaseModel):
+    """GET /v1/actions/{action_id}/explain — FEATURE E. READ-ONLY
+    presentation endpoint; absent from every routing path. The
+    structured record (GET /v1/actions/{id}, GET /v1/audit) governs -
+    this prose is a convenience summary of it, not a second source of
+    truth."""
+
+    action_id: str
+    explanation: str
+    degraded: bool
+    authoritative_record: str
+    note: str
+
+
 class PrecedentCheckRequest(BaseModel):
     """FEATURE A (MCP check_precedent tool): the same shape evaluate()
     would score, but this endpoint never creates an action or audit

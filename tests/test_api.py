@@ -9,6 +9,7 @@ both overridden with fakes via FastAPI's dependency_overrides, so these
 tests never call the live API or touch Postgres.
 """
 
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -340,6 +341,97 @@ def test_precedent_check_is_read_only_no_action_or_audit_created(client):
     assert resp2.status_code == 200
     audit_after = client.get("/v1/audit").json()
     assert len(audit_after) == len(audit_before)  # no new audit entry
+
+
+class _FakeExplanationProvider:
+    """Mirrors OpenAIExplanationProvider's own cache-by-action_id
+    contract (unit-tested directly in tests/test_explain.py) so
+    API-level tests can exercise the ENDPOINT's wiring without a real
+    OpenAI call, while still observing the same caching behavior a real
+    request would see."""
+
+    def __init__(self, text="A plain-English summary.", degraded=False):
+        self._text = text
+        self._degraded = degraded
+        self.calls: list[dict] = []
+        self._cache: dict[str, "object"] = {}
+
+    async def explain(self, action_id, structured_record):
+        from app.explain import ExplanationResult
+
+        if action_id in self._cache:
+            return self._cache[action_id]
+        self.calls.append(structured_record)  # only counted on a genuine (non-cached) computation
+        if self._degraded:
+            return ExplanationResult(text=None, degraded=True, reason="fake failure")
+        result = ExplanationResult(text=self._text, degraded=False)
+        self._cache[action_id] = result
+        return result
+
+
+def test_explain_endpoint_grounds_only_in_the_structured_record(client):
+    from app.main import get_explanation_provider
+
+    created = _evaluate(client, resource="secret-resource-xyz").json()
+    fake = _FakeExplanationProvider()
+    client.app.dependency_overrides[get_explanation_provider] = lambda: fake
+
+    resp = client.get(f"/v1/actions/{created['id']}/explain")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["degraded"] is False
+    assert body["authoritative_record"] == f"/v1/audit?action_id={created['id']}"
+
+    assert len(fake.calls) == 1
+    structured_record = fake.calls[0]
+    # E2: only the listed fields, never action_type/resource/params -
+    # the resource string must not leak into what the LLM sees.
+    assert "resource" not in structured_record
+    assert "action_type" not in structured_record
+    assert "params" not in structured_record
+    assert "secret-resource-xyz" not in json.dumps(structured_record)
+    assert structured_record["tier"] == created["tier"]
+    assert structured_record["composite"] == created["composite"]
+
+
+def test_explain_endpoint_falls_back_on_provider_failure(client):
+    from app.main import get_explanation_provider
+
+    created = _evaluate(client).json()
+    fake = _FakeExplanationProvider(degraded=True)
+    client.app.dependency_overrides[get_explanation_provider] = lambda: fake
+
+    resp = client.get(f"/v1/actions/{created['id']}/explain")
+    assert resp.status_code == 200  # E2: never fails the request
+    body = resp.json()
+    assert body["degraded"] is True
+    assert body["explanation"] == created["explanation"]  # existing rendered_explanation
+
+
+def test_explain_endpoint_caches_and_returns_identical_text(client):
+    from app.main import get_explanation_provider
+
+    created = _evaluate(client).json()
+    fake = _FakeExplanationProvider(text="Stable summary.")
+    client.app.dependency_overrides[get_explanation_provider] = lambda: fake
+
+    first = client.get(f"/v1/actions/{created['id']}/explain").json()
+    second = client.get(f"/v1/actions/{created['id']}/explain").json()
+
+    assert first["explanation"] == second["explanation"] == "Stable summary."
+    assert len(fake.calls) == 1  # second GET served from the provider's own cache
+
+
+def test_explain_endpoint_absent_from_evaluate_path(client):
+    from app.main import get_explanation_provider
+
+    fake = _FakeExplanationProvider()
+    client.app.dependency_overrides[get_explanation_provider] = lambda: fake
+
+    resp = _evaluate(client)
+    assert resp.status_code == 201
+    assert "explanation" in resp.json()  # the counterfactual string, always present
+    assert fake.calls == []  # ExplanationProvider was never invoked by evaluate()
 
 
 def test_get_action_returns_current_state(client):

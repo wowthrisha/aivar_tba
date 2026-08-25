@@ -17,6 +17,7 @@ from app.audit import AuditLog
 from app.calibration import calibration_for_action_type, compute_calibration_by_action_type, get_calibration_mode
 from app.db import make_app_engine
 from app.db_store import SQLAlchemyAuditLog, SQLAlchemyStore
+from app.explain import ExplanationProvider, OpenAIExplanationProvider
 from app.embeddings import (
     EmbeddingProvider,
     OpenAIEmbeddingProvider,
@@ -49,6 +50,7 @@ from app.schemas import (
     DecisionRequest,
     EvaluateRequest,
     ExecuteRequest,
+    ExplainResponse,
     KeyDependencyVersions,
     PrecedentCheckRequest,
     ReviewerContextResponse,
@@ -178,6 +180,17 @@ def get_confidence_provider() -> ConfidenceProvider:
         client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
         _real_provider = OpenAIConfidenceProvider(client, model=os.environ["OPENAI_MODEL"])
     return _real_provider
+
+
+_real_explanation_provider: ExplanationProvider | None = None
+
+
+def get_explanation_provider() -> ExplanationProvider:
+    global _real_explanation_provider
+    if _real_explanation_provider is None:
+        client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        _real_explanation_provider = OpenAIExplanationProvider(client, model=os.environ["OPENAI_MODEL"])
+    return _real_explanation_provider
 
 
 _real_embedding_provider: EmbeddingProvider | None = None
@@ -628,6 +641,47 @@ async def get_action(action_id: str, store: InMemoryStore | SQLAlchemyStore = De
     if record is None:
         raise HTTPException(status_code=404, detail="action not found")
     return _to_action_response(record)
+
+
+@app.get("/v1/actions/{action_id}/explain", response_model=ExplainResponse)
+async def explain_action(
+    action_id: str,
+    store: InMemoryStore | SQLAlchemyStore = Depends(get_store),
+    provider: ExplanationProvider = Depends(get_explanation_provider),
+):
+    """FEATURE E: READ-ONLY presentation endpoint - does not appear in
+    any routing path (evaluate() never calls this or ExplanationProvider).
+    E2 STRICT GROUNDING: the LLM sees ONLY the fields listed below, never
+    action_type/resource/params. E2 fail-soft: on any provider failure,
+    falls back to the action's own persisted rendered_explanation with
+    degraded=true - never fails the request."""
+    record = await store.get_action(action_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="action not found")
+
+    structured_record = {
+        "reversibility_score": record.reversibility,
+        "data_scope_score": record.data_scope,
+        "regulatory_score": record.regulatory,
+        "confidence_score": record.confidence,
+        "weights_version": record.weights_version,
+        "composite": record.composite,
+        "tier": record.tier,
+        "floor_name": record.floor_name,
+        "counterfactual_explanation": record.explanation,
+    }
+    result = await provider.explain(action_id, structured_record)
+
+    return ExplainResponse(
+        action_id=action_id,
+        explanation=result.text if not result.degraded else (record.explanation or ""),
+        degraded=result.degraded,
+        authoritative_record=f"/v1/audit?action_id={action_id}",
+        note=(
+            "This is a plain-English summary generated from the structured record at "
+            "authoritative_record. The structured record governs, not this prose."
+        ),
+    )
 
 
 async def _check_expiry(store, action_id: str, record) -> None:
