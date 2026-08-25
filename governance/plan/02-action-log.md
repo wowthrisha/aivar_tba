@@ -1959,3 +1959,33 @@ working around it - reporting the exact policy JSON and console steps
 instead of attempting SSM migration.
 Evidence: this session's transcript (all script runs, 5 pre-commit
 demonstrations, pytest output, IAM AccessDenied errors verbatim).
+
+### [2026-08-25 23:55 IST] [D-36 deploy + live behavioral verification] [assistant]
+Action: Deployed the D-36 logging-redaction change (the only application
+code among the guardrail commits) to both platforms per instruction
+(Option 2: deploy first, tag after). Full suite green (199 passed)
+before push. Railway auto-deployed, `GIT_SHA`/`BUILD_TIME` updated,
+confirmed `/v1/version` -> `ff706ee` with `git_sha_short` present. Lambda
+image built with the full-length SHA (per the earlier deploy-lambda.sh
+update), manifest verified, digest reported for console deploy; user
+confirmed both platforms live at `ff706ee`/`ff706ee3c0ed4da7af933604df0cc5b8642e0b5a`.
+Then did what was explicitly asked, not settled for SHA-only proof:
+sent a fake `sk-proj-`-shaped value as `resource` on both deployments,
+repeatedly, until a genuine `APITimeoutError` fired (`TIMEOUT_SECONDS=
+3.0` in `app/llm.py` - confirmed by reading the file, not guessed) -
+took 1 attempt on Railway, ~2 dozen attempts plus 10 concurrent requests
+on AWS (its OpenAI-call latency ran consistently under 3.0s even when
+full request wall-time exceeded 12-15s, presumably cold-start/network
+overhead outside the SDK's own timeout window). Read the actual
+platform logs: `railway logs` for Railway, `aws logs filter-log-events`
+for AWS - discovered along the way that this IAM identity CAN read
+CloudWatch Logs, unlike the Lambda-management APIs D-23 blocks, so no
+"cannot verify" caveat was needed. Both show
+`llm_degraded=true reason=timeout action_type=read resource=[REDACTED]`
+- the fake value never appears in either platform's actual logs.
+Result: D-36's redaction filter confirmed live and working by behavior,
+on both platforms, not inferred from a matching git_sha. `/readyz` ->
+db ok, llm ok on both, confirmed after.
+Evidence: this session's transcript (raw `railway logs`/`aws logs
+filter-log-events` output showing the `[REDACTED]` line on each
+platform, timestamps and request_ids included).
