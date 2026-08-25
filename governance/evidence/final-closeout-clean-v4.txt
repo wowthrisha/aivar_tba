@@ -1,0 +1,246 @@
+Final closeout — clean-v4
+Verified: 2026-08-25/26, ~18:00-00:30 IST
+Both deployments confirmed running commit
+ff706ee3c0ed4da7af933604df0cc5b8642e0b5a (full form, BOTH deployments —
+this is the first closeout where Railway and AWS report the identical
+full-length SHA string, not just matching short forms; see D-33 below).
+
+URLs:
+  Railway: https://aivartba-production.up.railway.app
+  AWS:     https://ym22rmfd6h3cyvu6tdv5a3mo7e0tsies.lambda-url.us-east-1.on.aws
+
+Scope note: this closeout follows two standalone-but-related passes
+since clean-v3: (1) D-34, a BLOCKING-crash fix pass (fuzz sweep found
+3 reproducible 500s; both required TWO fix rounds each verified live -
+see D-34 below), and (2) D-36, a secret-exposure-prevention pass
+(guardrails: scan-secrets.sh, check-var.sh, pre-commit, log redaction,
+CI scan, NEVER-DUMP docs; SSM migration blocked by the D-23 IAM ceiling,
+reported not worked around). Both are fully deployed and live-verified
+as of this commit.
+
+=== 1. FULL FUZZ MATRIX — BOTH DEPLOYMENTS, POST-FIX ===
+
+93-case matrix (governance/evidence/fuzz-matrix.py — committed,
+runnable, corrected after 6 harness-construction errors found in the
+first 3A pass), run against both deployments at ff706ee:
+
+  Railway: 93 cases, 0 BLOCKING (5xx), 0 unexpected.
+  AWS:     93 cases, 0 BLOCKING (5xx), 0 unexpected.
+  Total: 186/186 clean.
+
+Full 186-row table published:
+https://claude.ai/code/artifact/aba1c4ee-1780-4699-9d1f-25bd61272536
+
+All 3 of D-34's original crash cases (NaN in params, Infinity in params,
+unpaired Unicode surrogate in resource/params) now correctly 422 on
+both platforms - confirmed via this same live re-run, not assumed from
+the fix commit alone.
+
+=== 2. PARITY TABLE — seeded resources only (D-27), 4 runs each scenario ===
+
+deployment | scenario    | run | tier        | composite | floor_name                              | floors_fired                                                                        | llm_confidence (confidence_score) | uncertainty_score | llm_confidence_raw
+Railway    | read        | 1-4 | AUTONOMOUS  | 0.105     | null                                    | []                                                                                   | 0.45 (stable all 4)                | 0.45 (stable all 4) | 0.55 (stable all 4)
+AWS        | read        | 1-4 | AUTONOMOUS  | 0.105     | null                                    | []                                                                                   | 0.45 (stable all 4)                | 0.45 (stable all 4) | 0.55 (stable all 4)
+Railway    | update      | 1-4 | CONFIRM     | 0.44      | unrecoverable_mutation_requires_confirm | [unrecoverable_mutation_requires_confirm, low_confidence_on_mutation]               | 1.00 (stable all 4)                | 1.00 (stable all 4) | 0.20 (stable all 4)
+AWS        | update      | 1-4 | CONFIRM     | 0.44      | unrecoverable_mutation_requires_confirm | [unrecoverable_mutation_requires_confirm, low_confidence_on_mutation]               | 1.00 (stable all 4)                | 1.00 (stable all 4) | 0.12 (stable all 4)
+Railway    | bulk-delete | 1-4 | FULL_REVIEW | 0.737     | irreversible_bulk                       | [irreversible_bulk, unrecoverable_mutation_requires_confirm, low_confidence_on_mutation] | 0.97 (stable all 4)          | 0.97 (stable all 4) | 0.03 (stable all 4)
+AWS        | bulk-delete | 1-4 | FULL_REVIEW | 0.642     | irreversible_bulk                       | [irreversible_bulk, unrecoverable_mutation_requires_confirm]                        | 0.02 (stable all 4)                | 0.02 (stable all 4) | 0.98 (stable all 4)
+
+Result: TIERS MATCH across deployments on every scenario (read=AUTONOMOUS,
+update=CONFIRM, bulk-delete=FULL_REVIEW). floor_name stable across all 4
+runs, per deployment, per scenario - never flips, on both. Composites
+match exactly for read/update (floor-pinned or coincidentally identical
+LLM draws); bulk-delete composites differ (0.737 Railway vs 0.642 AWS)
+because of independent live LLM draws feeding low_confidence_on_mutation
+differently (Railway's 0.03 raw confidence tripped that floor
+additionally; AWS's 0.98 did not) - per instruction, NOT reconciled.
+
+uncertainty_score and llm_confidence_raw (L-G): present in every one of
+the 24 responses, both deployments - this closeout's own parity sweep is
+itself live confirmation that 2A's write-path change (uncertainty_score/
+llm_confidence_raw persisted to risk_assessments) is functioning
+correctly in production, not just locally tested.
+
+Raw sample response (Railway, bulk-delete, run 1):
+{"id":"...","agent_id":"agent-07","action_type":"delete","resource":"customers",
+ "params":{"resource_id":999},"reversibility_score":0.4,...,
+ "composite":0.737,"tier":"FULL_REVIEW",
+ "floor_name":"irreversible_bulk",
+ "floors_fired":["irreversible_bulk","unrecoverable_mutation_requires_confirm","low_confidence_on_mutation"],
+ "confidence_score":0.97,"uncertainty_score":0.97,"llm_confidence_raw":0.03,
+ "weights_version":"v1", ...}
+
+=== 3. FINGERPRINT TABLE ===
+
+deployment | git_sha                                   | git_sha_short | F1 (422) | F2 (floor null) | F3 (schema) | F4 (floors_fired) | readyz        | records_checked | pydantic | openai
+Railway    | ff706ee3c0ed4da7af933604df0cc5b8642e0b5a  | ff706ee       | PASS     | PASS            | PASS        | PASS               | llm:ok,db:ok  | 789              | 2.12.3   | 2.49.0
+AWS        | ff706ee3c0ed4da7af933604df0cc5b8642e0b5a  | ff706ee       | PASS     | PASS            | PASS        | PASS               | llm:ok,db:ok  | 789              | 2.12.3   | 2.49.0
+
+git_sha IDENTICAL full-length string on both, for the first time in this
+project's history (D-33: this is a deploy-script consistency fix -
+infra/aws/deploy-lambda.sh now passes the full SHA, matching
+infra/railway/deploy-railway.sh - NOT a Railway platform feature; see
+D-33's register entry for the explicit, re-verified statement that
+GIT_SHA remains manually-set on Railway, not platform-derived).
+
+records_checked: 789 on both, identical - reconciled.
+
+Raw F1 (both deployments, identical):
+{"detail":[{"type":"greater_than_equal","loc":["body","affected_records"],
+"msg":"Input should be greater than or equal to 0","input":-5,"ctx":{"ge":0}}]}
+HTTP 422
+
+Raw /readyz (both deployments, identical):
+{"status":"ok","checks":{"llm":"ok","db":"ok"}}
+
+Raw /v1/version (Railway):
+{"git_sha":"ff706ee3c0ed4da7af933604df0cc5b8642e0b5a","git_sha_short":"ff706ee",
+ "build_time":"2026-08-25T16:21:15Z","python_version":"3.13.15",
+ "key_dependencies":{"pydantic":"2.12.3","fastapi":"0.115.0","openai":"2.49.0","sqlalchemy":"2.0.36"}}
+
+Raw /v1/version (AWS):
+{"git_sha":"ff706ee3c0ed4da7af933604df0cc5b8642e0b5a","git_sha_short":"ff706ee",
+ "build_time":"2026-08-25T17:05:36Z","python_version":"3.13.15",
+ "key_dependencies":{"pydantic":"2.12.3","fastapi":"0.115.0","openai":"2.49.0","sqlalchemy":"2.0.36"}}
+
+Raw /v1/audit/verify (both deployments, identical):
+{"valid":true,"records_checked":789,"first_invalid_id":null}
+
+=== 4. NFC/NFD PARAMS_HASH — LIVE, BOTH DEPLOYMENTS (L-H fix, still holding) ===
+
+  Railway: NFC hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1
+           NFD hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1  MATCH
+  AWS:     NFC hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1
+           NFD hash = a84c174531ab46d58aaeb9c85aed22981d418f25bead412cd282e97f427a0ba1  MATCH
+
+Identical to every prior closeout's own NFC/NFD hash (content-derived,
+expected, not coincidental) - re-confirmed live a third time.
+
+=== 5. D-36 REDACTION FILTER — LIVE BEHAVIORAL PROOF, BOTH DEPLOYMENTS ===
+
+Not just deployed - proven live by BEHAVIOR, not SHA. Sent a fake
+sk-proj--shaped value as `resource`, forced a genuine APITimeoutError
+(TIMEOUT_SECONDS=3.0 in app/llm.py), read the actual platform logs:
+
+  Railway (railway logs):
+    {"level":"WARNING","message":"llm_degraded=true reason=timeout
+     action_type=read resource=[REDACTED]", ...}
+
+  AWS (aws logs filter-log-events - this IAM identity CAN read
+       CloudWatch, unlike the Lambda-management APIs D-23 blocks):
+    {"level":"WARNING","message":"llm_degraded=true reason=timeout
+     action_type=read resource=[REDACTED]", ...}
+    (two separate occurrences, different request_ids)
+
+The fake value never appears in either platform's actual logs - only
+[REDACTED]. Full detail: governance/plan/02-action-log.md, the
+"D-36 deploy + live behavioral verification" entry.
+
+=== 6. REGISTER STATUS AT THIS CLOSEOUT ===
+
+D-34 (calibration N+1... no, params sanitization): FIXED, both rounds.
+  Round 1: rejected NaN/Infinity/surrogates in params - closed the
+  original DB-write-path crash (asyncpg rejecting these at INSERT).
+  Round 2, found by live re-verification not by the test suite: round
+  1's own fix relocated the crash rather than closing it - Pydantic's
+  ValidationError.errors() echoes the raw offending value into the 422
+  body, and _json_safe() (D-29's existing fix for this same pathology)
+  only sanitized non-finite floats, not unencodable strings - so the
+  ERROR RESPONSE now crashed rendering itself. Same failure mode as
+  D-29's original RequestValidationError finding, one layer deeper.
+  Fixed by extending _json_safe() to sanitize strings (and dict keys)
+  too. Confirmed fixed live on both platforms (Section 1 above).
+
+D-35: fourth silent Lambda console deploy failure this project
+  (/v1/version still reported the previous commit after a console save
+  reported success) - detected only because /v1/version was checked
+  afterward. Environmental/IAM (same D-23 ceiling), not a code fix;
+  workaround (re-check /v1/version after every console deploy) used
+  successfully every time since, including this closeout's own deploys.
+
+D-33: explicitly re-verified at this closeout (Section 3 above) -
+  Railway's GIT_SHA is NOT platform-derived, confirmed via a fresh
+  `railway run env` (not inferred from the format match). Still a
+  manually-set Railway variable via infra/railway/deploy-railway.sh.
+
+D-36: secret-exposure-prevention guardrails complete and, as of this
+  closeout, deployed and live-verified behaviorally on both platforms
+  (Section 5 above). SSM migration for AWS remains blocked by the D-23
+  IAM ceiling - exact policy JSON and console steps reported, not
+  worked around.
+
+=== 7. OPEN BY DECISION (restated, not re-litigated) ===
+
+D-13: historical register row (negative affected_records -> 500,
+  pre-dating the actual fix). Read-only per instruction at the time it
+  was found; a cross-reference to D-29 (where the fix was eventually
+  carried out) already exists in that row. Not rewritten - rewriting a
+  historical claim would falsify the record.
+
+D-23: `aivar-deploy`'s IAM ceiling - can create/push Lambda images but
+  cannot update-function-code, get-function-configuration, or manage
+  IAM/SSM. Environmental, documented, workaround (console deploy + /v1/version
+  re-check) used successfully throughout this project, including D-35's
+  fourth recurrence and this closeout's own deploy round.
+
+D-30: process finding, not a code defect - parallel forks writing to a
+  shared live DB during the original final defect sweep produced
+  attribution confusion. No code fix; the lesson (writes go through one
+  sequential session, reads can parallelize) has been followed
+  consistently since, including in this closeout's own sequential
+  fuzz/parity sweeps.
+
+L-D: calibration input is observational (approval/rejection outcomes),
+  not ground truth on whether an action was actually safe. A deliberate
+  design property of the shadow-mode calibration feature, not a defect -
+  restated, not re-litigated.
+
+2A/2B/2C (uncertainty_score/llm_confidence_raw persistence, TTL env-var
+  configurability, floor counterfactual explanations): implemented and
+  locally verified before this closeout pass began; further live-
+  verification-specific effort on them was deliberately deferred while
+  D-34's BLOCKING crashes took priority ("a crash outranks a column
+  name"). All three ARE deployed as of this commit (git history is
+  linear - the D-34/D-36 commits sit on top of 2A/2B/2C, not separate
+  from them) and 2A is now indirectly live-confirmed by this closeout's
+  own parity table (Section 2: uncertainty_score/llm_confidence_raw
+  present in all 24 live responses). 2B/2C have no live-specific
+  behavioral test in this closeout beyond what full-suite pytest already
+  covers - not exhaustively re-verified live, stated honestly rather
+  than assumed.
+
+=== NOT EXHAUSTIVELY CHECKED ===
+
+- 2B (TTL env-var configurability) and 2C (floor counterfactual
+  explanations): live-deployed, full-suite tested, but not independently
+  re-verified against the live deployments in this closeout pass beyond
+  what the parity/fuzz sweeps incidentally exercise.
+- AWS SSM migration: not attempted beyond confirming the IAM blocker -
+  no code written for the boto3 resolution path, since Part 3 was gated
+  on Part 2 and then explicitly stopped rather than worked around.
+- The D-34/D-36 redaction-filter live proof relied on a genuine
+  APITimeoutError occurring under real network conditions - reproducible
+  on demand (confirmed on both platforms), but not deterministic; a
+  different, guaranteed-degradation code path was not identified or
+  built.
+
+=== FINAL VERDICT ===
+
+Verified: both deployments run the identical commit (full-length SHA
+match, first time in this project), fuzz-clean (186/186), tier-parity-
+matched on all three canonical scenarios with stable floor_name, D-34's
+crash fix holds live (both rounds), D-36's redaction filter holds live
+by direct behavioral proof (not SHA inference) on both platforms,
+records_checked reconciled (789/789), NFC/NFD hash parity holds.
+
+Open by decision: D-13, D-23, D-30, L-D, and the live-specific
+verification depth of 2B/2C (2A is now live-confirmed via this
+closeout's own parity data) - documented above, not silently dropped.
+
+Not exhaustively checked: AWS SSM migration (blocked, not attempted
+further), full live-behavioral coverage of 2B/2C beyond incidental test
+exercise, and determinism of the redaction-filter trigger path.
+
+This is not "error free" - it is verified against everything this
+closeout pass actually checked, with what wasn't checked stated
+explicitly above.
