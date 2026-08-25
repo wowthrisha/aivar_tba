@@ -170,6 +170,16 @@ def render_result(action: dict, affected_records: int) -> None:
             )
         console.print(f"                                              composite  {composite:.3f}")
 
+        stability = action.get("stability")
+        if stability is not None:
+            if stability["stability"] == "TIER_INVARIANT":
+                console.print("            stability      TIER_INVARIANT — same tier at any confidence")
+            else:
+                console.print(
+                    f"            stability      CONFIDENCE_BOUND — flips below "
+                    f"llm_confidence {stability['flips_below']:.2f}"
+                )
+
         if floor_name is None and "Would have been" in explanation:
             idx = explanation.find("Would have been")
             console.print()

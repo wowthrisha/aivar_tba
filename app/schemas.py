@@ -152,6 +152,15 @@ class EvaluateRequest(BaseModel):
         return self
 
 
+class StabilityInfo(BaseModel):
+    """FEATURE C (intelligence-v6): would this decision have gone the
+    other way at a different llm_confidence? Additive, never changes the
+    real tier - see app/risk/stability.py."""
+
+    stability: str  # "TIER_INVARIANT" | "CONFIDENCE_BOUND"
+    flips_below: float | None
+
+
 class CalibrationInfo(BaseModel):
     """BONUS: shadow/enforce-mode calibration info on one evaluate response."""
 
@@ -217,6 +226,9 @@ class ActionResponse(BaseModel):
     # BONUS (adaptive calibration): only populated when CALIBRATION_MODE
     # is shadow/enforce - omitted entirely in "off" mode.
     calibration: CalibrationInfo | None = None
+    # FEATURE C: only populated by evaluate() - not persisted, same
+    # pattern as `precedent`/`floors_fired` above.
+    stability: StabilityInfo | None = None
 
 
 class CalibrationActionTypeStats(BaseModel):

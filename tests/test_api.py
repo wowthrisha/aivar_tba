@@ -172,6 +172,38 @@ def test_evaluate_response_includes_factor_scores_matching_persisted_assessment(
     assert fetched["floor_name"] == body["floor_name"]
 
 
+def test_evaluate_response_reports_tier_invariant_stability(client):
+    # FEATURE C: default body (irreversible, 500 records) always fires
+    # irreversible_bulk regardless of llm_confidence - tier is invariant.
+    resp = _evaluate(client)
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["stability"]["stability"] == "TIER_INVARIANT"
+    assert body["stability"]["flips_below"] is None
+
+
+def test_evaluate_response_reports_confidence_bound_stability_and_does_not_change_tier(client):
+    # FEATURE C: update_with_snapshot/1 record/none isn't in any FULL_
+    # REVIEW-tier floor; low_confidence_on_mutation (CONFIRM) fires only
+    # below 0.5, and the weighted composite never reaches 0.30 at
+    # llm_confidence >= 0.5 - a clean floor-driven flip at exactly 0.5.
+    # client fixture's _FakeProvider(0.95) means the REAL tier here is
+    # AUTONOMOUS; the additive stability field must not have changed that.
+    resp = _evaluate(
+        client,
+        action_type="update",
+        params={"resource_id": 1, "fields": {"x": 1}},
+        reversibility="update_with_snapshot",
+        affected_records=1,
+        regulatory="none",
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["tier"] == "AUTONOMOUS"
+    assert body["stability"]["stability"] == "CONFIDENCE_BOUND"
+    assert 0.495 <= body["stability"]["flips_below"] <= 0.505
+
+
 def test_get_action_returns_current_state(client):
     created = _evaluate(client).json()
     resp = client.get(f"/v1/actions/{created['id']}")

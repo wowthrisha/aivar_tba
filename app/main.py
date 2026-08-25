@@ -32,6 +32,7 @@ from app.oversight import DecisionEvent, OversightResponse, compute_reviewer_met
 from app.risk.confidence import structural_completeness, two_signal_confidence
 from app.risk.decision import compose_final_decision
 from app.risk.scorer import score_action
+from app.risk.stability import compute_stability
 from app.schemas import (
     ActionResponse,
     AuditRecordResponse,
@@ -44,6 +45,7 @@ from app.schemas import (
     EvaluateRequest,
     ExecuteRequest,
     KeyDependencyVersions,
+    StabilityInfo,
     VersionResponse,
 )
 from app.state_machine import ActionState, transition
@@ -299,7 +301,7 @@ async def readyz(
 
 
 def _to_action_response(
-    record, precedent=None, calibration=None, floors_fired=None, llm_confidence_raw=None
+    record, precedent=None, calibration=None, floors_fired=None, llm_confidence_raw=None, stability=None
 ) -> ActionResponse:
     return ActionResponse(
         id=record.id,
@@ -324,6 +326,7 @@ def _to_action_response(
         floor_name=record.floor_name,
         floors_fired=floors_fired,
         calibration=calibration,
+        stability=stability,
     )
 
 
@@ -416,6 +419,25 @@ async def evaluate(
     final_floor_name = decision.floor_name
     final_floors_fired: list[str] = list(decision.floors_fired)
 
+    # FEATURE C: deterministic, no LLM calls - re-derives the tier at
+    # every 0.05 step of llm_confidence with everything else held fixed,
+    # purely to characterize how close this decision was to flipping.
+    # Never influences final_tier/final_composite above.
+    stability_result = compute_stability(
+        body.reversibility,
+        body.affected_records,
+        body.regulatory,
+        structural,
+        calibration_mode=calibration_mode,
+        calibration_adjustment=calibration_adjustment,
+        calibration_degraded=cal_degraded,
+        novelty_should_escalate=novelty_should_escalate,
+        novelty_prior_count=novelty_prior_count,
+    )
+    stability_info = StabilityInfo(
+        stability=stability_result.stability, flips_below=stability_result.flips_below
+    )
+
     calibration_info = None
     if calibration_mode != "off":
         calibration_info = CalibrationInfo(
@@ -491,6 +513,9 @@ async def evaluate(
             "explanation": final_explanation,
             "llm_degraded": llm_result.degraded,
             "embedding_degraded": embedding is None,
+            # FEATURE C: additive - see stability_result comment above.
+            "stability": stability_result.stability,
+            "flips_below": stability_result.flips_below,
         },
     )
 
@@ -500,6 +525,7 @@ async def evaluate(
         calibration=calibration_info,
         floors_fired=final_floors_fired,
         llm_confidence_raw=llm_result.confidence,
+        stability=stability_info,
     )
 
 
