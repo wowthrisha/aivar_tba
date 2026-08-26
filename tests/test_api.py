@@ -391,7 +391,16 @@ class _FakeExplanationProvider:
         return result
 
 
-def test_explain_endpoint_grounds_only_in_the_structured_record(client):
+def test_explain_receives_only_the_structured_record(client):
+    # NOTE (intelligence-v6 assessment, D-37 turn): this test verifies
+    # INPUT SCOPE - what data crosses the endpoint -> provider boundary -
+    # not GROUNDING as a model behavior. _FakeExplanationProvider is not
+    # an LLM: it returns a fixed string regardless of input and has no
+    # capacity to invent facts, so nothing here (or anywhere in this
+    # suite) exercises whether a real model, given permitted input,
+    # refrains from inventing beyond it. See L-K in
+    # governance/plan/03-errors-and-fixes.md for what that would require
+    # and why it isn't done here.
     from app.main import get_explanation_provider
 
     created = _evaluate(client, resource="secret-resource-xyz").json()
