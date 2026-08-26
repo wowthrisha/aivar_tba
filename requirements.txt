@@ -48,3 +48,16 @@ rich==14.2.0
 python-dotenv==1.2.2
 pytest==8.3.0
 pytest-asyncio==0.24.0
+# D-37/intelligence-v6: app/mcp_server.py's MCP SDK. Originally kept out
+# of this file and installed into a separate .venv-mcp on the theory
+# that mcp and fastapi==0.115.0 could not coexist in one environment -
+# that theory was false (resolver-ordering artifact: installing mcp[cli]
+# ALONE first lets pip pick the newest mutually-satisfying starlette,
+# 1.6.0, which IS incompatible with fastapi's <0.39.0 ceiling; installing
+# both together in one resolve correctly settles on starlette==0.38.6,
+# verified fresh from a clean venv - `pip install -r requirements.txt
+# "mcp[cli]"` in one call, `from app.main import app` and
+# `from mcp.server import MCPServer` both import in the same process,
+# full suite green). httpx is mcp[cli]'s own transitive dependency
+# (app/mcp_server.py imports it directly too) - not listed separately.
+mcp[cli]==2.1.1

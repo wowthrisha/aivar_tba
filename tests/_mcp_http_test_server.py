@@ -1,18 +1,23 @@
-"""Runs app.main:app on a local port with the SAME fakes
-tests/test_api.py uses (no live DB, no live OpenAI) - started by the
-MAIN project venv (which has fastapi/sqlalchemy but not `mcp`), as a
-subprocess, so tests_mcp/ (run from the ISOLATED .venv-mcp, which has
-`mcp` but not fastapi/starlette-compatible) has a real HTTP server to
-call. See app/mcp_server.py's module docstring for why these two venvs
-cannot be the same process.
+"""Runs app.main:app on a local port with the SAME fakes tests/test_api.py
+uses (no live DB, no live OpenAI), as a subprocess of the same
+interpreter running the tests - so tests/test_mcp_server.py has a real
+HTTP server to call. Named with a leading underscore, not `test_*`, so
+pytest's default collection does not pick this up as a test module.
 
-Usage: python3 scripts/mcp/_test_server.py <port>
+D-37: this subprocess split remains for a good reason even now that mcp
+and fastapi coexist in one venv (see requirements.txt's own comment) -
+it's a REAL local HTTP server, exercising the exact propose/commit
+boundary a real MCP client would see over a real socket, not an
+in-process ASGI shortcut. It is NOT a workaround for a dependency
+conflict; that conflict never existed.
+
+Usage: python3 tests/_mcp_http_test_server.py <port>
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import uvicorn
 

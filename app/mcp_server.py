@@ -15,22 +15,29 @@ ARCHITECTURE NOTE: this module does NOT import app.main or anything
 under app/risk/ - it is a thin HTTP client over the same REST API any
 other caller uses (GOVERNANCE_API_BASE_URL, default the deployed
 Railway URL, same convention as cli.py's DEFAULT_BASE_URL). This is a
-deliberate, environment-forced design choice, not a stylistic one:
-the `mcp` package (both the v2 and legacy v1.x lines, both attempted)
-pulls in a starlette major version incompatible with this project's
-pinned fastapi==0.115.0 (`Router.__init__() got an unexpected keyword
-argument 'on_startup'` - confirmed by direct reproduction, twice, per
-S6). Rather than upgrading a pinned, documented dependency mid-pass
-(out of scope, and exactly the kind of scope change E-6 says to stop
-and report rather than force through), the MCP server runs as a
-separate process/venv that talks to the governance API exactly the way
-any other MCP-compatible agent would - which also means the
-propose/commit boundary and the binding-verdict semantics below are
-enforced by the REAL API, not reimplemented here.
+deliberate design choice on its own merits - it exercises the exact
+propose/commit boundary a real external MCP client would see over a
+real socket, and the binding-verdict semantics below are enforced by
+the REAL API, not reimplemented here - NOT a workaround for a
+dependency conflict.
 
-Run: see scripts/mcp/requirements.txt for the isolated venv this needs
-(mcp[cli] + httpx - deliberately NOT this project's requirements.txt).
-README.md documents the Claude Desktop config.
+D-37: an earlier version of this docstring claimed mcp and this
+project's pinned fastapi==0.115.0 could not coexist in one process/venv,
+"confirmed by direct reproduction, twice," and shipped a whole separate
+.venv-mcp/scripts/mcp/tests_mcp/ split on that premise - which excluded
+this feature's tests from CI entirely (testpaths=["tests"] never saw
+tests_mcp/). That claim was false. Both "reproductions" ran
+`pip install "mcp[cli]"` ALONE first, with no fastapi constraint in that
+same resolve, so pip freely picked the newest mutually-satisfying
+starlette (1.6.0) - which IS incompatible with fastapi's <0.39.0
+ceiling. Installing mcp[cli] and this project's requirements.txt
+TOGETHER, in one resolve (now how it ships - see requirements.txt's own
+comment on the mcp[cli] pin), correctly settles on starlette==0.38.6:
+verified fresh from a clean venv, `from app.main import app` and
+`from mcp.server import MCPServer` both import in the same process, and
+this project's full test suite (including tests/test_mcp_server.py,
+formerly tests_mcp/) passes green. mcp is a normal dependency now - see
+requirements.txt. README.md documents the Claude Desktop config.
 """
 
 import os

@@ -1,11 +1,8 @@
-"""FEATURE A tests — run from the ISOLATED .venv-mcp venv, NOT part of
-the main `pytest -q` suite (the main project venv does not have `mcp`
-installed, and cannot: see app/mcp_server.py's module docstring for why
-`mcp` and fastapi==0.115.0 cannot coexist in one process).
-
-Run:
-    source .venv-mcp/bin/activate
-    MAIN_VENV_PYTHON=/path/to/main/python3 python3 -m pytest tests_mcp/ -v
+"""FEATURE A tests. Part of the main `pytest -q` suite (D-37: mcp and
+fastapi==0.115.0 coexist fine in one venv - see requirements.txt's own
+comment on the `mcp[cli]` pin; there was never a real dependency
+conflict, only a resolver-ordering mistake in how this was first
+installed).
 
 A4: each tool returns a valid response; evaluate_action via MCP returns
 the SAME tier as the HTTP endpoint for identical input (the important
@@ -15,18 +12,13 @@ test).
 import os
 import socket
 import subprocess
+import sys
 import time
 
 import httpx
 import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Must be a Python with THIS project's requirements.txt installed (fastapi,
-# sqlalchemy, etc.) - NOT this venv's own interpreter, which deliberately
-# lacks those (see app/mcp_server.py's module docstring). No portable way
-# to discover "the other venv" from here, so this defaults to the base
-# interpreter this project has been developed against and is overridable.
-MAIN_VENV_PYTHON = os.environ.get("MAIN_VENV_PYTHON", "/Users/thrisha/miniconda3/bin/python3")
 
 
 def _free_port() -> int:
@@ -39,7 +31,7 @@ def _free_port() -> int:
 def server_url():
     port = _free_port()
     proc = subprocess.Popen(
-        [MAIN_VENV_PYTHON, os.path.join(REPO_ROOT, "scripts", "mcp", "_test_server.py"), str(port)],
+        [sys.executable, os.path.join(REPO_ROOT, "tests", "_mcp_http_test_server.py"), str(port)],
         cwd=REPO_ROOT,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -56,7 +48,7 @@ def server_url():
             time.sleep(0.2)
         else:
             proc.terminate()
-            raise RuntimeError(f"test server on {url} did not become ready (using {MAIN_VENV_PYTHON})")
+            raise RuntimeError(f"test server on {url} did not become ready")
         yield url
     finally:
         proc.terminate()

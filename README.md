@@ -623,23 +623,23 @@ but never executes — the propose/commit boundary is absolute):
 | `get_review_status` | `GET /v1/actions/{id}` | Current state/tier/composite/explanation of a previously-proposed action. |
 | `list_pending` | `GET /v1/actions/pending?agent_id=` | The caller's own non-terminal actions. |
 
-**Why a separate venv.** The `mcp` package (both its v2 line and the
-legacy v1.x line — both tried) pulls in a starlette major version
-incompatible with this project's pinned `fastapi==0.115.0`, confirmed
-by direct reproduction (`TypeError: Router.__init__() got an
-unexpected keyword argument 'on_startup'` when both are installed in
-one environment and `app.main` is imported). Rather than upgrading a
-pinned, documented dependency mid-pass, `app/mcp_server.py` runs as a
-thin HTTP client over the same REST API any other MCP-compatible agent
-would use — no import of `app.main` or anything under `app/risk/`. See
-`scripts/mcp/requirements.txt` and the module's own docstring.
+**Why a thin HTTP client, not an in-process import.** `app/mcp_server.py`
+does not import `app.main` or anything under `app/risk/` — it calls the
+same REST API any other MCP-compatible agent would use
+(`GOVERNANCE_API_BASE_URL`, default the deployed Railway URL). This is
+a design choice on its own merits (it exercises the real propose/commit
+boundary over a real socket, the way an external caller actually would),
+not a dependency workaround — `mcp` is a normal entry in
+`requirements.txt` and installs alongside this project's pinned
+`fastapi==0.115.0` in one resolve with no conflict (see D-37 in
+`governance/evidence/intelligence-v6-report.md` and the comment on the
+`mcp[cli]` pin in `requirements.txt` — an earlier version of this
+section claimed otherwise, and was wrong).
 
 **Setup:**
 
 ```bash
-python3 -m venv .venv-mcp
-source .venv-mcp/bin/activate
-pip install -r scripts/mcp/requirements.txt
+pip install -r requirements.txt
 GOVERNANCE_API_BASE_URL=https://aivartba-production.up.railway.app \
   python3 app/mcp_server.py   # stdio transport
 ```
@@ -654,7 +654,7 @@ Add custom connector instead):
 {
   "mcpServers": {
     "ps91-governance": {
-      "command": "/absolute/path/to/aivar_tba/.venv-mcp/bin/python3",
+      "command": "/absolute/path/to/aivar_tba/venv/bin/python3",
       "args": ["/absolute/path/to/aivar_tba/app/mcp_server.py"],
       "env": {
         "GOVERNANCE_API_BASE_URL": "https://aivartba-production.up.railway.app"
@@ -664,16 +664,10 @@ Add custom connector instead):
 }
 ```
 
-**Tests** live in `tests_mcp/` (not part of the main `pytest -q` suite —
-the main venv doesn't have `mcp` installed, and can't, per the
-starlette conflict above):
-
-```bash
-source .venv-mcp/bin/activate
-MAIN_VENV_PYTHON=/path/to/main/python3 python3 -m pytest tests_mcp/ -v
-```
-
-The key test, `test_evaluate_action_matches_http_endpoint_for_identical_input`,
-spins up the real FastAPI app (via the main venv, as a subprocess) and
-asserts the MCP tool call and a direct HTTP call return the same tier
-for identical input.
+**Tests** live in `tests/test_mcp_server.py`, part of the main
+`pytest -q` suite and CI (`.github/workflows/tests.yml`) — no separate
+venv or invocation needed. The key test,
+`test_evaluate_action_matches_http_endpoint_for_identical_input`, spins
+up the real FastAPI app as a subprocess (`tests/_mcp_http_test_server.py`)
+and asserts the MCP tool call and a direct HTTP call return the same
+tier for identical input.
