@@ -151,6 +151,26 @@ though the absolute millisecond figures above should not be read as
 costs *something* non-trivial, on top of whatever the DB round-trip
 baseline already is, wherever this runs."
 
+**Decomposed, post-merge-assessment**: the combined delta above lumps
+two different costs together — the Feature C stability sweep (pure
+computation, runs unconditionally regardless of any flag) and the
+Feature B session read model (one DB query, gated by
+`SESSION_FLOOR_MODE`). Measured separately, 20 calls each, local:
+```
+(a) baseline off              n=20  p50=10500.60ms  p95=12478.40ms  mean=10673.14ms
+(b) stability sweep alone     n=20  p50=    0.36ms  p95=    0.61ms  mean=    0.37ms
+(c) session read model alone  n=20  p50= 2059.12ms  p95= 2299.06ms  mean= 2068.50ms
+```
+**(c) dominates.** The stability sweep is exactly as cheap as pure
+21-point computation with no I/O should be (sub-millisecond) — checked
+because it runs unconditionally on every `evaluate()` call today with
+no flag at all, and it is not a problem: no finding there. The session
+read model's DB query alone (~2.06s p50 in isolation) accounts for
+essentially the entire combined `off`→`shadow` delta (~2.4s p50) —
+confirming the fix (making it opt-in) targeted the right thing, and
+that the stability sweep does not also need a flag. Logged as **L-L**
+in `governance/plan/03-errors-and-fixes.md`'s LEFT OUT section.
+
 ### Correction 3 — Feature E's "grounding" test renamed to match what it tests
 
 `test_explain_endpoint_grounds_only_in_the_structured_record` →
@@ -183,6 +203,40 @@ at their (now-corrected) defaults — `SESSION_FLOOR_MODE=off`,
 clean-v4: 1408 rows | HEAD: 1408 rows
 DIFFERENCES: 0
 ```
+
+## Benchmark test-data cleanup (live shared Neon DB)
+
+Both latency benchmarks (Correction 2's combined measurement and its
+decomposition above) ran against the real, shared Neon database Railway
+and Lambda both read from, writing real `bench-fix2-*`/`bench-decomp-*`
+tagged rows. Cleaned up after the decomposition benchmark completed —
+**read-only investigation first**, per the explicit constraint: never
+break the audit hash chain to clean up test data, and stop and report
+if deleting would.
+
+Investigation found the 78 bench-tagged `audit_records` rows formed a
+**contiguous block at the exact tail of the chain** (indices 805–882 of
+883 total, re-verified a second time inside the same transaction as the
+delete, under the same advisory lock `SQLAlchemyAuditLog.append()`
+uses, to close the race window) — nothing legitimate was written after
+them. Deleting a clean tail cannot break any *remaining* record's
+`prev_hash` chain (hash chains only reference what came before, never
+what comes after), so this was safe, unlike deleting from the middle or
+interspersed rows would have been.
+
+Deleted in FK-safe order (`approvals` → `risk_assessments` →
+`audit_records` tail → `actions`):
+```
+BEFORE: actions=80  risk_assessments=79  approvals=0  audit_records(bench)=78  audit_records(total)=883
+AFTER:  actions=0   risk_assessments=0                audit_records(bench)=0   audit_records(total)=805
+```
+`GET /v1/audit/verify` on both live deployments afterward:
+```
+Railway: {"valid":true,"records_checked":805,"first_invalid_id":null}
+Lambda:  {"valid":true,"records_checked":805,"first_invalid_id":null}
+```
+Both agree with each other and with the post-delete count, confirming
+the shared DB and an intact chain on both.
 
 ## What needs you
 

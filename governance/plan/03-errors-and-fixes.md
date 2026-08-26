@@ -262,6 +262,25 @@ what was not done, never substitute silently.
   incomplete structured record — assert the fixture's own recorded
   output invents nothing absent from that record, then replay it in
   tests instead of live-calling on every run.
+- **L-L** `SESSION_FLOOR_MODE=shadow` costs roughly 20-25% more than
+  `off` on local benchmarks (`off` p50 11.28s → `shadow` p50 13.66s,
+  p95 13.44s → 15.24s — absolute figures inflated by slow local/Neon
+  connectivity this session, ~10-11s baseline for a single `evaluate()`
+  call; the *relative* cost is real, see the intelligence-v6 report).
+  Decomposed into its two components, measured separately (20 calls
+  each, local): the Feature C stability sweep alone is genuinely
+  sub-millisecond (p50 0.36ms, p95 0.61ms — pure computation, no I/O,
+  confirmed cheap, NOT a finding of concern despite running
+  unconditionally on every `evaluate()` call regardless of any flag) —
+  the session read model's DB query alone accounts for essentially all
+  of it (p50 2.06s, p95 2.30s in isolation, ~86% of the combined
+  `off`→`shadow` delta). Default is `"off"` (fixed post-assessment, see
+  the commit changing `SESSION_FLOOR_MODE`'s default) so nothing pays
+  this cost today. Enabling shadow in production requires accepting
+  that cost knowingly. Production approach: batch or cache the session
+  read model (it does one full DB round-trip per `evaluate()` call when
+  enabled); the stability sweep needs no such treatment — it was
+  checked and is not the problem.
 - No application logic in T-04 (scaffold only, per task spec).
 - ~~`requirements.txt` dependency versions left unpinned — pinning exact
   versions now would be guessing; to be finalized when feature code lands
