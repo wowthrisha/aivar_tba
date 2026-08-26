@@ -1,12 +1,18 @@
 """FEATURE B3 (intelligence-v6) — session floor, SHADOW MODE ONLY.
 
 Same discipline as app/calibration.py (S5): computed, reported, audited,
-NEVER applied to a real tier. SESSION_FLOOR_MODE defaults to "shadow" -
-matching CALIBRATION_MODE's own precedent in this codebase, not S5's
-generic "off" wording, per B3's own explicit spec. There is no "enforce"
-mode in this pass - only "off" and "shadow" are valid; anything else
-(including "enforce") falls back to "off", the same fail-safe pattern
-get_calibration_mode() already uses for an unrecognized value.
+NEVER applied to a real tier. SESSION_FLOOR_MODE defaults to "off" -
+matching S5's own instruction ("behind an env flag defaulting off"),
+corrected from an earlier default of "shadow" (which had been justified
+by analogy to CALIBRATION_MODE's precedent, but that analogy doesn't
+hold: unlike calibration, shadow-mode here isn't free even when it
+changes nothing - every evaluate() call was paying a DB round-trip
+(list_session_actions) plus a full session-stats aggregation with no
+flag set at all, unconditionally, before this fix). Shadow mode is now
+strictly opt-in. There is no "enforce" mode in this pass - only "off"
+and "shadow" are valid; anything else (including "enforce") falls back
+to "off", the same fail-safe pattern get_calibration_mode() already
+uses for an unrecognized value.
 
 New file - does not import or modify app/risk/scorer.py, floors.py,
 tiers.py, router.py, or decision.py.
@@ -26,7 +32,7 @@ SESSION_FRAGMENTATION_SIMILARITY_THRESHOLD = 0.90
 
 
 def get_session_floor_mode() -> str:
-    raw = os.environ.get("SESSION_FLOOR_MODE", "shadow").strip().lower()
+    raw = os.environ.get("SESSION_FLOOR_MODE", "off").strip().lower()
     return raw if raw in VALID_MODES else "off"
 
 

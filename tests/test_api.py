@@ -205,11 +205,22 @@ def test_evaluate_response_reports_confidence_bound_stability_and_does_not_chang
     assert 0.495 <= body["stability"]["flips_below"] <= 0.505
 
 
-def test_evaluate_response_includes_session_floor_and_does_not_change_tier(client):
-    # FEATURE B3: default SESSION_FLOOR_MODE=shadow means every evaluate()
-    # response carries a session_floor block; a single read-only action is
-    # far under every threshold, so would_fire is False and applied is
-    # always False (shadow never applies).
+def test_evaluate_response_session_floor_is_absent_by_default(client):
+    # SESSION_FLOOR_MODE defaults to "off" (fixed post-assessment: shadow
+    # mode is not free - every evaluate() call was paying a DB round-trip
+    # plus a full session-stats aggregation with no flag set at all).
+    # No env var set here - this IS the out-of-the-box default.
+    resp = _evaluate(client, action_type="read", params={}, reversibility="read", affected_records=1)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["session_floor"] is None
+
+
+def test_evaluate_response_includes_session_floor_and_does_not_change_tier(client, monkeypatch):
+    # FEATURE B3, opt-in: with SESSION_FLOOR_MODE=shadow explicitly set,
+    # every evaluate() response carries a session_floor block; a single
+    # read-only action is far under every threshold, so would_fire is
+    # False and applied is always False (shadow never applies).
+    monkeypatch.setenv("SESSION_FLOOR_MODE", "shadow")
     resp = _evaluate(
         client,
         action_type="read",
@@ -225,12 +236,14 @@ def test_evaluate_response_includes_session_floor_and_does_not_change_tier(clien
     assert body["session_floor"]["applied"] is False
 
 
-def test_evaluate_response_reports_session_floor_would_fire_without_changing_tier(client):
-    # FEATURE B3/B4 (critical): 20 mutating actions by the same agent in
-    # one window crosses SESSION_MUTATION_COUNT_THRESHOLD - the 20th
-    # call's session_floor must report would_fire=True, applied=False,
-    # and its OWN tier must be exactly what a standalone evaluation of
-    # the same input would produce (shadow never changes a tier).
+def test_evaluate_response_reports_session_floor_would_fire_without_changing_tier(client, monkeypatch):
+    # FEATURE B3/B4 (critical), opt-in via SESSION_FLOOR_MODE=shadow: 20
+    # mutating actions by the same agent in one window crosses
+    # SESSION_MUTATION_COUNT_THRESHOLD - the 20th call's session_floor
+    # must report would_fire=True, applied=False, and its OWN tier must
+    # be exactly what a standalone evaluation of the same input would
+    # produce (shadow never changes a tier).
+    monkeypatch.setenv("SESSION_FLOOR_MODE", "shadow")
     last_body = None
     for i in range(20):
         last_body = _evaluate(
@@ -263,7 +276,16 @@ def test_evaluate_response_reports_session_floor_would_fire_without_changing_tie
     assert last_body["composite"] == isolated["composite"]
 
 
-def test_session_stats_endpoint_aggregates_recent_actions(client):
+def test_session_stats_endpoint_session_floor_is_absent_by_default(client):
+    _evaluate(client, agent_id="agent-default-mode", resource="item/0", params={"resource_id": 0},
+              reversibility="irreversible", affected_records=1, regulatory="none")
+    resp = client.get("/v1/sessions/agent-default-mode?window=300")
+    assert resp.status_code == 200
+    assert resp.json()["session_floor"] is None
+
+
+def test_session_stats_endpoint_aggregates_recent_actions(client, monkeypatch):
+    monkeypatch.setenv("SESSION_FLOOR_MODE", "shadow")
     for i in range(3):
         _evaluate(
             client,
